@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, MessagesSquare, Users, Shield, Trophy } from 'lucide-react';
-import type { Guild, User, Boss, AuditLog } from '@/lib/definitions';
+import type { Clan, User, Boss, AuditLog } from '@/lib/definitions';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/contexts/UserContext';
@@ -25,7 +25,7 @@ interface MyGuildViewProps {
 
 export function MyGuildView({ guildId, onLeaveSuccess, onUpdate }: MyGuildViewProps) {
     const { user } = useUser();
-    const [guild, setGuild] = useState<(Guild & { members: Partial<User>[], owner: any }) | null>(null);
+    const [guild, setGuild] = useState<(Clan & { members: Partial<User>[], owner: any }) | null>(null);
     const [activeBoss, setActiveBoss] = useState<Boss | null>(null);
     const [timelineLogs, setTimelineLogs] = useState<AuditLog[]>([]);
     const [isLoading, setIsLoading] = useState(true);

@@ -20,12 +20,12 @@ const navLinks = [
 export function MainNav() {
     const isMobile = useIsMobile();
 
-    const mobileLinks = isMobile ? [
+    const mobileLinks = [
         { href: "/dashboard", label: "Início", iconName: "Home" },
         { href: "/dashboard/transacoes", label: "Transações", iconName: "ArrowLeftRight" },
         { href: "/dashboard/orcamentos", label: "Orçamentos", iconName: "Target" },
         { href: "/dashboard/servicos", label: "Serviços", iconName: "Grid3x3" },
-    ] : navLinks;
+    ];
 
     const NavComponent = isMobile 
         ? <BottomNavBar links={mobileLinks} /> 

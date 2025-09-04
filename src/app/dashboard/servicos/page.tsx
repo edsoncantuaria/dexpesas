@@ -17,7 +17,8 @@ import {
     BookText,
     GitCompareArrows,
     Tags,
-    Users
+    Users,
+    Swords
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
