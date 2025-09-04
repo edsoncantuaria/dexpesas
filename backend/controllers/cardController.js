@@ -1,4 +1,3 @@
-
 // src/controllers/cardController.js
 import { PrismaClient } from '@prisma/client';
 import { setDate, startOfDay, endOfDay } from 'date-fns';
@@ -305,5 +304,3 @@ class CardController {
 }
 
 export default new CardController();
-
-    

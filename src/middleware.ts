@@ -3,12 +3,6 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // ATENÇÃO: Lógica de autenticação desativada para depuração em ambiente de homologação.
-  // Permite o acesso direto às rotas protegidas sem redirecionamento.
-  // O backend AINDA validará o token para buscar dados.
-  return NextResponse.next();
-
-  /*
   const token = request.cookies.get('auth_token')?.value;
   const { pathname } = request.nextUrl;
 
@@ -31,7 +25,6 @@ export function middleware(request: NextRequest) {
   }
   
   return NextResponse.next();
-  */
 }
 
 // Define quais rotas serão interceptadas pelo middleware

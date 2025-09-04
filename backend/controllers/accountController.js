@@ -1,4 +1,3 @@
-
 // src/controllers/accountController.js
 import { PrismaClient } from '@prisma/client';
 import AuditService from '../services/auditService.js'; // Importa o serviço
@@ -262,5 +261,3 @@ class AccountController {
 }
 
 export default new AccountController();
-
-    
