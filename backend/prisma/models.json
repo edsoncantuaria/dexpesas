@@ -64,29 +64,29 @@
         "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
       },
       "relations": {
-        "clanMembership": { "type": "ClanMember", "optional": true, "relation": { "name": "ClanMembers" } },
-        "ownedClan": { "type": "Clan", "optional": true, "relation": { "name": "ClanOwner" } },
+        "clanMembership": { "type": "ClanMember", "optional": true },
+        "ownedClan": { "type": "Clan", "optional": true, "relation": { "name": "ClanLeader" } },
         "clanInvites": { "type": "ClanInvite", "isList": true, "relation": { "name": "UserInvites" } },
-        "sharedExpenseParticipations": { "type": "SharedExpenseParticipant", "isList": true, "relation": { "name": "UserSharedExpenses" } },
-        "createdSharedExpenses": { "type": "SharedExpense", "isList": true, "relation": { "name": "CreatedSharedExpenses" } },
-        "accounts": { "type": "Account", "isList": true, "relation": { "name": "UserAccounts" } },
-        "cards": { "type": "Card", "isList": true, "relation": { "name": "UserCards" } },
-        "transactions": { "type": "Transaction", "isList": true, "relation": { "name": "UserTransactions" } },
-        "unlockedAchievements": { "type": "UnlockedAchievement", "isList": true, "relation": { "name": "UserUnlockedAchievements" } },
-        "notifications": { "type": "Notification", "isList": true, "relation": { "name": "UserNotifications" } },
-        "budgets": { "type": "Budget", "isList": true, "relation": { "name": "UserBudgets" } },
-        "goals": { "type": "Goal", "isList": true, "relation": { "name": "UserGoals" } },
-        "automations": { "type": "Automation", "isList": true, "relation": { "name": "UserAutomations" } },
-        "categorizationRules": { "type": "CategorizationRule", "isList": true, "relation": { "name": "UserCategorizationRules" } },
-        "reconciliations": { "type": "Reconciliation", "isList": true, "relation": { "name": "UserReconciliations" } },
-        "importTemplates": { "type": "ImportTemplate", "isList": true, "relation": { "name": "UserImportTemplates" } },
-        "auditLogs": { "type": "AuditLog", "isList": true, "relation": { "name": "UserAuditLogs" } },
-        "aiAnalyses": { "type": "AiAnalysis", "isList": true, "relation": { "name": "UserAiAnalyses" } },
-        "tags": { "type": "Tag", "isList": true, "relation": { "name": "UserTags" } },
-        "userMissions": { "type": "UserMission", "isList": true, "relation": { "name": "UserMissions" } },
-        "inventoryItems": { "type": "UserItem", "isList": true, "relation": { "name": "UserInventory" } },
-        "streaks": { "type": "UserStreak", "isList": true, "relation": { "name": "UserStreaks" } },
-        "legacyRuins": { "type": "LegacyRuin", "isList": true, "relation": { "name": "UserLegacyRuins" } }
+        "sharedExpenseParticipations": { "type": "SharedExpenseParticipant", "isList": true },
+        "createdSharedExpenses": { "type": "SharedExpense", "isList": true, "relation": { "name": "ExpenseCreator" } },
+        "accounts": { "type": "Account", "isList": true },
+        "cards": { "type": "Card", "isList": true },
+        "transactions": { "type": "Transaction", "isList": true },
+        "unlockedAchievements": { "type": "UnlockedAchievement", "isList": true },
+        "notifications": { "type": "Notification", "isList": true },
+        "budgets": { "type": "Budget", "isList": true },
+        "goals": { "type": "Goal", "isList": true },
+        "automations": { "type": "Automation", "isList": true },
+        "categorizationRules": { "type": "CategorizationRule", "isList": true },
+        "reconciliations": { "type": "Reconciliation", "isList": true },
+        "importTemplates": { "type": "ImportTemplate", "isList": true },
+        "auditLogs": { "type": "AuditLog", "isList": true },
+        "aiAnalyses": { "type": "AiAnalysis", "isList": true },
+        "tags": { "type": "Tag", "isList": true },
+        "userMissions": { "type": "UserMission", "isList": true },
+        "inventoryItems": { "type": "UserItem", "isList": true },
+        "streaks": { "type": "UserStreak", "isList": true },
+        "legacyRuins": { "type": "LegacyRuin", "isList": true }
       }
     },
     "Clan": {
@@ -105,27 +105,27 @@
         "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
       },
       "relations": {
-        "leader": { "type": "User", "relation": { "name": "ClanOwner", "fields": ["leaderId"], "references": ["id"], "onDelete": "Restrict" } },
-        "members": { "type": "ClanMember", "isList": true, "relation": { "name": "ClanToMembers" } },
-        "invites": { "type": "ClanInvite", "isList": true, "relation": { "name": "ClanInvites" } },
-        "goals": { "type": "Goal", "isList": true, "relation": { "name": "ClanGoals" } },
-        "sharedExpenses": { "type": "SharedExpense", "isList": true, "relation": { "name": "ClanSharedExpenses" } }
+        "leader": { "type": "User", "relation": { "name": "ClanLeader", "fields": ["leaderId"], "references": ["id"], "onDelete": "Restrict" } },
+        "members": { "type": "ClanMember", "isList": true },
+        "invites": { "type": "ClanInvite", "isList": true },
+        "goals": { "type": "Goal", "isList": true },
+        "sharedExpenses": { "type": "SharedExpense", "isList": true }
       },
-      "map": "families"
+      "map": "clans"
     },
     "ClanMember": {
       "fields": {
-        "userId": { "type": "String", "attributes": ["@unique"] },
+        "userId": { "type": "String" },
         "clanId": { "type": "String" },
         "role": { "type": "ClanRole", "attributes": ["@default(MEMBER)"] },
         "joinedAt": { "type": "DateTime", "attributes": ["@default(now())"] }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "ClanMembers", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "user": { "type": "User", "relation": { "name": "UserToClan", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
         "clan": { "type": "Clan", "relation": { "name": "ClanToMembers", "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } }
       },
       "indices": [{ "fields": ["userId", "clanId"], "isId": true }],
-      "map": "family_members"
+      "map": "clan_members"
     },
     "ClanInvite": {
       "fields": {
@@ -138,11 +138,11 @@
         "expiresAt": { "type": "DateTime" }
       },
       "relations": {
-        "clan": { "type": "Clan", "relation": { "name": "ClanInvites", "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
+        "clan": { "type": "Clan", "relation": { "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
         "invitedUser": { "type": "User", "relation": { "name": "UserInvites", "fields": ["invitedUserId"], "references": ["id"], "onDelete": "Cascade" } }
       },
       "indices": [{ "fields": ["clanId", "invitedUserId"], "unique": true }],
-      "map": "family_invites"
+      "map": "clan_invites"
     },
     "SharedExpense": {
       "fields": {
@@ -156,10 +156,10 @@
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
       },
       "relations": {
-        "clan": { "type": "Clan", "relation": { "name": "ClanSharedExpenses", "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
-        "creator": { "type": "User", "relation": { "name": "CreatedSharedExpenses", "fields": ["creatorId"], "references": ["id"], "onDelete": "NoAction" } },
-        "category": { "type": "Category", "relation": { "name": "CategorySharedExpenses", "fields": ["categoryId"], "references": ["id"] } },
-        "participants": { "type": "SharedExpenseParticipant", "isList": true, "relation": { "name": "ExpenseParticipants" } }
+        "clan": { "type": "Clan", "relation": { "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
+        "creator": { "type": "User", "relation": { "name": "ExpenseCreator", "fields": ["creatorId"], "references": ["id"], "onDelete": "NoAction" } },
+        "category": { "type": "Category", "relation": { "fields": ["categoryId"], "references": ["id"] } },
+        "participants": { "type": "SharedExpenseParticipant", "isList": true }
       }
     },
     "SharedExpenseParticipant": {
@@ -171,9 +171,9 @@
         "createdTransactionId": { "type": "String", "attributes": ["@unique"] }
       },
       "relations": {
-        "sharedExpense": { "type": "SharedExpense", "relation": { "name": "ExpenseParticipants", "fields": ["sharedExpenseId"], "references": ["id"], "onDelete": "Cascade" } },
-        "user": { "type": "User", "relation": { "name": "UserSharedExpenses", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "transaction": { "type": "Transaction", "relation": { "name": "GeneratedTransaction", "fields": ["createdTransactionId"], "references": ["id"] } }
+        "sharedExpense": { "type": "SharedExpense", "relation": { "fields": ["sharedExpenseId"], "references": ["id"], "onDelete": "Cascade" } },
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "transaction": { "type": "Transaction", "relation": { "fields": ["createdTransactionId"], "references": ["id"] } }
       },
       "indices": [{ "fields": ["sharedExpenseId", "userId"], "unique": true }]
     },
@@ -189,7 +189,7 @@
         "originalRecurrenceId": { "type": "String", "attributes": ["@unique"] }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "UserLegacyRuins", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
       }
     },
     "UserStreak": {
@@ -202,7 +202,7 @@
             "lastCheckedAt": { "type": "DateTime" }
         },
         "relations": {
-            "user": { "type": "User", "relation": { "name": "UserStreaks", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
+            "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
         },
         "indices": [{ "fields": ["userId", "type"], "unique": true }]
     },
@@ -218,7 +218,7 @@
             "endAt": { "type": "DateTime" }
         },
         "relations": {
-            "item": { "type": "Item", "optional": true, "relation": { "name": "EventItem", "fields": ["itemId"], "references": ["id"], "onDelete": "SetNull" } }
+            "item": { "type": "Item", "optional": true, "relation": { "fields": ["itemId"], "references": ["id"], "onDelete": "SetNull" } }
         }
     },
     "Mission": {
@@ -237,7 +237,7 @@
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
       },
       "relations": {
-        "userMissions": { "type": "UserMission", "isList": true, "relation": { "name": "MissionProgress" } }
+        "userMissions": { "type": "UserMission", "isList": true }
       }
     },
     "UserItem": {
@@ -249,8 +249,8 @@
         "equipped": { "type": "Boolean", "attributes": ["@default(false)"] }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "UserInventory", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "item": { "type": "Item", "relation": { "name": "ItemInInventories", "fields": ["itemId"], "references": ["id"], "onDelete": "Cascade" } }
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "item": { "type": "Item", "relation": { "fields": ["itemId"], "references": ["id"], "onDelete": "Cascade" } }
       },
       "indices": [{ "fields": ["userId", "itemId"], "unique": true }]
     },
@@ -264,11 +264,11 @@
             "userId": { "type": "String" }
         },
         "relations": {
-            "user": { "type": "User", "relation": { "name": "UserAccounts", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+            "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
             "transactions": { "type": "Transaction", "isList": true, "relation": { "name": "AccountTransactions" } },
-            "reconciliations": { "type": "Reconciliation", "isList": true, "relation": { "name": "AccountReconciliations" } },
-            "goals": { "type": "Goal", "isList": true, "relation": { "name": "AccountGoals" } },
-            "cardsForPayment": { "type": "Card", "isList": true, "relation": { "name": "AccountCardPayments" } }
+            "reconciliations": { "type": "Reconciliation", "isList": true },
+            "goals": { "type": "Goal", "isList": true },
+            "cardsForPayment": { "type": "Card", "isList": true }
         }
     },
     "Card": {
@@ -288,10 +288,10 @@
             "paymentAccountId": { "type": "String", "optional": true }
         },
         "relations": {
-            "user": { "type": "User", "relation": { "name": "UserCards", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" }},
-            "paymentAccount": { "type": "Account", "optional": true, "relation": { "name": "AccountCardPayments", "fields": ["paymentAccountId"], "references": ["id"], "onDelete": "SetNull" }},
+            "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" }},
+            "paymentAccount": { "type": "Account", "optional": true, "relation": { "fields": ["paymentAccountId"], "references": ["id"], "onDelete": "SetNull" }},
             "transactions": { "type": "Transaction", "isList": true, "relation": { "name": "CardTransactions" } },
-            "reconciliations": { "type": "Reconciliation", "isList": true, "relation": { "name": "CardReconciliations" } }
+            "reconciliations": { "type": "Reconciliation", "isList": true }
         }
     },
     "Transaction": {
@@ -325,15 +325,15 @@
         "sharedExpenseParticipantId": { "type": "String", "optional": true, "attributes": ["@unique"] }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "UserTransactions", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
         "account": { "type": "Account", "optional": true, "relation": { "name": "AccountTransactions", "fields": ["accountId"], "references": ["id"], "onDelete": "Cascade" } },
         "card": { "type": "Card", "optional": true, "relation": { "name": "CardTransactions", "fields": ["cardId"], "references": ["id"], "onDelete": "Cascade" } },
-        "category": { "type": "Category", "optional": true, "relation": { "name": "CategoryTransactions", "fields": ["categoryId"], "references": ["id"], "onDelete": "SetNull" } },
-        "roundUpEntry": { "type": "RoundUpEntry", "optional": true, "relation": { "name": "TransactionRoundUp" } },
-        "importedTransaction": { "type": "ImportedTransaction", "optional": true, "relation": { "name": "ImportedToManualTransaction" } },
-        "goalContributions": { "type": "GoalContribution", "isList": true, "relation": { "name": "TransactionContributions" } },
-        "sharedExpenseParticipant": { "type": "SharedExpenseParticipant", "optional": true, "relation": { "name": "GeneratedTransaction" } },
-        "tags": { "type": "Tag", "isList": true, "relation": { "name": "TransactionTags" } }
+        "category": { "type": "Category", "optional": true, "relation": { "fields": ["categoryId"], "references": ["id"], "onDelete": "SetNull" } },
+        "roundUpEntry": { "type": "RoundUpEntry", "optional": true },
+        "importedTransaction": { "type": "ImportedTransaction", "optional": true, "relation": { "name": "ManualToImportedTransaction" } },
+        "goalContributions": { "type": "GoalContribution", "isList": true },
+        "sharedExpenseParticipant": { "type": "SharedExpenseParticipant", "optional": true, "relation": { "name": "GeneratedTransactionForParticipant" } },
+        "tags": { "type": "Tag", "isList": true }
       },
       "indices": [
         { "fields": ["recorrenciaId"] },
@@ -348,8 +348,8 @@
         "userId": { "type": "String" }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "UserTags", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "transactions": { "type": "Transaction", "isList": true, "relation": { "name": "TransactionTags" } }
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "transactions": { "type": "Transaction", "isList": true }
       },
       "indices": [{ "fields": ["userId", "name"], "unique": true }]
     },
@@ -362,10 +362,10 @@
             "type": { "type": "TransactionType", "attributes": ["@default(despesa)"] }
         },
         "relations": {
-            "transactions": { "type": "Transaction", "isList": true, "relation": { "name": "CategoryTransactions" } },
-            "budgets": { "type": "Budget", "isList": true, "relation": { "name": "CategoryBudgets" } },
-            "categorizationRules": { "type": "CategorizationRule", "isList": true, "relation": { "name": "CategoryRules" } },
-            "sharedExpenses": { "type": "SharedExpense", "isList": true, "relation": { "name": "CategorySharedExpenses" } }
+            "transactions": { "type": "Transaction", "isList": true },
+            "budgets": { "type": "Budget", "isList": true },
+            "categorizationRules": { "type": "CategorizationRule", "isList": true },
+            "sharedExpenses": { "type": "SharedExpense", "isList": true }
         }
     },
     "Budget": {
@@ -378,8 +378,8 @@
         "categoryId": { "type": "String" }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "UserBudgets", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "category": { "type": "Category", "relation": { "name": "CategoryBudgets", "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } }
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "category": { "type": "Category", "relation": { "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } }
       },
       "indices": [
         { "fields": ["userId", "month", "categoryId"], "unique": true },
@@ -401,10 +401,10 @@
         "clanId": { "type": "String", "optional": true }
       },
       "relations": {
-        "user": { "type": "User", "optional": true, "relation": { "name": "UserGoals", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "account": { "type": "Account", "optional": true, "relation": { "name": "AccountGoals", "fields": ["accountId"], "references": ["id"], "onDelete": "SetNull" } },
-        "clan": { "type": "Clan", "optional": true, "relation": { "name": "ClanGoals", "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
-        "contributions": { "type": "GoalContribution", "isList": true, "relation": { "name": "GoalContributions" } },
+        "user": { "type": "User", "optional": true, "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "account": { "type": "Account", "optional": true, "relation": { "fields": ["accountId"], "references": ["id"], "onDelete": "SetNull" } },
+        "clan": { "type": "Clan", "optional": true, "relation": { "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
+        "contributions": { "type": "GoalContribution", "isList": true },
         "automation": { "type": "Automation", "optional": true, "relation": { "name": "GoalAutomation" } }
       }
     },
@@ -417,8 +417,8 @@
         "debitTransactionId": { "type": "String", "optional": true, "attributes": ["@unique"] }
       },
       "relations": {
-        "goal": { "type": "Goal", "relation": { "name": "GoalContributions", "fields": ["goalId"], "references": ["id"], "onDelete": "Cascade" } },
-        "debitTransaction": { "type": "Transaction", "optional": true, "relation": { "name": "TransactionContributions", "fields": ["debitTransactionId"], "references": ["id"], "onDelete": "SetNull" } }
+        "goal": { "type": "Goal", "relation": { "fields": ["goalId"], "references": ["id"], "onDelete": "Cascade" } },
+        "debitTransaction": { "type": "Transaction", "optional": true, "relation": { "fields": ["debitTransactionId"], "references": ["id"], "onDelete": "SetNull" } }
       }
     },
     "Achievement": {
@@ -430,7 +430,7 @@
             "xp": { "type": "Int" }
         },
         "relations": {
-            "unlockedBy": { "type": "UnlockedAchievement", "isList": true, "relation": { "name": "AchievementUnlocks" } }
+            "unlockedBy": { "type": "UnlockedAchievement", "isList": true }
         }
     },
     "UnlockedAchievement": {
@@ -442,8 +442,8 @@
         "achievementId": { "type": "String" }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "UserUnlockedAchievements", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "achievement": { "type": "Achievement", "relation": { "name": "AchievementUnlocks", "fields": ["achievementId"], "references": ["id"], "onDelete": "Cascade" } }
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "achievement": { "type": "Achievement", "relation": { "fields": ["achievementId"], "references": ["id"], "onDelete": "Cascade" } }
       },
       "indices": [{ "fields": ["userId", "achievementId"], "unique": true }]
     },
@@ -460,7 +460,7 @@
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "UserNotifications", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
       }
     },
     "Automation": {
@@ -477,7 +477,7 @@
             "recorrenciaId": { "type": "String", "optional": true }
         },
         "relations": {
-            "user": { "type": "User", "relation": { "name": "UserAutomations", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+            "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
             "goal": { "type": "Goal", "optional": true, "relation": { "name": "GoalAutomation", "fields": ["goalId"], "references": ["id"], "onDelete": "Cascade" } }
         },
         "indices": [{ "fields": ["userId", "type", "recorrenciaId"], "unique": true }]
@@ -491,7 +491,7 @@
             "processedAt": { "type": "DateTime", "optional": true }
         },
         "relations": {
-            "transaction": { "type": "Transaction", "relation": { "name": "TransactionRoundUp", "fields": ["transactionId"], "references": ["id"], "onDelete": "Cascade" } }
+            "transaction": { "type": "Transaction", "relation": { "fields": ["transactionId"], "references": ["id"], "onDelete": "Cascade" } }
         }
     },
     "CategorizationRule": {
@@ -504,8 +504,8 @@
         "categoryId": { "type": "String" }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "UserCategorizationRules", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "category": { "type": "Category", "relation": { "name": "CategoryRules", "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } }
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "category": { "type": "Category", "relation": { "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } }
       }
     },
     "ImportTemplate": {
@@ -516,8 +516,8 @@
             "userId": { "type": "String" }
         },
         "relations": {
-            "user": { "type": "User", "relation": { "name": "UserImportTemplates", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" }},
-            "reconciliations": { "type": "Reconciliation", "isList": true, "relation": { "name": "TemplateReconciliations" } }
+            "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" }},
+            "reconciliations": { "type": "Reconciliation", "isList": true }
         }
     },
      "Reconciliation": {
@@ -537,11 +537,11 @@
             "importTemplateId": { "type": "String", "optional": true }
         },
         "relations": {
-            "user": { "type": "User", "relation": { "name": "UserReconciliations", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-            "account": { "type": "Account", "optional": true, "relation": { "name": "AccountReconciliations", "fields": ["accountId"], "references": ["id"], "onDelete": "Cascade" } },
-            "card": { "type": "Card", "optional": true, "relation": { "name": "CardReconciliations", "fields": ["cardId"], "references": ["id"], "onDelete": "Cascade" } },
-            "importedTransactions": { "type": "ImportedTransaction", "isList": true, "relation": { "name": "ReconciliationTransactions" } },
-            "importTemplate": { "type": "ImportTemplate", "optional": true, "relation": { "name": "TemplateReconciliations", "fields": ["importTemplateId"], "references": ["id"], "onDelete": "SetNull" } }
+            "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+            "account": { "type": "Account", "optional": true, "relation": { "fields": ["accountId"], "references": ["id"], "onDelete": "Cascade" } },
+            "card": { "type": "Card", "optional": true, "relation": { "fields": ["cardId"], "references": ["id"], "onDelete": "Cascade" } },
+            "importedTransactions": { "type": "ImportedTransaction", "isList": true },
+            "importTemplate": { "type": "ImportTemplate", "optional": true, "relation": { "fields": ["importTemplateId"], "references": ["id"], "onDelete": "SetNull" } }
         }
     },
     "ImportedTransaction": {
@@ -558,8 +558,8 @@
             "similarityScore": { "type": "Int", "optional": true }
         },
         "relations": {
-            "reconciliation": { "type": "Reconciliation", "relation": { "name": "ReconciliationTransactions", "fields": ["reconciliationId"], "references": ["id"], "onDelete": "Cascade" } },
-            "manualTransaction": { "type": "Transaction", "optional": true, "relation": { "name": "ImportedToManualTransaction", "fields": ["manualTransactionId"], "references": ["id"], "onDelete": "SetNull" } }
+            "reconciliation": { "type": "Reconciliation", "relation": { "fields": ["reconciliationId"], "references": ["id"], "onDelete": "Cascade" } },
+            "manualTransaction": { "type": "Transaction", "optional": true, "relation": { "name": "ManualToImportedTransaction", "fields": ["manualTransactionId"], "references": ["id"], "onDelete": "SetNull" } }
         }
     },
     "AuditLog": {
@@ -576,7 +576,7 @@
             "userId": { "type": "String" }
         },
         "relations": {
-            "user": { "type": "User", "relation": { "name": "UserAuditLogs", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
+            "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
         }
     },
     "AiAnalysis": {
@@ -589,7 +589,7 @@
             "userId": { "type": "String" }
         },
         "relations": {
-            "user": { "type": "User", "relation": { "name": "UserAiAnalyses", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
+            "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
         }
     },
     "UserMission": {
@@ -603,8 +603,8 @@
         "rewardClaimed": { "type": "Boolean", "attributes": ["@default(false)"] }
       },
       "relations": {
-        "user": { "type": "User", "relation": { "name": "UserMissions", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "mission": { "type": "Mission", "relation": { "name": "MissionProgress", "fields": ["missionId"], "references": ["id"], "onDelete": "Cascade" } }
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "mission": { "type": "Mission", "relation": { "fields": ["missionId"], "references": ["id"], "onDelete": "Cascade" } }
       },
       "indices": [{ "fields": ["userId", "missionId"], "unique": true }]
     },
@@ -619,8 +619,8 @@
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
       },
       "relations": {
-        "userItems": { "type": "UserItem", "isList": true, "relation": { "name": "ItemInInventories" } },
-        "gameEvents": { "type": "GameEvent", "isList": true, "relation": { "name": "EventItem" } }
+        "userItems": { "type": "UserItem", "isList": true },
+        "gameEvents": { "type": "GameEvent", "isList": true }
       }
     },
     "Boss": {

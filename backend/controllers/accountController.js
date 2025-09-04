@@ -1,3 +1,4 @@
+
 // src/controllers/accountController.js
 import { PrismaClient } from '@prisma/client';
 import AuditService from '../services/auditService.js'; // Importa o serviço
@@ -54,8 +55,8 @@ class AccountController {
             });
 
             const accountsWithCurrentBalance = accounts.map(account => {
-                const totalReceitas = Number(receitasMap.get(account.id)) || 0;
-                const totalDespesas = Number(despesasMap.get(account.id)) || 0;
+                const totalReceitas = Number(receitasMap.get(account.id) || 0);
+                const totalDespesas = Number(despesasMap.get(account.id) || 0);
                 const saldo = Number(account.saldoInicial) + totalReceitas - totalDespesas;
                 
                 return { ...account, saldo };
@@ -261,3 +262,5 @@ class AccountController {
 }
 
 export default new AccountController();
+
+    

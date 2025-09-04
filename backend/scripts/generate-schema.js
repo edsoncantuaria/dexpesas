@@ -92,13 +92,21 @@ generator client {
         
         schema += '\n'
 
-        // Índices
+        // Índices e IDs compostos
         if (modelDef.indices) {
             modelDef.indices.forEach(idx => {
-                const uniqueFlag = idx.unique ? '@@unique' : '@@index';
+                let directive;
+                if (idx.isId) {
+                    directive = '@@id';
+                } else if (idx.unique) {
+                    directive = '@@unique';
+                } else {
+                    directive = '@@index';
+                }
+
                 const fieldsDef = idx.fields.join(', ');
                 const typeDef = idx.type ? `, type: ${idx.type}`: ''; // Para text search etc.
-                schema += `  ${uniqueFlag}([${fieldsDef}]${typeDef})\n`;
+                schema += `  ${directive}([${fieldsDef}]${typeDef})\n`;
             });
         }
         
@@ -127,5 +135,5 @@ generator client {
 
 // Executar a função
 generateSchema();
-    
+
     
