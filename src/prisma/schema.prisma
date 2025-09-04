@@ -1,0 +1,540 @@
+// ATENÇÃO: Este arquivo é gerado automaticamente.
+// NÃO EDITE ESTE ARQUIVO DIRETAMENTE.
+// Edite o arquivo "models.json" e execute o script de geração.
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AccountType {
+  corrente
+  poupanca
+  investimento
+}
+
+enum CardBrand {
+  visa
+  mastercard
+  elo
+  amex
+}
+
+enum TransactionType {
+  receita
+  despesa
+}
+
+enum PaymentMethod {
+  debito
+  credito
+  pix
+  dinheiro
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ConditionType {
+  CONTAINS
+  EQUALS
+  STARTS_WITH
+  ENDS_WITH
+}
+
+enum NotificationType {
+  TRANSACTION_CREATED
+  PAYMENT_DUE
+  LIMIT_ALERT
+  ACHIEVEMENT_UNLOCKED
+  BUDGET_ALERT
+  UPCOMING_PAYMENT
+}
+
+enum AutomationType {
+  ROUND_UP
+  GOAL_CONTRIBUTION
+  BILL_PAY
+}
+
+enum ScheduleType {
+  MANUAL
+  DAILY
+  WEEKLY
+  MONTHLY
+  THRESHOLD
+}
+
+enum ReconciliationStatus {
+  PROCESSING
+  PENDING_REVIEW
+  COMPLETED
+  FAILED
+}
+
+enum ImportedTransactionStatus {
+  PENDING
+  SUGGESTED
+  RECONCILED
+  DISCARDED
+}
+
+enum ImportedTransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum AuditLogStatus {
+  SUCCESS
+  FAILURE
+}
+
+enum RecurrenceType {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  BIMONTHLY
+  TRIMONTHLY
+  SEMIANNUALLY
+}
+
+enum AiAnalysisType {
+  HABIT_ANALYSIS
+  OPPORTUNITY_ANALYSIS
+}
+
+enum CurrencyType {
+  BRL
+  USD
+}
+
+model Tag {
+  id                   String @id @default(cuid())
+  name                 String
+  userId               String
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions         Transaction[]
+
+  @@unique([userId, name])
+}
+
+model Category {
+  id                   String @id @default(cuid())
+  nome                 String @unique
+  label                String
+  icon                 String?
+  type                 TransactionType @default(despesa)
+
+  // --- Relações ---
+  transactions         Transaction[]
+  budgets              Budget[]
+  categorizationRules  CategorizationRule[]
+
+}
+
+model Achievement {
+  id                   String @id @default(cuid())
+  name                 String
+  description          String
+  icon                 String
+  xp                   Int
+
+  // --- Relações ---
+  unlockedBy           UnlockedAchievement[]
+
+}
+
+model ImportTemplate {
+  id                   String @id @default(cuid())
+  name                 String
+  mapping              Json
+  userId               String
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id])
+  reconciliations      Reconciliation[]
+
+}
+
+model GamificationProfile {
+  id                   String @id @default(cuid())
+  level                Int @default(1)
+  xp                   Int @default(0)
+  Alimentacao          Float @default(0)
+  AssinaturasEServicos Float @default(0)
+  BaresERestaurantes   Float @default(0)
+  Casa                 Float @default(0)
+  Compras              Float @default(0)
+  CuidadosPessoais     Float @default(0)
+  DividasEEmprestimos  Float @default(0)
+  Educacao             Float @default(0)
+  FamiliaEFilhos       Float @default(0)
+  ImpostosETaxas       Float @default(0)
+  LazerEHobbies        Float @default(0)
+  Mercado              Float @default(0)
+  Outros               Float @default(0)
+  Pets                 Float @default(0)
+  PresentesEDoacoes    Float @default(0)
+  Roupas               Float @default(0)
+  Saude                Float @default(0)
+  Trabalho             Float @default(0)
+  Transporte           Float @default(0)
+  Viagem               Float @default(0)
+  Vicios               Float @default(0)
+  userId               String @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id])
+
+}
+
+model UnlockedAchievement {
+  id                   String @id @default(cuid())
+  destacada            Boolean @default(false)
+  unlockedAt           DateTime @default(now())
+  userId               String
+  achievementId        String
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id])
+  achievement          Achievement @relation(fields: [achievementId], references: [id])
+
+  @@unique([userId, achievementId])
+}
+
+model Notification {
+  id                   String @id @default(cuid())
+  title                String
+  message              String
+  type                 NotificationType
+  read                 Boolean @default(false)
+  relatedId            String?
+  actions              Json?
+  userId               String
+  createdAt            DateTime @default(now())
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+}
+
+model Budget {
+  id                   String @id @default(cuid())
+  month                String
+  limit                Decimal @db.Decimal(10, 2)
+  rollover             Boolean @default(false)
+  userId               String
+  categoryId           String
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category             Category @relation(fields: [categoryId], references: [id])
+
+  @@unique([userId, month, categoryId])
+  @@index([userId, month])
+}
+
+model GoalContribution {
+  id                   String @id @default(cuid())
+  amount               Decimal @db.Decimal(10, 2)
+  date                 DateTime @default(now())
+  goalId               String
+  debitTransactionId   String? @unique
+
+  // --- Relações ---
+  goal                 Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  debitTransaction     Transaction? @relation(fields: [debitTransactionId], references: [id], onDelete: SetNull)
+
+}
+
+model RoundUpEntry {
+  id                   String @id @default(cuid())
+  transactionId        String @unique
+  amount               Decimal @db.Decimal(10, 2)
+  processed            Boolean @default(false)
+  processedAt          DateTime?
+
+  // --- Relações ---
+  transaction          Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+}
+
+model CategorizationRule {
+  id                   String @id @default(cuid())
+  keyword              String
+  conditionType        ConditionType @default(CONTAINS)
+  createdAt            DateTime @default(now())
+  userId               String
+  categoryId           String
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category             Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+}
+
+model ImportedTransaction {
+  id                   String @id @default(cuid())
+  date                 DateTime
+  amount               Decimal @db.Decimal(10, 2)
+  type                 ImportedTransactionType
+  description          String
+  fitId                String @unique
+  status               ImportedTransactionStatus @default(PENDING)
+  reconciliationId     String
+  manualTransactionId  String? @unique
+  similarityScore      Float?
+
+  // --- Relações ---
+  reconciliation       Reconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  manualTransaction    Transaction?
+
+}
+
+model AuditLog {
+  id                   String @id @default(cuid())
+  action               String
+  entity               String
+  entityId             String
+  details              Json
+  status               AuditLogStatus @default(SUCCESS)
+  origin               String @default("WEB_APP")
+  ipAddress            String?
+  createdAt            DateTime @default(now())
+  userId               String
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+}
+
+model AiAnalysis {
+  id                   String @id @default(cuid())
+  type                 AiAnalysisType
+  analysisText         String @db.Text
+  relevantTransactionIds String @db.Text
+  createdAt            DateTime @default(now())
+  userId               String
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+}
+
+model Account {
+  id                   String @id @default(cuid())
+  nome                 String
+  instituicao          String
+  tipo                 AccountType
+  saldoInicial         Decimal @db.Decimal(10, 2)
+  userId               String
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions         Transaction[]
+  reconciliations      Reconciliation[]
+  goals                Goal[]
+  cardsForPayment      Card[]
+
+  @@index([userId])
+}
+
+model Card {
+  id                   String @id @default(cuid())
+  nome                 String
+  limite               Decimal @db.Decimal(10, 2)
+  diaFechamento        Int
+  diaVencimento        Int
+  bandeira             CardBrand
+  rewardsType          String?
+  rewardsProgram       String?
+  rewardsConversionRate Float?
+  currencyForConversion CurrencyType? @default(BRL)
+  jurosRotativo        Float?
+  userId               String
+  paymentAccountId     String?
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  paymentAccount       Account? @relation(fields: [paymentAccountId], references: [id], onDelete: SetNull)
+  transactions         Transaction[]
+  reconciliations      Reconciliation[]
+
+  @@index([userId])
+}
+
+model Goal {
+  id                   String @id @default(cuid())
+  name                 String
+  targetAmount         Decimal @db.Decimal(10, 2)
+  currentAmount        Decimal @db.Decimal(10, 2) @default(0)
+  status               GoalStatus @default(IN_PROGRESS)
+  deadline             DateTime?
+  imageUrl             String?
+  createdAt            DateTime @default(now())
+  userId               String
+  accountId            String?
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account              Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  contributions        GoalContribution[]
+  automation           Automation?
+
+  @@index([userId])
+}
+
+model Automation {
+  id                   String @id @default(cuid())
+  type                 AutomationType
+  enabled              Boolean @default(false)
+  config               Json
+  scheduleType         ScheduleType @default(MANUAL)
+  scheduleValue        String?
+  lastRun              DateTime?
+  userId               String
+  goalId               String? @unique
+  recorrenciaId        String?
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal                 Goal? @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type, recorrenciaId])
+}
+
+model Reconciliation {
+  id                   String @id @default(cuid())
+  startDate            DateTime?
+  endDate              DateTime?
+  status               ReconciliationStatus @default(PROCESSING)
+  filePath             String
+  fileType             String
+  totalJobs            Int @default(0)
+  completedJobs        Int @default(0)
+  createdAt            DateTime @default(now())
+  userId               String
+  accountId            String?
+  cardId               String?
+  importTemplateId     String?
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account              Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  card                 Card? @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  importedTransactions ImportedTransaction[]
+  importTemplate       ImportTemplate? @relation(fields: [importTemplateId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model Transaction {
+  id                   String @id @default(cuid())
+  valor                Decimal @db.Decimal(10, 2)
+  descricao            String
+  tipo                 TransactionType
+  data                 DateTime
+  metodoPagamento      PaymentMethod
+  pago                 Boolean @default(true)
+  notes                String? @db.Text
+  installment          Boolean? @default(false)
+  installmentId        String?
+  installmentNumber    Int?
+  totalInstallments    Int?
+  withInterest         Boolean? @default(false)
+  interestRate         Float?
+  valorTotal           Decimal? @db.Decimal(10, 2)
+  totalWithInterest    Decimal? @db.Decimal(10, 2)
+  recurrenceType       RecurrenceType?
+  recorrenciaId        String?
+  attachmentUrl        String?
+  isReconciled         Boolean @default(false)
+  finalizedGoalId      String?
+  userId               String
+  accountId            String?
+  cardId               String?
+  categoryId           String?
+  importedTransactionId String? @unique
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account              Account? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  card                 Card? @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  category             Category? @relation(fields: [categoryId], references: [id])
+  roundUpEntry         RoundUpEntry?
+  importedTransaction  ImportedTransaction? @relation(fields: [importedTransactionId], references: [id], onDelete: SetNull)
+  goalContributions    GoalContribution[]
+  tags                 Tag[]
+
+  @@index([recorrenciaId])
+  @@index([installmentId])
+  @@index([userId, data])
+  @@index([userId, categoryId])
+}
+
+model User {
+  id                   String @id @default(cuid())
+  name                 String
+  username             String @unique
+  email                String @unique
+  password             String
+  age                  Int?
+  gender               String?
+  avatarUrl            String?
+  role                 Role @default(USER)
+  firstOpen            Boolean @default(true)
+  futureProjectionCount Int @default(3)
+  daysUntilDueReminder Int @default(3)
+  enableAchievementNotifications Boolean @default(true)
+  enableBudgetNotifications Boolean @default(true)
+  enableLimitAlerts    Boolean @default(true)
+  enableUpcomingPaymentNotifications Boolean @default(true)
+  enableOcr            Boolean @default(false)
+  enableDailySummary   Boolean @default(false)
+  enableBudgetSuggestion Boolean @default(false)
+  enableReconciliationAi Boolean @default(false)
+  enableGoalProjection Boolean @default(false)
+  habilitarDescricaoInteligente Boolean @default(true)
+  dashboardLayout      Json? @default("[]")
+  professionalSituation String?
+  monthlyIncomeRange   String?
+  investmentProfile    String?
+  mainFinancialGoal    String?
+  pushSubscription     Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // --- Relações ---
+  accounts             Account[]
+  cards                Card[]
+  transactions         Transaction[]
+  gamificationProfile  GamificationProfile?
+  unlockedAchievements UnlockedAchievement[]
+  notifications        Notification[]
+  budgets              Budget[]
+  goals                Goal[]
+  automations          Automation[]
+  categorizationRules  CategorizationRule[]
+  reconciliations      Reconciliation[]
+  importTemplates      ImportTemplate[]
+  auditLogs            AuditLog[]
+  aiAnalyses           AiAnalysis[]
+  tags                 Tag[]
+
+}

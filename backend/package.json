@@ -1,0 +1,53 @@
+{
+  "name": "jornada-financeira-backend",
+  "version": "1.0.0",
+  "description": "Backend para a aplicação Jornada Financeira.",
+  "main": "server.js",
+  "type": "module",
+  "prisma": {
+    "seed": "node prisma/seed.cjs"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "worker": "node worker.js",
+    "dev": "concurrently \"npm:dev:server\" \"npm:dev:worker\"",
+    "dev:server": "nodemon server.js",
+    "dev:worker": "nodemon worker.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "express",
+    "prisma",
+    "nodejs",
+    "genkit"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@genkit-ai/googleai": "^1.14.1",
+    "@prisma/client": "^5.17.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.10.3",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.6",
+    "csv-stringify": "^6.5.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "genkit": "^1.14.1",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "minio": "^8.0.1",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^3.0.3",
+    "ofx-js": "^0.2.0",
+    "string-similarity-js": "^1.0.4",
+    "web-push": "^3.6.7",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11",
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.4",
+    "prisma": "^5.17.0"
+  }
+}
