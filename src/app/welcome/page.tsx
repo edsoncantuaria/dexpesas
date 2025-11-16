@@ -89,7 +89,7 @@ export default function WelcomePage() {
       props: {
           title: "Equipe seu Escudo: O Cartão",
           description: "O cartão de crédito é uma ferramenta poderosa. Cadastre o seu para gerenciar seu poder de compra com sabedoria.",
-          onSave: async (data: Omit<CardType, 'id'|'userId'|'saldoFatura'>) => {
+          onSave: async (data: Omit<CardType, 'id'|'userId'|'bestDayToBuy' | 'currentInvoiceAmount' | 'availableLimit'>) => {
               setIsSubmitting(true);
               try {
                   await api.post('/cards', data);

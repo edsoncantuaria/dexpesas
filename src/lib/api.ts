@@ -10,7 +10,8 @@ import axios from 'axios';
 import Cookies from 'js-cookie';
 
 // A URL base do seu backend Express, lida a partir das variáveis de ambiente.
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const DEFAULT_API_URL = 'https://backend-dexpesas.cloudive.com.br/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL;
 
 const api = axios.create({
   baseURL: API_URL,
@@ -36,5 +37,17 @@ api.interceptors.request.use(
   }
 );
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      Cookies.remove('auth_token');
+      if (window.location.pathname !== '/') {
+        window.location.href = '/';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;

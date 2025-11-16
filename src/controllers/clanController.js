@@ -61,8 +61,8 @@ class ClanController {
         const userId = req.user.id;
 
         try {
-            const user = await prisma.user.findUnique({ where: { id: userId }, include: { clanMembership: true } });
-            if (user.clanMembership) {
+            const user = await prisma.user.findUnique({ where: { id: userId }, include: { clanMemberships: true } });
+            if (user.clanMemberships?.length) {
                 return res.status(400).json({ message: 'Você já faz parte de um clã. Saia do clã atual para criar um novo.' });
             }
 
@@ -409,8 +409,8 @@ class ClanController {
         const { clanId } = req.params;
         const userId = req.user.id;
         try {
-            const user = await prisma.user.findUnique({ where: { id: userId }, include: { clanMembership: true }});
-             if (user.clanMembership) {
+            const user = await prisma.user.findUnique({ where: { id: userId }, include: { clanMemberships: true }});
+             if (user.clanMemberships?.length) {
                 return res.status(400).json({ message: 'Você já está em um clã.' });
             }
             await prisma.clanMember.create({ data: { clanId, userId, role: 'MEMBER' } });

@@ -71,9 +71,9 @@ class ClanController {
     try {
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: { clanMembership: true },
+        include: { clanMemberships: true },
       });
-      if (user.clanMembership) {
+      if (user.clanMemberships?.length) {
         return res
           .status(400)
           .json({
@@ -635,13 +635,13 @@ class ClanController {
 
       const invitedUser = await prisma.user.findUnique({
         where: { id: invitedUserId },
-        include: { clanMembership: true },
+        include: { clanMemberships: true },
       });
       if (!invitedUser)
         return res
           .status(404)
           .json({ message: "O jogador convidado não foi encontrado." });
-      if (invitedUser.clanMembership)
+      if (invitedUser.clanMemberships?.length)
         return res
           .status(400)
           .json({ message: "Este jogador já faz parte de uma família." });

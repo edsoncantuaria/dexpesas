@@ -68,7 +68,9 @@ class StreaksWorker {
         const yesterdayStart = startOfDay(subDays(new Date(), 1));
         const yesterdayEnd = endOfDay(subDays(new Date(), 1));
         
-        const viceCategory = await prisma.category.findUnique({ where: { nome: 'Vicios' } });
+        const viceCategory = await prisma.category.findFirst({
+            where: { nome: 'Vicios', userId: null }
+        });
         if (!viceCategory) return;
         
         const viceSpendingYesterday = await prisma.transaction.count({

@@ -6,8 +6,11 @@
     "ClanInviteStatus": ["PENDING", "ACCEPTED", "DECLINED"],
     "AccountType": ["corrente", "poupanca", "investimento"],
     "CardBrand": ["visa", "mastercard", "elo", "amex"],
+    "CardStatus": ["ACTIVE", "BLOCKED", "CANCELLED"],
+    "CardInvoiceStatus": ["OPEN", "CLOSED", "PAID", "OVERDUE"],
     "TransactionType": ["receita", "despesa"],
     "PaymentMethod": ["debito", "credito", "pix", "dinheiro", "transferencia"],
+    "TransactionStatus": ["PENDING", "POSTED", "CANCELLED", "FAILED"],
     "GoalStatus": ["IN_PROGRESS", "COMPLETED"],
     "ConditionType": ["CONTAINS", "EQUALS", "STARTS_WITH", "ENDS_WITH"],
     "NotificationType": ["TRANSACTION_CREATED", "PAYMENT_DUE", "LIMIT_ALERT", "ACHIEVEMENT_UNLOCKED", "BUDGET_ALERT", "UPCOMING_PAYMENT", "STREAK_AWARDED"],
@@ -23,7 +26,11 @@
     "MissionScope": ["USER", "GUILD"],
     "GameEventType": ["XP_MULTIPLIER", "ITEM_DROP"],
     "StreakType": ["DAILY_TRANSACTION", "NO_VICE_SPENDING"],
-    "SplitMethod": ["EQUAL", "PERCENTAGE", "AMOUNT"]
+    "SplitMethod": ["EQUAL", "PERCENTAGE", "AMOUNT"],
+    "BudgetType": ["MONTHLY", "WEEKLY", "CUSTOM"],
+    "LedgerDirection": ["DEBIT", "CREDIT"],
+    "RecurringBillStatus": ["ACTIVE", "PAUSED", "CANCELLED"],
+    "BillPaymentStatus": ["PENDING", "PAID", "SKIPPED", "FAILED"]
   },
   "models": {
     "User": {
@@ -64,10 +71,10 @@
         "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
       },
       "relations": {
-        "clanMembership": { "type": "ClanMember", "optional": true },
+        "clanMemberships": { "type": "ClanMember", "isList": true, "relation": { "name": "UserToClan" } },
         "ownedClan": { "type": "Clan", "optional": true, "relation": { "name": "ClanLeader" } },
         "clanInvites": { "type": "ClanInvite", "isList": true, "relation": { "name": "UserInvites" } },
-        "sharedExpenseParticipations": { "type": "SharedExpenseParticipant", "isList": true },
+        "sharedExpenseParticipations": { "type": "SharedExpenseParticipant", "isList": true, "relation": { "name": "User_SharedExpenseParticipants" } },
         "createdSharedExpenses": { "type": "SharedExpense", "isList": true, "relation": { "name": "ExpenseCreator" } },
         "accounts": { "type": "Account", "isList": true },
         "cards": { "type": "Card", "isList": true },
@@ -83,10 +90,13 @@
         "auditLogs": { "type": "AuditLog", "isList": true },
         "aiAnalyses": { "type": "AiAnalysis", "isList": true },
         "tags": { "type": "Tag", "isList": true },
+        "categories": { "type": "Category", "isList": true },
         "userMissions": { "type": "UserMission", "isList": true },
         "inventoryItems": { "type": "UserItem", "isList": true },
         "streaks": { "type": "UserStreak", "isList": true },
-        "legacyRuins": { "type": "LegacyRuin", "isList": true }
+        "legacyRuins": { "type": "LegacyRuin", "isList": true },
+        "recurringBills": { "type": "RecurringBill", "isList": true },
+        "attachments": { "type": "Attachment", "isList": true }
       }
     },
     "Clan": {
@@ -95,7 +105,7 @@
         "name": { "type": "String", "attributes": ["@unique"] },
         "description": { "type": "String", "optional": true },
         "iconUrl": { "type": "String", "optional": true },
-        "balance": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(12, 2)"] },
+        "balance": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
         "level": { "type": "Int", "attributes": ["@default(1)"] },
         "xp": { "type": "BigInt", "attributes": ["@default(0)"] },
         "policies": { "type": "Json", "optional": true, "comment": "Regras de governança da família" },
@@ -106,7 +116,7 @@
       },
       "relations": {
         "leader": { "type": "User", "relation": { "name": "ClanLeader", "fields": ["leaderId"], "references": ["id"], "onDelete": "Restrict" } },
-        "members": { "type": "ClanMember", "isList": true },
+        "members": { "type": "ClanMember", "isList": true, "relation": { "name": "ClanToMembers" } },
         "invites": { "type": "ClanInvite", "isList": true },
         "goals": { "type": "Goal", "isList": true },
         "sharedExpenses": { "type": "SharedExpense", "isList": true }
@@ -150,7 +160,7 @@
         "clanId": { "type": "String" },
         "creatorId": { "type": "String" },
         "description": { "type": "String" },
-        "totalAmount": { "type": "Decimal", "attributes": ["@db.Decimal(12, 2)"] },
+        "totalAmount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
         "splitMethod": { "type": "SplitMethod" },
         "categoryId": { "type": "String" },
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
@@ -158,8 +168,8 @@
       "relations": {
         "clan": { "type": "Clan", "relation": { "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
         "creator": { "type": "User", "relation": { "name": "ExpenseCreator", "fields": ["creatorId"], "references": ["id"], "onDelete": "NoAction" } },
-        "category": { "type": "Category", "relation": { "fields": ["categoryId"], "references": ["id"] } },
-        "participants": { "type": "SharedExpenseParticipant", "isList": true }
+        "category": { "type": "Category", "relation": { "name": "Category_SharedExpense", "fields": ["categoryId"], "references": ["id"], "onDelete": "NoAction" } },
+        "participants": { "type": "SharedExpenseParticipant", "isList": true, "relation": { "name": "SharedExpense_Participants" } }
       }
     },
     "SharedExpenseParticipant": {
@@ -167,13 +177,13 @@
         "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
         "sharedExpenseId": { "type": "String" },
         "userId": { "type": "String" },
-        "amountOwed": { "type": "Decimal", "attributes": ["@db.Decimal(12, 2)"] },
+        "amountOwed": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
         "createdTransactionId": { "type": "String", "attributes": ["@unique"] }
       },
       "relations": {
-        "sharedExpense": { "type": "SharedExpense", "relation": { "fields": ["sharedExpenseId"], "references": ["id"], "onDelete": "Cascade" } },
-        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "transaction": { "type": "Transaction", "relation": { "fields": ["createdTransactionId"], "references": ["id"] } }
+        "sharedExpense": { "type": "SharedExpense", "relation": { "name": "SharedExpense_Participants", "fields": ["sharedExpenseId"], "references": ["id"], "onDelete": "Cascade" } },
+        "user": { "type": "User", "relation": { "name": "User_SharedExpenseParticipants", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "transaction": { "type": "Transaction", "relation": { "name": "GeneratedTransactionForParticipant", "fields": ["createdTransactionId"], "references": ["id"] } }
       },
       "indices": [{ "fields": ["sharedExpenseId", "userId"], "unique": true }]
     },
@@ -182,8 +192,8 @@
         "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
         "userId": { "type": "String" },
         "name": { "type": "String", "comment": "Nome da dívida, ex: Financiamento Veículo" },
-        "totalAmountPaid": { "type": "Decimal", "attributes": ["@db.Decimal(12, 2)"] },
-        "totalInterestPaid": { "type": "Decimal", "attributes": ["@db.Decimal(12, 2)"], "optional": true },
+        "totalAmountPaid": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "totalInterestPaid": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"], "optional": true },
         "startDate": { "type": "DateTime" },
         "endDate": { "type": "DateTime" },
         "originalRecurrenceId": { "type": "String", "attributes": ["@unique"] }
@@ -259,49 +269,74 @@
             "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
             "nome": { "type": "String" },
             "instituicao": { "type": "String" },
+            "bankCode": { "type": "String", "optional": true },
+            "agencyNumber": { "type": "String", "optional": true },
+            "agencyDigit": { "type": "String", "optional": true },
+            "accountNumber": { "type": "String", "optional": true },
+            "accountDigit": { "type": "String", "optional": true },
             "tipo": { "type": "AccountType" },
-            "saldoInicial": { "type": "Decimal", "attributes": ["@db.Decimal(10, 2)"] },
+            "currency": { "type": "CurrencyType", "attributes": ["@default(BRL)"] },
+            "saldoInicial": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+            "color": { "type": "String", "optional": true },
+            "icone": { "type": "String", "optional": true },
+            "isArchived": { "type": "Boolean", "attributes": ["@default(false)"] },
             "userId": { "type": "String" }
         },
         "relations": {
             "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
             "transactions": { "type": "Transaction", "isList": true, "relation": { "name": "AccountTransactions" } },
+            "counterTransactions": { "type": "Transaction", "isList": true, "relation": { "name": "Transaction_counterAccount" } },
             "reconciliations": { "type": "Reconciliation", "isList": true },
             "goals": { "type": "Goal", "isList": true },
-            "cardsForPayment": { "type": "Card", "isList": true }
+            "cardsForPayment": { "type": "Card", "isList": true, "relation": { "name": "Card_paymentAccount" } },
+            "ledgerEntries": { "type": "LedgerEntry", "isList": true },
+            "recurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_BillAccount" } },
+            "autoPayRecurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_AutoPayAccount" } },
+            "budgetAccounts": { "type": "Budget", "isList": true, "relation": { "name": "Budget_account" } }
         }
     },
     "Card": {
         "fields": {
             "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
             "nome": { "type": "String" },
-            "limite": { "type": "Decimal", "attributes": ["@db.Decimal(10, 2)"] },
+            "limite": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
             "diaFechamento": { "type": "Int" },
             "diaVencimento": { "type": "Int" },
             "bandeira": { "type": "CardBrand" },
+            "status": { "type": "CardStatus", "attributes": ["@default(ACTIVE)"] },
             "rewardsType": { "type": "String", "optional": true },
             "rewardsProgram": { "type": "String", "optional": true },
-            "rewardsConversionRate": { "type": "Float", "optional": true },
+            "rewardsConversionRate": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(10, 4)"] },
+            "lastFourDigits": { "type": "String", "optional": true },
+            "issuer": { "type": "String", "optional": true },
+            "billingCurrency": { "type": "CurrencyType", "attributes": ["@default(BRL)"] },
             "currencyForConversion": { "type": "CurrencyType", "optional": true, "attributes": ["@default(BRL)"] },
-            "jurosRotativo": { "type": "Float", "optional": true },
+            "currentInvoiceAmount": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
+            "availableLimit": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 4)"] },
+            "jurosRotativo": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(10, 4)"] },
             "userId": { "type": "String" },
             "paymentAccountId": { "type": "String", "optional": true }
         },
         "relations": {
             "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" }},
-            "paymentAccount": { "type": "Account", "optional": true, "relation": { "fields": ["paymentAccountId"], "references": ["id"], "onDelete": "SetNull" }},
+            "paymentAccount": { "type": "Account", "optional": true, "relation": { "name": "Card_paymentAccount", "fields": ["paymentAccountId"], "references": ["id"], "onDelete": "SetNull" }},
             "transactions": { "type": "Transaction", "isList": true, "relation": { "name": "CardTransactions" } },
-            "reconciliations": { "type": "Reconciliation", "isList": true }
+            "reconciliations": { "type": "Reconciliation", "isList": true },
+            "invoices": { "type": "CardInvoice", "isList": true, "relation": { "name": "CardInvoice_Card" } },
+            "billingRecurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_BillCard" } },
+            "autoPayRecurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_AutoPayCard" } }
         }
     },
     "Transaction": {
       "fields": {
         "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
-        "valor": { "type": "Decimal", "attributes": ["@db.Decimal(10, 2)"] },
+        "valor": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
         "descricao": { "type": "String" },
         "tipo": { "type": "TransactionType" },
         "data": { "type": "DateTime" },
         "metodoPagamento": { "type": "PaymentMethod" },
+        "currency": { "type": "CurrencyType", "attributes": ["@default(BRL)"] },
+        "status": { "type": "TransactionStatus", "attributes": ["@default(POSTED)"] },
         "pago": { "type": "Boolean", "attributes": ["@default(true)"] },
         "notes": { "type": "String", "optional": true, "attributes": ["@db.Text"] },
         "installment": { "type": "Boolean", "optional": true, "attributes": ["@default(false)"] },
@@ -309,13 +344,25 @@
         "installmentNumber": { "type": "Int", "optional": true },
         "totalInstallments": { "type": "Int", "optional": true },
         "withInterest": { "type": "Boolean", "optional": true, "attributes": ["@default(false)"] },
-        "interestRate": { "type": "Float", "optional": true },
-        "valorTotal": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(10, 2)"] },
-        "totalWithInterest": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(10, 2)"] },
+        "interestRate": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(10, 4)"] },
+        "valorTotal": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 4)"] },
+        "totalWithInterest": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 4)"] },
+        "balanceAfter": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 4)"] },
         "recurrenceType": { "type": "RecurrenceType", "optional": true },
         "recorrenciaId": { "type": "String", "optional": true },
         "attachmentUrl": { "type": "String", "optional": true },
+        "bankReference": { "type": "String", "optional": true },
+        "authorizationCode": { "type": "String", "optional": true },
+        "merchantName": { "type": "String", "optional": true },
+        "merchantCategory": { "type": "String", "optional": true },
+        "counterparty": { "type": "String", "optional": true },
+        "postedAt": { "type": "DateTime", "optional": true },
+        "clearedAt": { "type": "DateTime", "optional": true },
+        "isTransfer": { "type": "Boolean", "attributes": ["@default(false)"] },
+        "counterAccountId": { "type": "String", "optional": true },
+        "transferGroupId": { "type": "String", "optional": true },
         "isReconciled": { "type": "Boolean", "attributes": ["@default(false)"] },
+        "isInvoicePayment": { "type": "Boolean", "attributes": ["@default(false)"] },
         "finalizedGoalId": { "type": "String", "optional": true },
         "userId": { "type": "String" },
         "accountId": { "type": "String", "optional": true },
@@ -327,19 +374,156 @@
       "relations": {
         "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
         "account": { "type": "Account", "optional": true, "relation": { "name": "AccountTransactions", "fields": ["accountId"], "references": ["id"], "onDelete": "Cascade" } },
+        "counterAccount": { "type": "Account", "optional": true, "relation": { "name": "Transaction_counterAccount", "fields": ["counterAccountId"], "references": ["id"], "onDelete": "SetNull" } },
         "card": { "type": "Card", "optional": true, "relation": { "name": "CardTransactions", "fields": ["cardId"], "references": ["id"], "onDelete": "Cascade" } },
-        "category": { "type": "Category", "optional": true, "relation": { "fields": ["categoryId"], "references": ["id"], "onDelete": "SetNull" } },
-        "roundUpEntry": { "type": "RoundUpEntry", "optional": true },
+        "category": { "type": "Category", "optional": true, "relation": { "name": "Transaction_category", "fields": ["categoryId"], "references": ["id"], "onDelete": "SetNull" } },
+        "roundUpEntry": { "type": "RoundUpEntry", "optional": true, "relation": { "name": "RoundUpEntry_transaction" } },
         "importedTransaction": { "type": "ImportedTransaction", "optional": true, "relation": { "name": "ManualToImportedTransaction" } },
-        "goalContributions": { "type": "GoalContribution", "isList": true },
+        "goalContributions": { "type": "GoalContribution", "isList": true, "relation": { "name": "GoalContribution_debitTransaction" } },
         "sharedExpenseParticipant": { "type": "SharedExpenseParticipant", "optional": true, "relation": { "name": "GeneratedTransactionForParticipant" } },
-        "tags": { "type": "Tag", "isList": true }
+        "tags": { "type": "Tag", "isList": true },
+        "ledgerEntries": { "type": "LedgerEntry", "isList": true, "relation": { "name": "LedgerEntry_Transaction" } },
+        "cardInvoiceItems": { "type": "CardInvoiceItem", "isList": true, "relation": { "name": "Transaction_CardInvoiceItems" } },
+        "billOccurrences": { "type": "BillOccurrence", "isList": true, "relation": { "name": "Transaction_BillOccurrences" } },
+        "attachments": { "type": "Attachment", "isList": true, "relation": { "name": "Transaction_Attachments" } }
       },
       "indices": [
         { "fields": ["recorrenciaId"] },
         { "fields": ["installmentId"] },
-        { "fields": ["userId", "data"] }
+        { "fields": ["userId", "data"] },
+        { "fields": ["status"] },
+        { "fields": ["bankReference"] },
+        { "fields": ["transferGroupId"] }
       ]
+    },
+    "LedgerEntry": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "transactionId": { "type": "String" },
+        "accountId": { "type": "String" },
+        "direction": { "type": "LedgerDirection" },
+        "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "currency": { "type": "CurrencyType", "attributes": ["@default(BRL)"] },
+        "exchangeRate": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 8)"] },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "transaction": { "type": "Transaction", "relation": { "name": "LedgerEntry_Transaction", "fields": ["transactionId"], "references": ["id"], "onDelete": "Cascade" } },
+        "account": { "type": "Account", "relation": { "fields": ["accountId"], "references": ["id"], "onDelete": "Cascade" } }
+      },
+      "indices": [
+        { "fields": ["transactionId"] },
+        { "fields": ["accountId"] },
+        { "fields": ["transactionId", "accountId", "direction"], "unique": true }
+      ]
+    },
+    "CardInvoice": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "cardId": { "type": "String" },
+        "referenceMonth": { "type": "String" },
+        "startDate": { "type": "DateTime" },
+        "endDate": { "type": "DateTime" },
+        "closingDate": { "type": "DateTime" },
+        "dueDate": { "type": "DateTime" },
+        "status": { "type": "CardInvoiceStatus", "attributes": ["@default(OPEN)"] },
+        "amountDue": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "amountPaid": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
+        "minimumPayment": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 4)"] },
+        "previousBalance": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 4)"] },
+        "generatedAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "card": { "type": "Card", "relation": { "name": "CardInvoice_Card", "fields": ["cardId"], "references": ["id"], "onDelete": "Cascade" } },
+        "items": { "type": "CardInvoiceItem", "isList": true, "relation": { "name": "CardInvoice_Items" } }
+      },
+      "indices": [
+        { "fields": ["cardId", "referenceMonth"] }
+      ]
+    },
+    "CardInvoiceItem": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "invoiceId": { "type": "String" },
+        "transactionId": { "type": "String", "optional": true },
+        "description": { "type": "String" },
+        "type": { "type": "TransactionType" },
+        "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "invoice": { "type": "CardInvoice", "relation": { "name": "CardInvoice_Items", "fields": ["invoiceId"], "references": ["id"], "onDelete": "Cascade" } },
+        "transaction": { "type": "Transaction", "optional": true, "relation": { "name": "Transaction_CardInvoiceItems", "fields": ["transactionId"], "references": ["id"], "onDelete": "SetNull" } }
+      }
+    },
+    "RecurringBill": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "userId": { "type": "String" },
+        "description": { "type": "String" },
+        "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "currency": { "type": "CurrencyType", "attributes": ["@default(BRL)"] },
+        "type": { "type": "TransactionType" },
+        "status": { "type": "RecurringBillStatus", "attributes": ["@default(ACTIVE)"] },
+        "recurrenceType": { "type": "RecurrenceType" },
+        "dueDayOfMonth": { "type": "Int", "optional": true },
+        "startDate": { "type": "DateTime" },
+        "endDate": { "type": "DateTime", "optional": true },
+        "nextOccurrenceAt": { "type": "DateTime", "optional": true },
+        "remindDaysBefore": { "type": "Int", "attributes": ["@default(2)"] },
+        "autopayEnabled": { "type": "Boolean", "attributes": ["@default(false)"] },
+        "autoPayAccountId": { "type": "String", "optional": true },
+        "autoPayCardId": { "type": "String", "optional": true },
+        "accountId": { "type": "String", "optional": true },
+        "cardId": { "type": "String", "optional": true },
+        "categoryId": { "type": "String", "optional": true },
+        "notes": { "type": "String", "optional": true, "attributes": ["@db.Text"] },
+        "lastGeneratedAt": { "type": "DateTime", "optional": true }
+      },
+      "relations": {
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "account": { "type": "Account", "optional": true, "relation": { "name": "RecurringBill_BillAccount", "fields": ["accountId"], "references": ["id"], "onDelete": "SetNull" } },
+        "card": { "type": "Card", "optional": true, "relation": { "name": "RecurringBill_BillCard", "fields": ["cardId"], "references": ["id"], "onDelete": "SetNull" } },
+        "category": { "type": "Category", "optional": true, "relation": { "name": "RecurringBill_category", "fields": ["categoryId"], "references": ["id"], "onDelete": "SetNull" } },
+        "autoPayAccount": { "type": "Account", "optional": true, "relation": { "name": "RecurringBill_AutoPayAccount", "fields": ["autoPayAccountId"], "references": ["id"], "onDelete": "SetNull" } },
+        "autoPayCard": { "type": "Card", "optional": true, "relation": { "name": "RecurringBill_AutoPayCard", "fields": ["autoPayCardId"], "references": ["id"], "onDelete": "SetNull" } },
+        "occurrences": { "type": "BillOccurrence", "isList": true, "relation": { "name": "RecurringBill_Occurrences" } }
+      }
+    },
+    "BillOccurrence": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "billId": { "type": "String" },
+        "dueDate": { "type": "DateTime" },
+        "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "status": { "type": "BillPaymentStatus", "attributes": ["@default(PENDING)"] },
+        "paidAt": { "type": "DateTime", "optional": true },
+        "transactionId": { "type": "String", "optional": true },
+        "notes": { "type": "String", "optional": true, "attributes": ["@db.Text"] }
+      },
+      "relations": {
+        "bill": { "type": "RecurringBill", "relation": { "name": "RecurringBill_Occurrences", "fields": ["billId"], "references": ["id"], "onDelete": "Cascade" } },
+        "transaction": { "type": "Transaction", "optional": true, "relation": { "name": "Transaction_BillOccurrences", "fields": ["transactionId"], "references": ["id"], "onDelete": "SetNull" } },
+        "attachments": { "type": "Attachment", "isList": true, "relation": { "name": "BillOccurrence_Attachments" } }
+      }
+    },
+    "Attachment": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "url": { "type": "String" },
+        "mimeType": { "type": "String", "optional": true },
+        "size": { "type": "Int", "optional": true },
+        "description": { "type": "String", "optional": true },
+        "uploadedAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "userId": { "type": "String" },
+        "transactionId": { "type": "String", "optional": true },
+        "billOccurrenceId": { "type": "String", "optional": true }
+      },
+      "relations": {
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "transaction": { "type": "Transaction", "optional": true, "relation": { "name": "Transaction_Attachments", "fields": ["transactionId"], "references": ["id"], "onDelete": "SetNull" } },
+        "billOccurrence": { "type": "BillOccurrence", "optional": true, "relation": { "name": "BillOccurrence_Attachments", "fields": ["billOccurrenceId"], "references": ["id"], "onDelete": "Cascade" } }
+      }
     },
     "Tag": {
       "fields": {
@@ -356,33 +540,51 @@
     "Category": {
         "fields": {
             "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
-            "nome": { "type": "String", "attributes": ["@unique"] },
+            "nome": { "type": "String" },
             "label": { "type": "String" },
             "icon": { "type": "String", "optional": true },
-            "type": { "type": "TransactionType", "attributes": ["@default(despesa)"] }
+            "type": { "type": "TransactionType", "attributes": ["@default(despesa)"] },
+            "parentCategoryId": { "type": "String", "optional": true },
+            "userId": { "type": "String", "optional": true }
         },
         "relations": {
-            "transactions": { "type": "Transaction", "isList": true },
-            "budgets": { "type": "Budget", "isList": true },
-            "categorizationRules": { "type": "CategorizationRule", "isList": true },
-            "sharedExpenses": { "type": "SharedExpense", "isList": true }
-        }
+            "transactions": { "type": "Transaction", "isList": true, "relation": { "name": "Transaction_category" } },
+            "budgets": { "type": "Budget", "isList": true, "relation": { "name": "Budget_category" } },
+            "categorizationRules": { "type": "CategorizationRule", "isList": true, "relation": { "name": "CategorizationRule_category" } },
+            "sharedExpenses": { "type": "SharedExpense", "isList": true, "relation": { "name": "Category_SharedExpense" } },
+            "recurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_category" } },
+            "parentCategory": { "type": "Category", "optional": true, "relation": { "name": "CategoryHierarchy", "fields": ["parentCategoryId"], "references": ["id"], "onDelete": "NoAction", "onUpdate": "NoAction" } },
+            "subcategories": { "type": "Category", "isList": true, "relation": { "name": "CategoryHierarchy" } },
+            "user": { "type": "User", "optional": true, "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
+        },
+        "indices": [
+            { "fields": ["userId", "nome"], "unique": true },
+            { "fields": ["parentCategoryId"] }
+        ]
     },
     "Budget": {
       "fields": {
         "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
-        "month": { "type": "String" },
-        "limit": { "type": "Decimal", "attributes": ["@db.Decimal(10, 2)"] },
+        "month": { "type": "String", "optional": true },
+        "limit": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
         "rollover": { "type": "Boolean", "attributes": ["@default(false)"] },
+        "type": { "type": "BudgetType", "attributes": ["@default(MONTHLY)"] },
+        "startDate": { "type": "DateTime", "optional": true },
+        "endDate": { "type": "DateTime", "optional": true },
+        "currency": { "type": "CurrencyType", "attributes": ["@default(BRL)"] },
+        "includeTransfers": { "type": "Boolean", "attributes": ["@default(false)"] },
         "userId": { "type": "String" },
-        "categoryId": { "type": "String" }
+        "categoryId": { "type": "String" },
+        "accountId": { "type": "String", "optional": true }
       },
       "relations": {
         "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "category": { "type": "Category", "relation": { "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } }
+        "category": { "type": "Category", "relation": { "name": "Budget_category", "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } },
+        "account": { "type": "Account", "optional": true, "relation": { "name": "Budget_account", "fields": ["accountId"], "references": ["id"], "onDelete": "SetNull" } }
       },
       "indices": [
-        { "fields": ["userId", "month", "categoryId"], "unique": true },
+        { "fields": ["userId", "categoryId", "accountId", "type", "month", "startDate", "endDate"], "unique": true },
+        { "fields": ["userId", "startDate", "endDate"] },
         { "fields": ["userId", "month"] }
       ]
     },
@@ -390,8 +592,8 @@
       "fields": {
         "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
         "name": { "type": "String" },
-        "targetAmount": { "type": "Decimal", "attributes": ["@db.Decimal(10, 2)"] },
-        "currentAmount": { "type": "Decimal", "attributes": ["@db.Decimal(10, 2)", "@default(0)"] },
+        "targetAmount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "currentAmount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)", "@default(0)"] },
         "status": { "type": "GoalStatus", "attributes": ["@default(IN_PROGRESS)"] },
         "deadline": { "type": "DateTime", "optional": true },
         "imageUrl": { "type": "String", "optional": true },
@@ -404,21 +606,21 @@
         "user": { "type": "User", "optional": true, "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
         "account": { "type": "Account", "optional": true, "relation": { "fields": ["accountId"], "references": ["id"], "onDelete": "SetNull" } },
         "clan": { "type": "Clan", "optional": true, "relation": { "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
-        "contributions": { "type": "GoalContribution", "isList": true },
+        "contributions": { "type": "GoalContribution", "isList": true, "relation": { "name": "GoalContribution_goal" } },
         "automation": { "type": "Automation", "optional": true, "relation": { "name": "GoalAutomation" } }
       }
     },
     "GoalContribution": {
       "fields": {
         "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
-        "amount": { "type": "Decimal", "attributes": ["@db.Decimal(10, 2)"] },
+        "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
         "date": { "type": "DateTime", "attributes": ["@default(now())"] },
         "goalId": { "type": "String" },
         "debitTransactionId": { "type": "String", "optional": true, "attributes": ["@unique"] }
       },
       "relations": {
-        "goal": { "type": "Goal", "relation": { "fields": ["goalId"], "references": ["id"], "onDelete": "Cascade" } },
-        "debitTransaction": { "type": "Transaction", "optional": true, "relation": { "fields": ["debitTransactionId"], "references": ["id"], "onDelete": "SetNull" } }
+        "goal": { "type": "Goal", "relation": { "name": "GoalContribution_goal", "fields": ["goalId"], "references": ["id"], "onDelete": "Cascade" } },
+        "debitTransaction": { "type": "Transaction", "optional": true, "relation": { "name": "GoalContribution_debitTransaction", "fields": ["debitTransactionId"], "references": ["id"], "onDelete": "SetNull" } }
       }
     },
     "Achievement": {
@@ -486,12 +688,12 @@
         "fields": {
             "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
             "transactionId": { "type": "String", "attributes": ["@unique"] },
-            "amount": { "type": "Decimal", "attributes": ["@db.Decimal(10, 2)"] },
+            "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
             "processed": { "type": "Boolean", "attributes": ["@default(false)"] },
             "processedAt": { "type": "DateTime", "optional": true }
         },
         "relations": {
-            "transaction": { "type": "Transaction", "relation": { "fields": ["transactionId"], "references": ["id"], "onDelete": "Cascade" } }
+            "transaction": { "type": "Transaction", "relation": { "name": "RoundUpEntry_transaction", "fields": ["transactionId"], "references": ["id"], "onDelete": "Cascade" } }
         }
     },
     "CategorizationRule": {
@@ -505,7 +707,7 @@
       },
       "relations": {
         "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
-        "category": { "type": "Category", "relation": { "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } }
+        "category": { "type": "Category", "relation": { "name": "CategorizationRule_category", "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } }
       }
     },
     "ImportTemplate": {
@@ -548,7 +750,7 @@
         "fields": {
             "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
             "date": { "type": "DateTime" },
-            "amount": { "type": "Decimal", "attributes": ["@db.Decimal(10, 2)"] },
+            "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
             "type": { "type": "ImportedTransactionType" },
             "description": { "type": "String" },
             "fitId": { "type": "String", "attributes": ["@unique"] },

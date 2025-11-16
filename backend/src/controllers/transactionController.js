@@ -8,6 +8,8 @@ import { stringify as stringifyCsv } from 'csv-stringify/sync';
 import AuditService from '../services/auditService.js';
 import GamificationService from '../services/gamificationService.js';
 import { suggestCategoryFlow } from '../ai/flows/category-suggestion-flow.js';
+import CardBalanceService from '../services/cardBalanceService.js';
+import { getInvoicePeriod } from '../utils/date-helpers.js';
 
 
 const prisma = new PrismaClient();
@@ -69,8 +71,8 @@ async function createTransactionLogic(tx, userId, data) {
     // **NOVO**: Validação de Saldo para qualquer despesa de débito/pix
     if (tipo === 'despesa' && pago && ['debito', 'pix'].includes(metodoPagamento) && accountId) {
         const account = await tx.account.findUnique({ where: { id: accountId } });
-        const receitas = await tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: accountId, tipo: 'receita', pago: true } });
-        const despesas = await tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: accountId, tipo: 'despesa', pago: true } });
+        const receitas = await tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: accountId, tipo: 'receita' } });
+        const despesas = await tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: accountId, tipo: 'despesa' } });
         const currentBalance = Number(account.saldoInicial) + (receitas._sum.valor || 0) - (despesas._sum.valor || 0);
 
         if (currentBalance < valorOriginal) {
@@ -84,10 +86,29 @@ async function createTransactionLogic(tx, userId, data) {
             const error = new Error('Cartão de crédito não encontrado.'); error.statusCode = 404; throw error;
         }
         const valorDaCompra = (withInterest && interestRate > 0 && totalInstallments > 1) ? ((valorOriginal * (interestRate / 100)) / (1 - Math.pow(1 + (interestRate / 100), -totalInstallments))) * totalInstallments : valorOriginal;
-        const saldoFaturaResult = await tx.transaction.aggregate({ _sum: { valor: true }, where: { cardId: card.id, tipo: 'despesa' }});
-        const faturaPagaResult = await tx.transaction.aggregate({ _sum: { valor: true }, where: { cardId: card.id, tipo: 'receita' }});
-        const saldoFatura = (saldoFaturaResult._sum.valor || 0) - (faturaPagaResult._sum.valor || 0);
-        const limiteDisponivel = parseFloat(card.limite) - saldoFatura;
+        const { start: invoiceStart, end: invoiceEnd } = getInvoicePeriod(card, transactionDate);
+        const [periodExpenses, periodPayments] = await Promise.all([
+            tx.transaction.aggregate({
+                _sum: { valor: true },
+                where: {
+                    cardId: card.id,
+                    tipo: 'despesa',
+                    metodoPagamento: 'credito',
+                    data: { gte: invoiceStart, lte: invoiceEnd },
+                },
+            }),
+            tx.transaction.aggregate({
+                _sum: { valor: true },
+                where: {
+                    cardId: card.id,
+                    tipo: 'receita',
+                    isInvoicePayment: true,
+                    data: { gte: invoiceStart, lte: invoiceEnd },
+                },
+            }),
+        ]);
+        const saldoFatura = Number(periodExpenses._sum.valor || 0) - Number(periodPayments._sum.valor || 0);
+        const limiteDisponivel = Number(card.availableLimit ?? (parseFloat(card.limite) - saldoFatura));
         if (valorDaCompra > limiteDisponivel) {
             const error = new Error('Limite do cartão de crédito excedido.'); error.statusCode = 403;
             error.details = { message: 'Limite do cartão de crédito excedido.', limiteDisponivel: limiteDisponivel.toFixed(2), valorExcedido: (valorDaCompra - limiteDisponivel).toFixed(2) };
@@ -260,6 +281,10 @@ class TransactionController {
                         details: { after: trans, entryType: req.body.entryType }, status: 'SUCCESS', origin: 'WEB_APP', ipAddress: req.ip
                     });
                 }
+                const cardIdsToRefresh = [...new Set(newTransactions.map(t => t.cardId).filter(Boolean))];
+                for (const cardId of cardIdsToRefresh) {
+                    await CardBalanceService.recalculateCardSummary(cardId);
+                }
                 const user = await prisma.user.findUnique({ where: { id: userId } });
                 if (user) {
                   await NotificationService.createNotification(prisma, user, {
@@ -309,11 +334,17 @@ class TransactionController {
                     }
                 });
 
-                 await AuditService.log({
+                await AuditService.log({
                     userId, action: 'UPDATE_TRANSACTION', entity: 'TRANSACTION', entityId: id,
                     details: { before: originalTransaction, after: updatedTransaction },
                     status: 'SUCCESS', ipAddress: req.ip
                 });
+                const affectedCardIds = new Set(
+                    [originalTransaction.cardId, updatedTransaction.cardId].filter(Boolean)
+                );
+                for (const cardId of affectedCardIds) {
+                    await CardBalanceService.recalculateCardSummary(cardId);
+                }
                 return res.json([updatedTransaction]);
             }
 
@@ -335,7 +366,17 @@ class TransactionController {
     
                 return createdTransactions;
             });
-    
+
+            const cardsToRefresh = new Set(
+                [
+                    originalTransaction.cardId,
+                    ...(newTransactions || []).map(t => t.cardId)
+                ].filter(Boolean)
+            );
+            for (const cardId of cardsToRefresh) {
+                await CardBalanceService.recalculateCardSummary(cardId);
+            }
+
             res.json(newTransactions);
             
         } catch (error) {
@@ -363,10 +404,13 @@ class TransactionController {
                 }
             });
 
-             await AuditService.log({
+            await AuditService.log({
                 userId, action: 'DELETE_TRANSACTION', entity: 'TRANSACTION', entityId: id,
                 details: { before: transactionToDelete }, status: 'SUCCESS', ipAddress: req.ip
             });
+            if (transactionToDelete.cardId) {
+                await CardBalanceService.recalculateCardSummary(transactionToDelete.cardId);
+            }
 
             res.status(204).send();
         } catch (error) {
@@ -401,10 +445,16 @@ class TransactionController {
             });
 
 
-             await AuditService.log({
+            await AuditService.log({
                 userId, action: 'TOGGLE_PAID_STATUS', entity: 'TRANSACTION', entityId: id,
                 details: { before: transaction, after: updatedTransaction }, status: 'SUCCESS', ipAddress: req.ip
             });
+            if (updatedTransaction.cardId || transaction.cardId) {
+                const cardIds = new Set([transaction.cardId, updatedTransaction.cardId].filter(Boolean));
+                for (const cardId of cardIds) {
+                    await CardBalanceService.recalculateCardSummary(cardId);
+                }
+            }
 
             res.json(updatedTransaction);
         } catch (error) {

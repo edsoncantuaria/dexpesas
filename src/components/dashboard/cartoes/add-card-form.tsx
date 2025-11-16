@@ -22,17 +22,21 @@ const formSchema = z.object({
   diaFechamento: z.coerce.number().min(1).max(31, { message: 'Dia inválido.' }),
   diaVencimento: z.coerce.number().min(1).max(31, { message: 'Dia inválido.' }),
   bandeira: z.enum(['visa', 'mastercard', 'elo', 'amex'], { required_error: 'Selecione a bandeira.' }),
+  status: z.enum(['ACTIVE', 'BLOCKED', 'CANCELLED']).default('ACTIVE'),
   rewardsType: z.string().optional(),
   rewardsProgram: z.string().optional(),
   rewardsConversionRate: z.coerce.number().min(0, "A taxa de conversão não pode ser negativa.").optional().nullable(),
   currencyForConversion: z.enum(['BRL', 'USD']).optional().nullable(),
   jurosRotativo: z.coerce.number().min(0, "A taxa de juros não pode ser negativa.").optional().nullable(),
+  billingCurrency: z.enum(['BRL', 'USD']).default('BRL'),
+  lastFourDigits: z.union([z.string().trim().length(4, { message: 'Informe os 4 últimos dígitos.' }), z.literal('')]).optional().nullable(),
+  issuer: z.union([z.string(), z.literal('')]).optional().nullable(),
   paymentAccountId: z.string().optional(),
 });
 
 type AddCardFormProps = {
     card?: Card | null;
-    onSuccess: (card: Omit<Card, 'id' | 'userId' | 'saldoFatura' | 'bestDayToBuy'> & { id?: string }) => void;
+    onSuccess: (card: Omit<Card, 'id' | 'userId' | 'bestDayToBuy' | 'currentInvoiceAmount' | 'availableLimit'> & { id?: string }) => void;
     onClose: () => void;
     isSubmitting: boolean;
 };
@@ -61,11 +65,15 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting }: AddCardF
       limite: 0,
       diaFechamento: 1,
       diaVencimento: 10,
+      status: 'ACTIVE',
       rewardsType: 'nenhum',
       rewardsProgram: '',
       rewardsConversionRate: 1.0,
       currencyForConversion: 'BRL',
       jurosRotativo: 14.9,
+      billingCurrency: 'BRL',
+      lastFourDigits: '',
+      issuer: '',
       paymentAccountId: 'none',
     },
   });
@@ -78,6 +86,10 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting }: AddCardF
             rewardsType: card.rewardsType ?? 'nenhum',
             rewardsConversionRate: card.rewardsConversionRate ?? 1.0,
             currencyForConversion: card.currencyForConversion ?? 'BRL',
+            billingCurrency: card.billingCurrency ?? 'BRL',
+            status: card.status ?? 'ACTIVE',
+            lastFourDigits: card.lastFourDigits ?? '',
+            issuer: card.issuer ?? '',
             paymentAccountId: card.paymentAccountId || 'none',
         });
     }
@@ -85,7 +97,12 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting }: AddCardF
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    const cardData = isEditing ? { ...values, id: card.id } : values;
+    const payload = {
+        ...values,
+        lastFourDigits: values.lastFourDigits?.trim() ? values.lastFourDigits.trim() : undefined,
+        issuer: values.issuer?.trim() ? values.issuer.trim() : undefined,
+    };
+    const cardData = isEditing ? { ...payload, id: card.id } : payload;
     onSuccess(cardData);
   }
   
@@ -105,6 +122,51 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting }: AddCardF
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField control={form.control} name="diaFechamento" render={({ field }) => ( <FormItem><FormLabel>Dia do Fechamento</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
             <FormField control={form.control} name="diaVencimento" render={({ field }) => ( <FormItem><FormLabel>Dia do Vencimento</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem> )}/>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField control={form.control} name="status" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Status do Cartão</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            <SelectItem value="ACTIVE">Ativo</SelectItem>
+                            <SelectItem value="BLOCKED">Bloqueado</SelectItem>
+                            <SelectItem value="CANCELLED">Cancelado</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+            )}/>
+            <FormField control={form.control} name="billingCurrency" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Moeda da Fatura</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            <SelectItem value="BRL">Real (BRL)</SelectItem>
+                            <SelectItem value="USD">Dólar (USD)</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+            )}/>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField control={form.control} name="lastFourDigits" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Últimos 4 dígitos (opcional)</FormLabel>
+                    <FormControl><Input maxLength={4} {...field} value={field.value ?? ''} /></FormControl>
+                    <FormMessage />
+                </FormItem>
+            )}/>
+            <FormField control={form.control} name="issuer" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Emissor (opcional)</FormLabel>
+                    <FormControl><Input {...field} value={field.value ?? ''} /></FormControl>
+                    <FormMessage />
+                </FormItem>
+            )}/>
         </div>
         
          <FormField

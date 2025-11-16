@@ -125,11 +125,14 @@ export function PayBillDialog({
                                 </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                {accounts.map((acc) => (
-                                    <SelectItem key={acc.id} value={acc.id}>
-                                        {acc.nome} (Saldo: {Number(acc.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
-                                    </SelectItem>
-                                ))}
+                                {accounts.map((acc) => {
+                                    const available = Number(acc.saldoPago ?? acc.saldo ?? 0);
+                                    return (
+                                        <SelectItem key={acc.id} value={acc.id}>
+                                            {acc.nome} (Disponível: {available.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+                                        </SelectItem>
+                                    );
+                                })}
                                 </SelectContent>
                             </Select>
                             <FormMessage />

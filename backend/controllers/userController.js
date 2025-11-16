@@ -40,7 +40,7 @@ class UserController {
                     isAdmin: true,
                     level: true,
                     // Correção: Acessar a relação ClanMember para obter o clanId e role
-                    clanMembership: {
+                    clanMemberships: {
                         select: {
                             clanId: true,
                             role: true,
@@ -50,13 +50,16 @@ class UserController {
             });
 
             if (!user) {
-                return res.status(404).json({ message: 'Usuário não encontrado.' });
+                return res.status(401).json({ message: 'Usuário não encontrado ou sessão expirada.' });
             }
 
-            // Simplificação: Os dados agora vêm formatados corretamente da consulta
+            const { clanMemberships = [], ...userData } = user;
+            const primaryMembership = clanMemberships[0] ?? null;
             const userResponse = {
-                ...user,
-                clanId: user.clanMembership?.clanId || null,
+                ...userData,
+                clanMemberships,
+                clanMembership: primaryMembership,
+                clanId: primaryMembership?.clanId || null,
             };
 
             res.json(userResponse);

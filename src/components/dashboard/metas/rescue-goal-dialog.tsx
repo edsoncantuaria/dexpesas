@@ -59,11 +59,14 @@ export function RescueGoalDialog({ isOpen, isSaving, onClose, onConfirm, goal, a
                     <SelectValue placeholder="Para onde o dinheiro deve ir?"/>
                 </SelectTrigger>
                 <SelectContent>
-                    {accounts.map(acc => (
-                        <SelectItem key={acc.id} value={acc.id}>
-                            {acc.nome} ({Number(acc.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
-                        </SelectItem>
-                    ))}
+                    {accounts.map(acc => {
+                        const available = Number(acc.saldoPago ?? acc.saldo ?? 0);
+                        return (
+                            <SelectItem key={acc.id} value={acc.id}>
+                                {acc.nome} ({available.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+                            </SelectItem>
+                        );
+                    })}
                 </SelectContent>
             </Select>
         </div>

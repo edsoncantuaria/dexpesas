@@ -293,7 +293,7 @@ class GamificationService {
             prisma.budget.findMany({
                 where: { userId, month: { lte: yesterday.toISOString().slice(0, 7) } },
             }),
-            prisma.category.findUnique({ where: { nome: 'DividasEEmprestimos' }})
+            prisma.category.findFirst({ where: { nome: 'DividasEEmprestimos', userId: null }})
         ]);
         
         const RENDA_MEDIA_POPULACAO = 2800; 

@@ -11,7 +11,7 @@ interface ClanMembership {
 }
 
 interface UserContextType {
-  user: (User & { clanMembership?: ClanMembership | null; clanId?: string | null; }) | null;
+  user: (User & { clanMembership?: ClanMembership | null; clanMemberships?: ClanMembership[]; clanId?: string | null; }) | null;
   isLoading: boolean;
   fetchUser: () => Promise<void>; // Expor a função de busca
 }

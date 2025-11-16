@@ -34,7 +34,9 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
 
     }, [cards]);
 
-    const availableLimit = cardToDisplay ? Number(cardToDisplay.limite) - Number(cardToDisplay.saldoFatura) : 0;
+    const availableLimit = cardToDisplay
+        ? Number(cardToDisplay.availableLimit ?? (Number(cardToDisplay.limite) - Number(cardToDisplay.currentInvoiceAmount ?? 0)))
+        : 0;
 
     return (
         <Link href="/dashboard/cartoes" className="group">
@@ -62,7 +64,7 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                             <div className="flex justify-between items-center text-sm">
                                 <div>
                                     <p className="text-muted-foreground">Fatura Atual</p>
-                                    <p className="font-bold text-destructive text-lg">{formatCurrency(cardToDisplay.saldoFatura)}</p>
+                                    <p className="font-bold text-destructive text-lg">{formatCurrency(cardToDisplay.currentInvoiceAmount ?? 0)}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-muted-foreground">Limite Disponível</p>

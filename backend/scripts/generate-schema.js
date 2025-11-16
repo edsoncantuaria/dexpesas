@@ -75,10 +75,8 @@ generator client {
 
             if (relDef.relation) {
               const { name, fields, references, onDelete, onUpdate } = relDef.relation;
-              // Lógica aprimorada para nomear relações automaticamente
-              const relNameAuto = name || `${modelName}_${relDef.type}_${relName}`;
               const relAttrs = [
-                `"${relNameAuto}"`,
+                name ? `"${name}"` : '',
                 fields ? `fields: [${fields.join(', ')}]` : '',
                 references ? `references: [${references.join(', ')}]` : '',
                 onDelete ? `onDelete: ${onDelete}` : '',

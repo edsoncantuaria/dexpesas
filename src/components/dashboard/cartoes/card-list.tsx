@@ -98,7 +98,7 @@ export function CardList({ cards, onEdit, onDelete, isLoading }: CardListProps) 
                 </CardHeader>
                 <CardContent className="p-0 [text-shadow:_1px_1px_2px_rgb(0_0_0_/_0.2)]">
                   <div className="space-y-2">
-                      <p className="font-mono tracking-widest text-lg">**** **** **** 1234</p>
+                      <p className="font-mono tracking-widest text-lg">**** **** **** {card.lastFourDigits ?? '????'}</p>
                       <div className="flex justify-between text-xs opacity-80">
                           <p>Venc. {card.diaVencimento.toString().padStart(2, '0')}</p>
                           <p>Fecha {card.diaFechamento.toString().padStart(2, '0')}</p>

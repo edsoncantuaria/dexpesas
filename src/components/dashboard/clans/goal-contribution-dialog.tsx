@@ -88,14 +88,17 @@ export function GoalContributionDialog({ isOpen, onClose, goal, userAccounts, on
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {userAccounts.map(acc => (
-                        <SelectItem key={acc.id} value={acc.id}>
-                          <span className="font-medium">{acc.nome}</span>
-                          <span className={cn("ml-2 text-sm", Number(acc.saldo) >= 0 ? "text-green-500" : "text-destructive")}>
-                            (Saldo: {Number(acc.saldo).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
-                          </span>
-                        </SelectItem>
-                      ))}
+                      {userAccounts.map(acc => {
+                        const available = Number(acc.saldoPago ?? acc.saldo ?? 0);
+                        return (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            <span className="font-medium">{acc.nome}</span>
+                            <span className={cn("ml-2 text-sm", available >= 0 ? "text-green-500" : "text-destructive")}>
+                              (Saldo disponível: {available.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+                            </span>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                   <FormMessage />

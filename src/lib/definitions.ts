@@ -37,8 +37,13 @@ export type User = {
     level: number;
     clanId?: string | null;
     clanMembership?: {
-      role: 'LEADER' | 'ADMIN' | 'MEMBER'
+      role: 'LEADER' | 'ADMIN' | 'MEMBER';
+      clanId?: string | null;
     } | null;
+    clanMemberships?: {
+      role: 'LEADER' | 'ADMIN' | 'MEMBER';
+      clanId: string;
+    }[];
 };
 
 export type LegacyRuin = {
@@ -89,10 +94,21 @@ export type Account = {
     userId: string;
     nome: string;
     instituicao: string;
+    bankCode?: string | null;
+    agencyNumber?: string | null;
+    agencyDigit?: string | null;
+    accountNumber?: string | null;
+    accountDigit?: string | null;
     tipo: 'corrente' | 'poupanca' | 'investimento';
-    saldo: number;
+    currency: 'BRL' | 'USD';
+    saldoInicial: number;
+    color?: string | null;
+    icone?: string | null;
+    isArchived: boolean;
+    saldo?: number;
+    saldoPago?: number;
 };
-  
+
 export type Card = {
     id: string;
     userId: string;
@@ -101,13 +117,18 @@ export type Card = {
     diaFechamento: number;
     diaVencimento: number;
     bandeira: 'visa' | 'mastercard' | 'elo' | 'amex';
-    saldoFatura: number;
+    status: 'ACTIVE' | 'BLOCKED' | 'CANCELLED';
+    billingCurrency: 'BRL' | 'USD';
+    currencyForConversion?: 'BRL' | 'USD' | null;
+    currentInvoiceAmount: number;
+    availableLimit?: number | null;
     rewardsType?: string | null;
     rewardsProgram?: string | null;
     rewardsConversionRate?: number | null;
-    currencyForConversion?: 'BRL' | 'USD' | null;
     jurosRotativo?: number | null;
-    bestDayToBuy?: string;
+    lastFourDigits?: string | null;
+    issuer?: string | null;
+    bestDayToBuy?: string | null;
     paymentAccountId?: string | null;
 };
 
@@ -121,15 +142,18 @@ export type Transaction = {
     id: string;
     userId: string;
     accountId?: string | null;
+    counterAccountId?: string | null;
     cardId?: string | null;
     descricao: string;
     valor: number;
     valorTotal?: number | null;
     tipo: 'receita' | 'despesa';
     data: string;
-    categoria: string; // Vem do include
+    categoria?: string;
     categoryId?: string | null;
-    metodoPagamento: 'debito' | 'credito' | 'pix' | 'dinheiro';
+    metodoPagamento: 'debito' | 'credito' | 'pix' | 'dinheiro' | 'transferencia';
+    currency: 'BRL' | 'USD';
+    status: 'PENDING' | 'POSTED' | 'CANCELLED' | 'FAILED';
     pago: boolean;
     notes?: string | null;
     installment?: boolean | null;
@@ -139,10 +163,21 @@ export type Transaction = {
     withInterest?: boolean | null;
     interestRate?: number | null;
     totalWithInterest?: number | null;
-    recurrenceType?: 'NONE' | 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'BIMONTHLY' | 'TRIMONTHLY' | 'SEMIANNUALLY' | null;
+    balanceAfter?: number | null;
+    recurrenceType?: 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'BIMONTHLY' | 'TRIMONTHLY' | 'SEMIANNUALLY' | null;
     recorrenciaId?: string | null;
     attachmentUrl?: string | null;
+    bankReference?: string | null;
+    authorizationCode?: string | null;
+    merchantName?: string | null;
+    merchantCategory?: string | null;
+    counterparty?: string | null;
+    postedAt?: string | null;
+    clearedAt?: string | null;
+    isTransfer?: boolean | null;
+    transferGroupId?: string | null;
     isReconciled: boolean;
+    isInvoicePayment?: boolean | null;
     importedTransactionId?: string | null;
     tags: Tag[];
 };
@@ -151,8 +186,10 @@ export type Category = {
     id: string;
     nome: string;
     label: string;
-    icon: string;
+    icon?: string | null;
     type: 'receita' | 'despesa';
+    parentCategoryId?: string | null;
+    userId?: string | null;
 };
   
 export type Achievement = {

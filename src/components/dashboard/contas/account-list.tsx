@@ -94,6 +94,8 @@ export function AccountList({ accounts, onEdit, onDelete, isLoading }: AccountLi
         {accounts.map((account) => {
            const style = getBankStyle(account.instituicao);
            const Icon = accountTypeIcons[account.tipo] || Landmark;
+           const projectedBalance = Number(account.saldo ?? account.saldoPago ?? 0);
+           const availableBalance = Number(account.saldoPago ?? account.saldo ?? 0);
            return (
             <div key={account.id} className="relative group">
               <Link href={`/dashboard/transacoes?accountId=${account.id}`} className="block">
@@ -108,11 +110,12 @@ export function AccountList({ accounts, onEdit, onDelete, isLoading }: AccountLi
                       <div className="space-y-1">
                           <p className="text-xs opacity-70">Saldo disponível</p>
                           <p className="text-3xl font-bold tracking-tight">
-                              {Number(account.saldo).toLocaleString('pt-BR', {
+                              {availableBalance.toLocaleString('pt-BR', {
                                   style: 'currency',
                                   currency: 'BRL',
                               })}
                           </p>
+                          <p className="text-xs opacity-70">Saldo projetado: {projectedBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                           <div className="flex items-center gap-1.5 text-xs pt-1 opacity-80">
                              <Icon className="h-3.5 w-3.5" />
                              <span className="capitalize">{account.tipo}</span>

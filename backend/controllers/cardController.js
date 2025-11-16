@@ -1,10 +1,11 @@
 // src/controllers/cardController.js
 import { PrismaClient } from '@prisma/client';
-import { setDate, startOfDay, endOfDay } from 'date-fns';
+import { setDate } from 'date-fns';
 import AuditService from '../services/auditService.js';
 import TransactionService from '../services/transactionService.js';
 import GamificationService from '../services/gamificationService.js';
 import { getInvoicePeriod } from '../utils/date-helpers.js';
+import CardBalanceService from '../services/cardBalanceService.js';
 
 const prisma = new PrismaClient();
 
@@ -54,8 +55,9 @@ class CardController {
                 const bestDayToBuy = setDate(now, card.diaFechamento + 1);
 
                 return { 
-                    ...card, 
-                    saldoFatura,
+                    ...card,
+                    currentInvoiceAmount: saldoFatura,
+                    availableLimit: Number(card.limite) - saldoFatura,
                     bestDayToBuy: bestDayToBuy.toISOString()
                 };
             });
@@ -96,8 +98,12 @@ class CardController {
             const totalReceitas = Number(receitas._sum.valor) || 0;
             const saldoDevedorTotal = totalDespesas - totalReceitas;
 
-
-            const cardWithDetails = { ...card, bestDayToBuy: bestDayToBuy.toISOString(), saldoDevedor: saldoDevedorTotal };
+            const cardWithDetails = {
+                ...card,
+                currentInvoiceAmount: saldoDevedorTotal,
+                availableLimit: Number(card.limite) - saldoDevedorTotal,
+                bestDayToBuy: bestDayToBuy.toISOString(),
+            };
 
 
             res.json(cardWithDetails);
@@ -108,7 +114,25 @@ class CardController {
 
     async createCard(req, res, next) {
         try {
-            const { nome, limite, diaFechamento, diaVencimento, bandeira, rewardsType, rewardsProgram, jurosRotativo, rewardsConversionRate, currencyForConversion, paymentAccountId } = req.body;
+            const {
+                nome,
+                limite,
+                diaFechamento,
+                diaVencimento,
+                bandeira,
+                rewardsType,
+                rewardsProgram,
+                jurosRotativo,
+                rewardsConversionRate,
+                currencyForConversion,
+                paymentAccountId,
+                status = 'ACTIVE',
+                lastFourDigits,
+                issuer,
+                billingCurrency = 'BRL',
+                currentInvoiceAmount = 0,
+                availableLimit,
+            } = req.body;
             const newCard = await prisma.card.create({
                 data: {
                     nome,
@@ -116,11 +140,17 @@ class CardController {
                     diaFechamento,
                     diaVencimento,
                     bandeira,
+                    status,
                     rewardsType,
                     rewardsProgram,
                     rewardsConversionRate,
                     currencyForConversion,
                     jurosRotativo,
+                    lastFourDigits: lastFourDigits || null,
+                    issuer: issuer || null,
+                    billingCurrency,
+                    currentInvoiceAmount,
+                    availableLimit: availableLimit ?? null,
                     paymentAccountId: paymentAccountId === 'none' ? null : paymentAccountId,
                     userId: req.user.id,
                 }
@@ -144,28 +174,55 @@ class CardController {
     async updateCard(req, res, next) {
         try {
             const { id } = req.params;
-            const { nome, limite, diaFechamento, diaVencimento, bandeira, rewardsType, rewardsProgram, jurosRotativo, rewardsConversionRate, currencyForConversion, paymentAccountId } = req.body;
+            const {
+                nome,
+                limite,
+                diaFechamento,
+                diaVencimento,
+                bandeira,
+                rewardsType,
+                rewardsProgram,
+                jurosRotativo,
+                rewardsConversionRate,
+                currencyForConversion,
+                paymentAccountId,
+                status,
+                lastFourDigits,
+                issuer,
+                billingCurrency,
+                currentInvoiceAmount,
+                availableLimit,
+            } = req.body;
             
             const originalCard = await prisma.card.findUnique({ where: { id: id, userId: req.user.id }});
             if (!originalCard) {
                 return res.status(404).json({ message: 'Cartão não encontrado.' });
             }
 
+            const updateData = {
+                nome,
+                limite,
+                diaFechamento,
+                diaVencimento,
+                bandeira,
+                rewardsType,
+                rewardsProgram,
+                jurosRotativo,
+                rewardsConversionRate,
+                currencyForConversion,
+                status,
+                lastFourDigits: lastFourDigits ?? originalCard.lastFourDigits,
+                issuer: issuer ?? originalCard.issuer,
+                billingCurrency,
+                currentInvoiceAmount,
+                availableLimit,
+                paymentAccountId: paymentAccountId === 'none' ? null : paymentAccountId,
+            };
+            Object.keys(updateData).forEach((key) => updateData[key] === undefined && delete updateData[key]);
+
             const updatedCard = await prisma.card.update({
                 where: { id: id, userId: req.user.id },
-                data: { 
-                    nome, 
-                    limite, 
-                    diaFechamento, 
-                    diaVencimento, 
-                    bandeira, 
-                    rewardsType, 
-                    rewardsProgram, 
-                    jurosRotativo, 
-                    rewardsConversionRate, 
-                    currencyForConversion,
-                    paymentAccountId: paymentAccountId === 'none' ? null : paymentAccountId,
-                }
+                data: updateData
             });
 
             await AuditService.log({
@@ -236,8 +293,8 @@ class CardController {
                     throw { statusCode: 404, message: 'Conta de origem não encontrada.' };
                 }
 
-                const receitas = await tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: accountId, tipo: 'receita', pago: true } });
-                const despesas = await tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: accountId, tipo: 'despesa', pago: true } });
+                const receitas = await tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: accountId, tipo: 'receita' } });
+                const despesas = await tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: accountId, tipo: 'despesa' } });
                 const accountBalance = Number(sourceAccount.saldoInicial) + (receitas._sum.valor || 0) - (despesas._sum.valor || 0);
 
                 if (accountBalance < parsedAmount) {
@@ -268,6 +325,7 @@ class CardController {
             });
 
 
+            await CardBalanceService.recalculateCardSummary(cardId);
             res.status(201).json({ message: "Fatura paga com sucesso!", data: result });
         } catch (error) {
             if (error.statusCode) {

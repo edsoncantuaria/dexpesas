@@ -33,7 +33,6 @@ class AccountController {
                 where: {
                     userId,
                     accountId: { in: accounts.map(a => a.id) },
-                    pago: true,
                     data: { lte: endOfDay(new Date()) }
                 },
                 _sum: {
@@ -41,9 +40,21 @@ class AccountController {
                 },
             });
 
-            // Processa os resultados em memória (muito mais rápido que múltiplos acessos ao DB)
+            const transactionsSumsPaid = await prisma.transaction.groupBy({
+                by: ['accountId', 'tipo'],
+                where: {
+                    userId,
+                    accountId: { in: accounts.map(a => a.id) },
+                    pago: true,
+                    data: { lte: endOfDay(new Date()) }
+                },
+                _sum: { valor: true },
+            });
+
             const receitasMap = new Map();
             const despesasMap = new Map();
+            const receitasPagasMap = new Map();
+            const despesasPagasMap = new Map();
 
             transactionsSums.forEach(group => {
                 if (group.tipo === 'receita') {
@@ -53,12 +64,23 @@ class AccountController {
                 }
             });
 
+            transactionsSumsPaid.forEach(group => {
+                if (group.tipo === 'receita') {
+                    receitasPagasMap.set(group.accountId, group._sum.valor || 0);
+                } else {
+                    despesasPagasMap.set(group.accountId, group._sum.valor || 0);
+                }
+            });
+
             const accountsWithCurrentBalance = accounts.map(account => {
                 const totalReceitas = Number(receitasMap.get(account.id) || 0);
                 const totalDespesas = Number(despesasMap.get(account.id) || 0);
+                const totalReceitasPagas = Number(receitasPagasMap.get(account.id) || 0);
+                const totalDespesasPagas = Number(despesasPagasMap.get(account.id) || 0);
                 const saldo = Number(account.saldoInicial) + totalReceitas - totalDespesas;
+                const saldoPago = Number(account.saldoInicial) + totalReceitasPagas - totalDespesasPagas;
                 
-                return { ...account, saldo };
+                return { ...account, saldo, saldoPago };
             });
 
             res.json(accountsWithCurrentBalance);
@@ -70,7 +92,21 @@ class AccountController {
 
     async createAccount(req, res, next) {
         try {
-            const { nome, instituicao, tipo, saldo } = req.body;
+            const {
+                nome,
+                instituicao,
+                tipo,
+                saldo,
+                currency = 'BRL',
+                bankCode,
+                agencyNumber,
+                agencyDigit,
+                accountNumber,
+                accountDigit,
+                color,
+                icone,
+                isArchived = false,
+            } = req.body;
             const userId = req.user.id;
             const initialBalance = parseFloat(saldo) || 0;
 
@@ -81,7 +117,16 @@ class AccountController {
                     nome,
                     instituicao,
                     tipo,
+                    currency,
                     saldoInicial: initialBalance,
+                    bankCode: bankCode || null,
+                    agencyNumber: agencyNumber || null,
+                    agencyDigit: agencyDigit || null,
+                    accountNumber: accountNumber || null,
+                    accountDigit: accountDigit || null,
+                    color: color || null,
+                    icone: icone || null,
+                    isArchived,
                     userId,
                 }
             });
@@ -105,16 +150,45 @@ class AccountController {
     async updateAccount(req, res, next) {
         try {
             const { id } = req.params;
-            const { nome, instituicao, tipo } = req.body;
+            const {
+                nome,
+                instituicao,
+                tipo,
+                currency,
+                bankCode,
+                agencyNumber,
+                agencyDigit,
+                accountNumber,
+                accountDigit,
+                color,
+                icone,
+                isArchived,
+            } = req.body;
 
             const originalAccount = await prisma.account.findUnique({ where: { id: id, userId: req.user.id }});
             if (!originalAccount) {
                  return res.status(404).json({ message: 'Conta não encontrada.' });
             }
 
+            const updateData = {
+                nome,
+                instituicao,
+                tipo,
+                currency,
+                bankCode: bankCode ?? originalAccount.bankCode,
+                agencyNumber: agencyNumber ?? originalAccount.agencyNumber,
+                agencyDigit: agencyDigit ?? originalAccount.agencyDigit,
+                accountNumber: accountNumber ?? originalAccount.accountNumber,
+                accountDigit: accountDigit ?? originalAccount.accountDigit,
+                color: color ?? originalAccount.color,
+                icone: icone ?? originalAccount.icone,
+                isArchived: typeof isArchived === 'boolean' ? isArchived : originalAccount.isArchived,
+            };
+            Object.keys(updateData).forEach((key) => updateData[key] === undefined && delete updateData[key]);
+
             const updatedAccount = await prisma.account.update({
                 where: { id: id, userId: req.user.id },
-                data: { nome, instituicao, tipo }
+                data: updateData
             });
             
             await AuditService.log({
@@ -194,8 +268,8 @@ class AccountController {
                 }
                 
                  const [receitas, despesas] = await Promise.all([
-                    tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: fromAccountId, tipo: 'receita', pago: true } }),
-                    tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: fromAccountId, tipo: 'despesa', pago: true } }),
+                    tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: fromAccountId, tipo: 'receita' } }),
+                    tx.transaction.aggregate({ _sum: { valor: true }, where: { accountId: fromAccountId, tipo: 'despesa' } }),
                 ]);
                 const fromAccountBalance = Number(fromAccount.saldoInicial) + (receitas._sum.valor || 0) - (despesas._sum.valor || 0);
 

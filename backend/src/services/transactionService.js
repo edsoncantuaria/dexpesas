@@ -3,6 +3,7 @@
 import { PrismaClient } from '@prisma/client';
 import { getInvoicePeriod } from '../utils/date-helpers.js';
 import { setDate, format, startOfDay, endOfDay, addMonths } from 'date-fns';
+import CardBalanceService from './cardBalanceService.js';
 
 const prisma = new PrismaClient();
 
@@ -14,13 +15,19 @@ async function getCategoryMap(tx) {
 
 class TransactionService {
 
-    static async handleBillPayment(userId, cardId, accountId, paymentAmount, paymentDate, tx) {
-        const prismaInstance = tx || prisma;
+    static async handleBillPayment(userId, cardId, accountId, paymentAmount, paymentDate, prismaTx) {
+        const executor = prismaTx
+            ? (callback) => callback(prismaTx)
+            : (callback) => prisma.$transaction(callback);
         
-        return prismaInstance.$transaction(async (transactionTx) => {
+        return executor(async (transactionTx) => {
             const categoryMap = await getCategoryMap(transactionTx);
-            const pagamentoFaturaCategoryId = categoryMap.get('Moradia'); // Pagamento de fatura é uma despesa de moradia
-            const jurosCategoryId = categoryMap.get('DividasEEmprestimos');
+            const pagamentoFaturaCategoryId =
+                ['Pagamento Fatura', 'PagamentoFatura', 'PagamentosFatura']
+                    .map(name => categoryMap.get(name))
+                    .find(Boolean) || categoryMap.get('Moradia');
+            const jurosCategoryId =
+                categoryMap.get('DividasEEmprestimos') || categoryMap.get('Dividas');
             const payDate = paymentDate ? new Date(paymentDate) : new Date();
 
             if (!pagamentoFaturaCategoryId || !jurosCategoryId) {
@@ -90,6 +97,7 @@ class TransactionService {
                     descricao: `Pagamento Fatura`,
                     valor: paymentAmount, data: payDate, tipo: 'receita',
                     pago: true, metodoPagamento: 'credito', categoryId: pagamentoFaturaCategoryId,
+                    isInvoicePayment: true,
                 }
             });
 
@@ -110,6 +118,7 @@ class TransactionService {
                 });
             }
 
+            await CardBalanceService.recalculateCardSummary(cardId, transactionTx);
             return { expenseTransaction, incomeTransaction };
         });
     }

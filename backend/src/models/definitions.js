@@ -35,8 +35,19 @@
  * @property {string} userId
  * @property {string} nome
  * @property {string} instituicao
+ * @property {string} [bankCode]
+ * @property {string} [agencyNumber]
+ * @property {string} [agencyDigit]
+ * @property {string} [accountNumber]
+ * @property {string} [accountDigit]
  * @property {'corrente' | 'poupanca' | 'investimento'} tipo
- * @property {number} saldo
+ * @property {'BRL' | 'USD'} currency
+ * @property {number} saldoInicial
+ * @property {string} [color]
+ * @property {string} [icone]
+ * @property {boolean} isArchived
+ * @property {number} [saldo]
+ * @property {number} [saldoPago]
  */
 
 /**
@@ -48,7 +59,19 @@
  * @property {number} diaFechamento
  * @property {number} diaVencimento
  * @property {'visa' | 'mastercard' | 'elo' | 'amex'} bandeira
- * @property {number} saldoFatura
+ * @property {'ACTIVE' | 'BLOCKED' | 'CANCELLED'} status
+ * @property {string} [rewardsType]
+ * @property {string} [rewardsProgram]
+ * @property {number} [rewardsConversionRate]
+ * @property {string} [lastFourDigits]
+ * @property {string} [issuer]
+ * @property {'BRL' | 'USD'} billingCurrency
+ * @property {'BRL' | 'USD'} [currencyForConversion]
+ * @property {number} currentInvoiceAmount
+ * @property {number} [availableLimit]
+ * @property {number} [jurosRotativo]
+ * @property {string} [paymentAccountId]
+ * @property {string} [bestDayToBuy]
  */
 
 /**
@@ -59,25 +82,49 @@
  * @property {string} [cardId]
  * @property {string} descricao
  * @property {number} valor
- * @property {number} [valorTotal]
  * @property {'receita' | 'despesa'} tipo
  * @property {string} data
- * @property {string} categoria
- * @property {'debito' | 'credito' | 'pix' | 'dinheiro'} metodoPagamento
+ * @property {'debito' | 'credito' | 'pix' | 'dinheiro' | 'transferencia'} metodoPagamento
+ * @property {'BRL' | 'USD'} currency
+ * @property {'PENDING' | 'POSTED' | 'CANCELLED' | 'FAILED'} status
  * @property {boolean} pago
+ * @property {string} [notes]
  * @property {boolean} [installment]
  * @property {string} [installmentId]
  * @property {number} [installmentNumber]
  * @property {number} [totalInstallments]
- * @property {boolean} [recorrente]
+ * @property {boolean} [withInterest]
+ * @property {number} [interestRate]
+ * @property {number} [valorTotal]
+ * @property {number} [totalWithInterest]
+ * @property {number} [balanceAfter]
+ * @property {'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'BIMONTHLY' | 'TRIMONTHLY' | 'SEMIANNUALLY'} [recurrenceType]
  * @property {string} [recorrenciaId]
+ * @property {string} [attachmentUrl]
+ * @property {string} [bankReference]
+ * @property {string} [authorizationCode]
+ * @property {string} [merchantName]
+ * @property {string} [merchantCategory]
+ * @property {string} [counterparty]
+ * @property {string} [postedAt]
+ * @property {string} [clearedAt]
+ * @property {boolean} [isTransfer]
+ * @property {string} [counterAccountId]
+ * @property {string} [transferGroupId]
+ * @property {boolean} isReconciled
+ * @property {string} [categoryId]
+ * @property {boolean} [isInvoicePayment]
  */
 
 /**
  * @typedef {Object} Category
  * @property {string} id
  * @property {string} nome
- * @property {string} icon
+ * @property {string} label
+ * @property {string} [icon]
+ * @property {'receita' | 'despesa'} type
+ * @property {string} [parentCategoryId]
+ * @property {string} [userId]
  */
 
 /**
@@ -116,6 +163,17 @@
  * @property {string} createdAt
  * @property {string} [relatedId]
  * @property {NotificationAction[]} [actions]
+ */
+
+/**
+ * @typedef {Object} LedgerEntry
+ * @property {string} id
+ * @property {string} transactionId
+ * @property {string} accountId
+ * @property {'DEBIT' | 'CREDIT'} direction
+ * @property {number} amount
+ * @property {'BRL' | 'USD'} currency
+ * @property {number} [exchangeRate]
  */
 
 

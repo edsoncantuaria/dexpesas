@@ -86,7 +86,7 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
       };
   }, [fetchData]);
 
-  const { invoiceTransactions } = useMemo(() => {
+    const { invoiceTransactions } = useMemo(() => {
     if (!card) return { invoiceTransactions: [] };
 
     // A data de referência para a fatura é sempre o mês selecionado pelo usuário.
@@ -96,18 +96,20 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
       return tDate >= period.start && tDate <= period.end;
     });
 
+    const creditTransactions = filtered.filter(t => t.metodoPagamento === 'credito' || t.isInvoicePayment);
+
     return { 
-        invoiceTransactions: filtered.sort((a,b) => new Date(b.data).getTime() - new Date(a.data).getTime()),
+        invoiceTransactions: creditTransactions.sort((a,b) => new Date(b.data).getTime() - new Date(a.data).getTime()),
     };
   }, [transactions, card, selectedMonth]);
   
   const { faturaTotal, valorPago, saldoDevedor } = useMemo(() => {
      const total = invoiceTransactions.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + Number(t.valor), 0);
-     const pago = invoiceTransactions.filter(t => t.tipo === 'receita' && t.descricao.includes(`Pagamento Fatura`)).reduce((acc, t) => acc + Number(t.valor), 0);
+     const pago = invoiceTransactions.filter(t => t.isInvoicePayment).reduce((acc, t) => acc + Number(t.valor), 0);
      return { faturaTotal: total, valorPago: pago, saldoDevedor: total - pago };
   }, [invoiceTransactions]);
   
-   const limiteDisponivel = card ? Number(card.limite) - Number(card.saldoFatura) : 0;
+   const limiteDisponivel = card ? Number(card.availableLimit ?? (Number(card.limite) - Number(card.currentInvoiceAmount ?? 0))) : 0;
 
 
   const handleOpenForm = (transaction?: Transaction) => {
@@ -141,7 +143,7 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
   const filteredTransactions = useMemo(() => {
     let results = invoiceTransactions;
     if (filters.text) results = results.filter(t => t.descricao.toLowerCase().includes(filters.text!.toLowerCase()));
-    if (filters.categories.length > 0) results = results.filter(t => filters.categories.includes(t.categoria));
+    if (filters.categories.length > 0) results = results.filter(t => t.categoria && filters.categories.includes(t.categoria));
     return results;
   }, [invoiceTransactions, filters]);
 
