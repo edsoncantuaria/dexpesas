@@ -1,24 +1,26 @@
 // src/app/welcome/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, BrainCircuit, CheckCircle, CreditCard, Gamepad2, Landmark, PartyPopper, Rocket, Target, User as UserIcon, Wallet, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Logo } from '@/components/ui/logo';
+import { Logo } from '@/components/logo';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { AddAccountForm } from '@/components/dashboard/contas/add-account-form';
 import { AddCardForm } from '@/components/dashboard/cartoes/add-card-form';
-import type { Account, Card as CardType } from '@/lib/definitions';
+import type { Account, Card as CardType, Category } from '@/lib/definitions';
 import type { LucideIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { cn } from '@/lib/utils';
 
 
 const variants = {
@@ -59,7 +61,7 @@ export default function WelcomePage() {
       component: InfoStep,
       props: { 
         icon: Gamepad2,
-        title: "Sua Jornada Financeira Começa!",
+        title: "Sua jornada no Dexpesas começa!",
         description: "Prepare-se para transformar suas finanças em uma aventura épica. Vamos criar seu herói financeiro."
       }
     },
@@ -127,6 +129,41 @@ export default function WelcomePage() {
             },
             isSubmitting: isSubmitting,
         }
+    },
+    {
+      component: FinancialSetupStep,
+      props: {
+        onSave: async ({ fixedMonthlyIncome, favoriteCategoryIds, mainGoal }: { fixedMonthlyIncome: number; favoriteCategoryIds: string[]; mainGoal: string }) => {
+            const hasIncome = fixedMonthlyIncome > 0;
+            const hasGoal = !!mainGoal;
+            const hasCategories = favoriteCategoryIds.length > 0;
+            if (!hasIncome && !hasGoal && !hasCategories) {
+                paginate(1);
+                return;
+            }
+            setIsSubmitting(true);
+            try {
+                const requests: Promise<any>[] = [];
+                if (hasIncome || hasGoal) {
+                    requests.push(api.put('/user/profile', {
+                        fixedMonthlyIncome: hasIncome ? fixedMonthlyIncome : null,
+                        mainFinancialGoal: hasGoal ? mainGoal : null,
+                    }));
+                }
+                if (hasCategories) {
+                    requests.push(api.put('/user/preferences', { favoriteCategoryIds }));
+                }
+                await Promise.all(requests);
+                toast({ title: 'Preferências financeiras salvas!' });
+                paginate(1);
+            } catch (error) {
+                toast({ variant: 'destructive', title: 'Erro ao salvar preferências' });
+            } finally {
+                setIsSubmitting(false);
+            }
+        },
+        isSubmitting,
+      }
     },
     {
       component: InfoStep,
@@ -331,6 +368,12 @@ function AddProfileStep({ onSaveAndContinue, isSubmitting }: { onSaveAndContinue
                 <FormField control={form.control} name="monthlyIncomeRange" render={({ field }) => ( 
                   <FormItem><FormLabel>Faixa de Renda Mensal</FormLabel><Select onValueChange={field.onChange} value={field.value ?? ''}><FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Até R$ 2.000">Até R$ 2.000</SelectItem><SelectItem value="R$ 2.001 - R$ 5.000">R$ 2.001 - R$ 5.000</SelectItem><SelectItem value="R$ 5.001 - R$ 10.000">R$ 5.001 - R$ 10.000</SelectItem><SelectItem value="R$ 10.001 - R$ 20.000">R$ 10.001 - R$ 20.000</SelectItem><SelectItem value="Acima de R$ 20.000">Acima de R$ 20.000</SelectItem><SelectItem value="Prefiro não informar">Prefiro não informar</SelectItem></SelectContent></Select><FormMessage /></FormItem> 
                 )}/>
+                <FormField control={form.control} name="investmentProfile" render={({ field }) => ( 
+                  <FormItem><FormLabel>Perfil de Investidor</FormLabel><Select onValueChange={field.onChange} value={field.value ?? ''}><FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Conservador">Conservador</SelectItem><SelectItem value="Moderado">Moderado</SelectItem><SelectItem value="Arrojado">Arrojado</SelectItem><SelectItem value="Ainda não sei">Ainda não sei</SelectItem></SelectContent></Select><FormMessage /></FormItem> 
+                )}/>
+                <FormField control={form.control} name="mainFinancialGoal" render={({ field }) => ( 
+                  <FormItem><FormLabel>Principal Objetivo</FormLabel><Select onValueChange={field.onChange} value={field.value ?? ''}><FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="Quitar dívidas">Quitar dívidas</SelectItem><SelectItem value="Montar reserva">Montar reserva</SelectItem><SelectItem value="Investir mais">Investir mais</SelectItem><SelectItem value="Realizar um sonho">Realizar um sonho</SelectItem><SelectItem value="Outro">Outro</SelectItem></SelectContent></Select><FormMessage /></FormItem> 
+                )}/>
                 <div className="pt-4 flex justify-between">
                     <Button type="button" variant="secondary" onClick={() => onSaveAndContinue({})}>Pular</Button>
                     <Button type="submit" disabled={isSubmitting}>
@@ -342,4 +385,108 @@ function AddProfileStep({ onSaveAndContinue, isSubmitting }: { onSaveAndContinue
         </Form>
     </div>
   );
+}
+
+type FinancialSetupStepProps = {
+    onSave: (payload: { fixedMonthlyIncome: number; favoriteCategoryIds: string[]; mainGoal: string }) => Promise<void>;
+    isSubmitting: boolean;
+};
+
+function FinancialSetupStep({ onSave, isSubmitting }: FinancialSetupStepProps) {
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [favoriteCategoryIds, setFavoriteCategoryIds] = useState<string[]>([]);
+    const [fixedIncome, setFixedIncome] = useState(0);
+    const [mainGoal, setMainGoal] = useState('');
+
+    useEffect(() => {
+        const fetchCategories = async () => {
+            try {
+                const response = await api.get('/categories');
+                setCategories(response.data.filter((cat: Category) => cat.type === 'despesa'));
+            } catch (error) {
+                console.error('Erro ao carregar categorias para onboarding', error);
+            }
+        };
+        fetchCategories();
+    }, []);
+
+    const toggleCategory = (categoryId: string) => {
+        setFavoriteCategoryIds((prev) =>
+            prev.includes(categoryId)
+                ? prev.filter((id) => id !== categoryId)
+                : prev.length >= 5
+                    ? prev
+                    : [...prev, categoryId]
+        );
+    };
+
+    const handleContinue = () => {
+        onSave({
+            fixedMonthlyIncome: fixedIncome,
+            favoriteCategoryIds,
+            mainGoal,
+        });
+    };
+
+    const recommendedCategories = categories.slice(0, 8);
+
+    return (
+        <div className="w-full max-h-[70vh] overflow-y-auto px-1 space-y-4">
+            <div className="text-center mb-4 space-y-2">
+                <h2 className="text-xl font-bold font-headline">Monte seu plano financeiro</h2>
+                <p className="text-sm text-muted-foreground">Defina renda, metas e categorias favoritas para personalizarmos seu dashboard.</p>
+            </div>
+            <div className="space-y-4">
+                <div>
+                    <p className="text-sm font-semibold mb-1">Renda mensal fixa</p>
+                    <CurrencyInput value={fixedIncome} onValueChange={(value) => setFixedIncome(Number(value))} />
+                </div>
+                <div>
+                    <p className="text-sm font-semibold mb-1">Meta principal</p>
+                    <Select value={mainGoal} onValueChange={setMainGoal}>
+                        <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Quitar dívidas">Quitar dívidas</SelectItem>
+                            <SelectItem value="Montar reserva">Montar reserva</SelectItem>
+                            <SelectItem value="Investir mais">Investir mais</SelectItem>
+                            <SelectItem value="Viajar">Viajar</SelectItem>
+                            <SelectItem value="Outro">Outro</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-semibold">Categorias favoritas</p>
+                        <span className="text-xs text-muted-foreground">Escolha até 5</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {recommendedCategories.map((category) => (
+                            <button
+                                key={category.id}
+                                type="button"
+                                onClick={() => toggleCategory(category.id)}
+                                className={cn(
+                                    'rounded-full border px-3 py-1 text-xs transition-colors',
+                                    favoriteCategoryIds.includes(category.id)
+                                        ? 'bg-primary text-primary-foreground border-primary'
+                                        : 'bg-transparent hover:bg-muted'
+                                )}
+                            >
+                                {category.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+            <div className="flex items-center justify-between pt-2">
+                <Button type="button" variant="secondary" onClick={() => onSave({ fixedMonthlyIncome: 0, favoriteCategoryIds: [], mainGoal })}>
+                    Pular
+                </Button>
+                <Button onClick={handleContinue} disabled={isSubmitting}>
+                    Continuar
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+            </div>
+        </div>
+    );
 }

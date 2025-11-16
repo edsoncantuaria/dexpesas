@@ -33,6 +33,10 @@ export type User = {
     monthlyIncomeRange?: string | null;
     investmentProfile?: string | null;
     mainFinancialGoal?: string | null;
+    fixedMonthlyIncome?: number | null;
+    favoriteCategories?: string[] | string | null;
+    dashboardPreferences?: Record<string, unknown> | string | null;
+    hideFamilyMode?: boolean;
     isAdmin: boolean;
     level: number;
     clanId?: string | null;
@@ -44,6 +48,10 @@ export type User = {
       role: 'LEADER' | 'ADMIN' | 'MEMBER';
       clanId: string;
     }[];
+    phoneNumber?: string | null;
+    phoneVerified?: boolean;
+    twoFactorEnabled?: boolean;
+    lastSecurityNotificationAt?: string | null;
 };
 
 export type LegacyRuin = {
@@ -259,6 +267,92 @@ export type Goal = {
     imageUrl?: string | null;
     contributions: GoalContribution[];
     projectionDate?: string | null;
+};
+
+export type DashboardAlert = {
+    id: string;
+    title: string;
+    description: string;
+    severity: 'critical' | 'warning' | 'info';
+    href?: string;
+};
+
+export type SecuritySummary = {
+    twoFactorEnabled: boolean;
+    phoneVerified: boolean;
+    hasPhone: boolean;
+    pendingApprovals: Array<{
+        id: string;
+        deviceName: string;
+        platform?: string | null;
+        lastLoginAt: string;
+    }>;
+    recentDevices: Array<{
+        id: string;
+        deviceName: string;
+        platform?: string | null;
+        trusted: boolean;
+        lastLoginAt: string;
+    }>;
+};
+
+export type FamilyRankingEntry = {
+    memberId: string;
+    name: string;
+    avatarUrl?: string | null;
+    spent: number;
+    role: string;
+};
+
+export type FamilySummary = {
+    clan: {
+        id: string;
+        name: string;
+        balance: number;
+    };
+    ranking: FamilyRankingEntry[];
+    totalMembers: number;
+};
+
+export type FinancialOverview = {
+    monthSummary: {
+        received: number;
+        spent: number;
+        toReceive: number;
+        toPay: number;
+        balance: number;
+        projectedBalance: number;
+        previousBalance: number;
+        variationPercentage: number | null;
+    };
+    accounts: Array<{
+        id: string;
+        nome: string;
+        instituicao?: string | null;
+        tipo: string;
+        saldo: number;
+        saldoPago: number;
+    }>;
+    cards: Array<Card & { usagePercentage: number }>;
+    budgets: Array<{
+        id: string;
+        categoryId: string;
+        label?: string;
+        limit: number;
+        spent: number;
+    }>;
+    categoryHighlights: Array<{
+        categoryId: string;
+        label: string;
+        amount: number;
+    }>;
+    alerts: DashboardAlert[];
+    favoriteCategories: string[];
+    fixedMonthlyIncome?: number | null;
+    dashboardPreferences: Record<string, unknown>;
+    hideFamilyMode?: boolean;
+    familySummary: FamilySummary | null;
+    security: SecuritySummary | null;
 };
 
 export type FilterState = {

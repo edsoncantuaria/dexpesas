@@ -10,6 +10,7 @@ export const updateProfileSchema = z.object({
   monthlyIncomeRange: z.string().optional().nullable(),
   investmentProfile: z.string().optional().nullable(),
   mainFinancialGoal: z.string().optional().nullable(),
+  fixedMonthlyIncome: z.coerce.number().min(0).optional().nullable(),
 });
 
 export const updatePreferencesSchema = z.object({
@@ -26,6 +27,9 @@ export const updatePreferencesSchema = z.object({
     enableGoalProjection: z.boolean().optional(),
     habilitarDescricaoInteligente: z.boolean().optional(),
     dashboardLayout: z.any().optional(),
+    favoriteCategoryIds: z.array(z.string()).optional(),
+    dashboardPreferences: z.record(z.any()).optional(),
+    hideFamilyMode: z.boolean().optional(),
 });
 
 
@@ -40,4 +44,9 @@ export const changePasswordSchema = z.object({
 }).refine(data => data.currentPassword !== data.newPassword, {
     message: 'A nova senha deve ser diferente da atual.',
     path: ['newPassword'],
+});
+
+export const updateSecuritySchema = z.object({
+    phoneNumber: z.string().regex(/^\+?\d{10,15}$/, 'Informe um telefone válido com DDD.').optional().nullable(),
+    twoFactorEnabled: z.boolean().optional(),
 });

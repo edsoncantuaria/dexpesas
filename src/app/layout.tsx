@@ -4,10 +4,11 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
 import { PushNotificationProvider } from '@/contexts/PushNotificationProvider';
+import { RootClientShell } from '@/components/layout/root-client-shell';
 
 export const metadata: Metadata = {
-  title: 'Jornada Financeira',
-  description: 'Sua jornada para o sucesso financeiro começa aqui.',
+  title: 'Cloudive • Dexpesas',
+  description: 'Cloudive: tecnologia leve, modular e acessível guiando a sua jornada financeira.',
   manifest: '/manifest.json',
 };
 
@@ -21,9 +22,9 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&display=swap" rel="stylesheet" />
         <link rel="apple-touch-icon" href="/logo-192.png"></link>
-        <meta name="theme-color" content="#1E40AF" />
+        <meta name="theme-color" content="#3B82F6" />
       </head>
       <body>
          <script
@@ -48,10 +49,12 @@ export default function RootLayout({
           defaultTheme="dark"
           storageKey="vite-ui-theme"
         >
-          <PushNotificationProvider>
-            {children}
-            <Toaster />
-          </PushNotificationProvider>
+          <RootClientShell>
+            <PushNotificationProvider>
+              {children}
+              <Toaster />
+            </PushNotificationProvider>
+          </RootClientShell>
         </ThemeProvider>
       </body>
     </html>

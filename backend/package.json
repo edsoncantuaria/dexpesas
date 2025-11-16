@@ -1,7 +1,7 @@
 {
   "name": "jornada-financeira-backend",
   "version": "1.0.0",
-  "description": "Backend para a aplicação Jornada Financeira.",
+  "description": "Backend para a aplicação Dexpesas.",
   "main": "server.js",
   "type": "module",
   "prisma": {
@@ -13,7 +13,7 @@
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:worker\"",
     "dev:server": "nodemon server.js",
     "dev:worker": "nodemon worker.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test ./tests/**/*.test.js"
   },
   "keywords": [
     "express",

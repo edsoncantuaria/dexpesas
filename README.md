@@ -1,9 +1,9 @@
-# Jornada Financeira - Documentação Completa do Projeto
+# Dexpesas - Documentação Completa do Projeto
 
 **Versão:** 2.0
 **Data:** 28 de Agosto de 2024
 
-Bem-vindo à documentação completa da **Jornada Financeira**, uma aplicação full-stack projetada para ser um assistente financeiro pessoal completo, com um forte apelo à gamificação.
+Bem-vindo à documentação completa do **Dexpesas**, uma aplicação full-stack projetada para ser um assistente financeiro pessoal completo, com um forte apelo à gamificação.
 
 ---
 
@@ -95,16 +95,36 @@ A interface é guiada por três pilares: **Fluidez Absoluta**, **Consistência I
     *   **Tipografia:** **Inter**, por sua excelente legibilidade.
     *   **Iconografia:** **Lucide React**, por seu estilo minimalista e consistente.
 
+### 6.1 Kit Cloudive (Identidade Visual + Carregamentos)
+
+Toda a família de produtos agora compartilha o kit oficial da marca **Cloudive**:
+
+-   **Ativos na pasta `/public`** – `cloudive-logo.svg`, `cloudive-icon.svg`, versões monocromáticas e todas as splash screens (`cloudive-splash-dark.svg`, `cloudive-splash-gradient.svg`, `cloudive-splash-once.svg`, `cloudive-splash-text.svg`) além da animação Lottie `cloudive-bubbles.json`.
+-   **Componentes React reutilizáveis**
+    -   `CloudiveSplash` (`src/components/brand/cloudive-splash.tsx`): executado automaticamente pelo `app/layout.tsx` para exibir a abertura institucional (mostra uma única vez por sessão).
+    -   `CloudiveLoading` (`src/components/brand/cloudive-loading.tsx`): usado pelo `app/loading.tsx` e por `LoadingScreen`, podendo ser importado em qualquer rota para manter o mesmo visual em skeletons, modais ou telas completas.
+-   **Tokens do tema Cloudive** – Tailwind agora expõe `cloudive.sky`, `cloudive.mint`, `cloudive.amber`, novos raios (`radius-xl`, `radius-2xl`), sombras (`shadow-soft`, `shadow-floating`) e tipografia Inter + Inter Tight para facilitar a replicação da identidade.
+-   **Uso em outros apps Cloudive**: copie os arquivos de `/public`, importe `CloudiveSplash`/`CloudiveLoading`, utilize o Lottie (`cloudive-bubbles.json`) em apps móveis e ajuste o `manifest.json` do app para apontar para `cloudive-icon.svg` com as cores `#3B82F6` (theme) e `#020617` (background).
+
+Assim, todo aplicativo Cloudive mantém um carregamento/splash consistente e modular, sem interferir no restante do fluxo de cada produto.
+
+### 6.2 Criptografia & Observabilidade
+
+-   **Criptografia AES-256-GCM**: `phoneNumber`, `pushSubscription` e `twoFactorSecret` são persistidos com a chave `DATA_ENCRYPTION_KEY` (fallback no `JWT_SECRET`). Sem a chave, o backend loga um aviso e mantém texto plano.
+-   **Métricas em tempo real**: `GET /api/health/metrics` expõe total de requisições, rotas lentas, erros e uso de memória/CPU (vide [`docs/observability.md`](./docs/observability.md)).
+-   **Middleware de auditoria**: cada request incrementa contadores, mantém histórico de rotas > 1.2s e pode ser plugado em Prometheus/grafana via json exporter.
+-   **Alertas rápidos**: combine `/api/health` + `/api/health/metrics` com serviços como UptimeRobot ou Grafana Cloud para alertar sobre latência e picos de erro.
+
 ---
 
 ## 7. Status e Próximos Passos (Auditoria)
 
--   **Status de Prontidão:** **Necessita de Ajustes Críticos**.
--   **Principal Risco:** A autenticação de usuário (`authMiddleware`) está desativada para fins de depuração. **Isso DEVE ser reativado antes da produção.**
+-   **Status de Prontidão:** **Estabilizando (foco em QA/tests)**.
+-   **Principal Risco:** Falta de testes automatizados/lint/typecheck impede detectar regressões com confiança.
 -   **Recomendações Chave:**
-    1.  **Reativar Autenticação:** A prioridade máxima é reativar a validação de token JWT no backend e a proteção de rotas no frontend.
-    2.  **Implementar Testes:** A falta de testes automatizados é o maior risco técnico do projeto. Iniciar com testes de integração para os fluxos da API é crucial.
-    3.  **Criptografar Dados Sensíveis:** O campo `pushSubscription` no banco de dados deve ser criptografado.
+    1.  **Implementar Testes:** Cobrir rotas cruciais (transações, budgets, família) em integrações e destravar `npm run lint`/`typecheck`.
+    2.  **Monitoramento contínuo:** Configurar coleta periódica do endpoint `/api/health/metrics` e alertas para `totalErrors`/`slowRequests`.
+    3.  **Planejar Open Finance leve:** Mantemos integração bancária desativada; definir cronograma/investimento para competir com Mobills+.
 
 ---
 

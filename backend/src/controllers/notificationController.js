@@ -4,28 +4,9 @@ import NotificationService from '../services/notificationService.js';
 import { notificationQueue } from '../queues/notificationQueue.js';
 import webpush from 'web-push';
 import config from '../config/config.js';
-import crypto from 'crypto';
+import { encryptValue } from '../utils/fieldEncryption.js';
 
 const prisma = new PrismaClient();
-
-// Chave de criptografia deve ter 32 bytes para aes-256-cbc.
-// Usamos uma chave de 16 bytes (128 bits) em hexadecimal (32 caracteres) e a convertemos para um buffer de 16 bytes.
-const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY || '', 'hex');
-const IV_LENGTH = 16; // Para AES, o IV é sempre 16 bytes
-
-// Função para criptografar dados
-function encrypt(text) {
-    if (!text || !ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 16) {
-        console.error("Chave de criptografia inválida ou ausente.");
-        return null;
-    }
-    const iv = crypto.randomBytes(IV_LENGTH);
-    const cipher = crypto.createCipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
-    let encrypted = cipher.update(JSON.stringify(text), 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return iv.toString('hex') + ':' + encrypted;
-}
-
 
 // Configura o web-push com as chaves VAPID
 if (config.vapid.publicKey && config.vapid.privateKey && config.vapid.subject) {
@@ -60,7 +41,7 @@ class NotificationController {
 
         try {
             // Criptografa o objeto de inscrição antes de salvar
-            const encryptedSubscription = encrypt(subscription);
+            const encryptedSubscription = encryptValue(subscription);
             if (!encryptedSubscription) {
                 return res.status(500).json({ message: "Falha ao criptografar dados de inscrição."});
             }

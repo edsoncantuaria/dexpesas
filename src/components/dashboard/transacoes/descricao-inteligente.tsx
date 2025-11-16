@@ -53,7 +53,8 @@ export function DescricaoInteligente({
   const [sugestoes, setSugestoes] = React.useState<SugestaoTransacao[]>([]);
   const [status, setStatus] = React.useState<'idle' | 'loading' | 'error' | 'success'>('idle');
   const { toast } = useToast();
-  const debouncedSearchTerm = useDebounce(valor, 3000);
+  const debouncedSearchTerm = useDebounce(valor, 800);
+  const cacheRef = React.useRef<Record<string, SugestaoTransacao[]>>({});
 
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
@@ -62,6 +63,14 @@ export function DescricaoInteligente({
       if (debouncedSearchTerm.length < 3) {
         setSugestoes([]);
         setOpen(false);
+        return;
+      }
+
+      if (cacheRef.current[debouncedSearchTerm]) {
+        const cached = cacheRef.current[debouncedSearchTerm];
+        setSugestoes(cached);
+        setStatus('success');
+        setOpen(cached.length > 0);
         return;
       }
 
@@ -89,6 +98,7 @@ export function DescricaoInteligente({
         });
 
         const newSugestoes = response.data.itens;
+        cacheRef.current[debouncedSearchTerm] = newSugestoes;
         setSugestoes(newSugestoes);
         setStatus('success');
         setOpen(newSugestoes.length > 0);

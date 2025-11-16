@@ -1,4 +1,4 @@
-# **App Name**: Jornada Financeira
+# **App Name**: Dexpesas
 
 ## Core Features:
 

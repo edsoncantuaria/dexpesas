@@ -51,7 +51,7 @@ export default function AdminPage() {
                 <Shield className="h-8 w-8 text-primary" />
                 <div>
                     <h1 className="text-3xl font-bold font-headline">Painel do Game Master</h1>
-                    <p className="text-muted-foreground">Bem-vindo, mestre! Gerencie o universo da Jornada Financeira.</p>
+                    <p className="text-muted-foreground">Bem-vindo, mestre! Gerencie o universo do Dexpesas.</p>
                 </div>
             </div>
 

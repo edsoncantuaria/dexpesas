@@ -1,12 +1,18 @@
 {
-  "name": "Jornada Financeira",
-  "short_name": "Jornada",
+  "name": "Cloudive • Dexpesas",
+  "short_name": "Dexpesas",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#020817",
-  "theme_color": "#118150",
-  "description": "Sua jornada para o sucesso financeiro começa aqui.",
+  "background_color": "#020617",
+  "theme_color": "#3B82F6",
+  "description": "Cloudive: tecnologia leve, modular e acessível guiando sua jornada financeira.",
   "icons": [
+    {
+      "src": "/cloudive-icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
     {
       "src": "/logo-192.png",
       "sizes": "192x192",

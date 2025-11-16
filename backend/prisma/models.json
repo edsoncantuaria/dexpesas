@@ -13,7 +13,7 @@
     "TransactionStatus": ["PENDING", "POSTED", "CANCELLED", "FAILED"],
     "GoalStatus": ["IN_PROGRESS", "COMPLETED"],
     "ConditionType": ["CONTAINS", "EQUALS", "STARTS_WITH", "ENDS_WITH"],
-    "NotificationType": ["TRANSACTION_CREATED", "PAYMENT_DUE", "LIMIT_ALERT", "ACHIEVEMENT_UNLOCKED", "BUDGET_ALERT", "UPCOMING_PAYMENT", "STREAK_AWARDED"],
+    "NotificationType": ["TRANSACTION_CREATED", "PAYMENT_DUE", "LIMIT_ALERT", "ACHIEVEMENT_UNLOCKED", "BUDGET_ALERT", "UPCOMING_PAYMENT", "STREAK_AWARDED", "SECURITY_ALERT", "FAMILY_UPDATE"],
     "AutomationType": ["ROUND_UP", "GOAL_CONTRIBUTION", "BILL_PAY"],
     "ScheduleType": ["MANUAL", "DAILY", "WEEKLY", "MONTHLY", "THRESHOLD"],
     "ReconciliationStatus": ["PROCESSING", "PENDING_REVIEW", "COMPLETED", "FAILED"],
@@ -23,6 +23,7 @@
     "RecurrenceType": ["WEEKLY", "BIWEEKLY", "MONTHLY", "BIMONTHLY", "TRIMONTHLY", "SEMIANNUALLY"],
     "AiAnalysisType": ["HABIT_ANALYSIS", "OPPORTUNITY_ANALYSIS"],
     "CurrencyType": ["BRL", "USD"],
+    "SecurityEventType": ["NEW_DEVICE", "PASSWORD_RESET", "TWO_FACTOR_CHALLENGE"],
     "MissionScope": ["USER", "GUILD"],
     "GameEventType": ["XP_MULTIPLIER", "ITEM_DROP"],
     "StreakType": ["DAILY_TRANSACTION", "NO_VICE_SPENDING"],
@@ -63,6 +64,15 @@
         "monthlyIncomeRange": { "type": "String", "optional": true },
         "investmentProfile": { "type": "String", "optional": true },
         "mainFinancialGoal": { "type": "String", "optional": true },
+        "fixedMonthlyIncome": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 2)"] },
+        "phoneNumber": { "type": "String", "optional": true },
+        "phoneVerified": { "type": "Boolean", "attributes": ["@default(false)"] },
+        "twoFactorEnabled": { "type": "Boolean", "attributes": ["@default(false)"] },
+        "twoFactorSecret": { "type": "String", "optional": true },
+        "favoriteCategories": { "type": "Json", "optional": true, "attributes": ["@default(\"[]\")"] },
+        "dashboardPreferences": { "type": "Json", "optional": true, "attributes": ["@default(\"{}\")"] },
+        "hideFamilyMode": { "type": "Boolean", "attributes": ["@default(false)"] },
+        "lastSecurityNotificationAt": { "type": "DateTime", "optional": true },
         "pushSubscription": { "type": "String", "optional": true, "attributes": ["@db.Text"] },
         "level": { "type": "Int", "attributes": ["@default(1)"] },
         "xp": { "type": "Int", "attributes": ["@default(0)"] },
@@ -96,7 +106,10 @@
         "streaks": { "type": "UserStreak", "isList": true },
         "legacyRuins": { "type": "LegacyRuin", "isList": true },
         "recurringBills": { "type": "RecurringBill", "isList": true },
-        "attachments": { "type": "Attachment", "isList": true }
+        "attachments": { "type": "Attachment", "isList": true },
+        "devices": { "type": "UserDevice", "isList": true },
+        "securityEvents": { "type": "SecurityEvent", "isList": true },
+        "favoriteCategoryLinks": { "type": "UserFavoriteCategory", "isList": true }
       }
     },
     "Clan": {
@@ -555,6 +568,7 @@
             "recurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_category" } },
             "parentCategory": { "type": "Category", "optional": true, "relation": { "name": "CategoryHierarchy", "fields": ["parentCategoryId"], "references": ["id"], "onDelete": "NoAction", "onUpdate": "NoAction" } },
             "subcategories": { "type": "Category", "isList": true, "relation": { "name": "CategoryHierarchy" } },
+            "favoriteUsers": { "type": "UserFavoriteCategory", "isList": true },
             "user": { "type": "User", "optional": true, "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
         },
         "indices": [
@@ -824,6 +838,59 @@
         "userItems": { "type": "UserItem", "isList": true },
         "gameEvents": { "type": "GameEvent", "isList": true }
       }
+    },
+    "UserFavoriteCategory": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "userId": { "type": "String" },
+        "categoryId": { "type": "String" },
+        "priority": { "type": "Int", "attributes": ["@default(0)"] }
+      },
+      "relations": {
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "category": { "type": "Category", "relation": { "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } }
+      },
+      "indices": [
+        { "fields": ["userId", "categoryId"], "unique": true }
+      ],
+      "map": "user_favorite_categories"
+    },
+    "UserDevice": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "userId": { "type": "String" },
+        "deviceId": { "type": "String" },
+        "deviceName": { "type": "String", "optional": true },
+        "platform": { "type": "String", "optional": true },
+        "ipAddress": { "type": "String", "optional": true },
+        "trusted": { "type": "Boolean", "attributes": ["@default(false)"] },
+        "lastLoginAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
+      },
+      "indices": [
+        { "fields": ["userId", "deviceId"], "unique": true }
+      ],
+      "map": "user_devices"
+    },
+    "SecurityEvent": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "userId": { "type": "String" },
+        "type": { "type": "SecurityEventType" },
+        "message": { "type": "String" },
+        "metadata": { "type": "Json", "optional": true },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
+      },
+      "indices": [
+        { "fields": ["userId"] }
+      ],
+      "map": "security_events"
     },
     "Boss": {
       "fields": {

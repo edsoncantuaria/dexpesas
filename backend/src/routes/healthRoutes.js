@@ -4,7 +4,8 @@ import healthController from '../controllers/healthController.js';
 
 const router = express.Router();
 
-// Rota pública, não precisa de authMiddleware
+// Rotas públicas para health e métricas
 router.get('/', healthController.check);
+router.get('/metrics', healthController.metrics);
 
 export default router;

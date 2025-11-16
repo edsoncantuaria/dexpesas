@@ -14,6 +14,7 @@ export default {
     port: process.env.PORT || 3001,
     databaseUrl: process.env.DATABASE_URL,
     jwtSecret: process.env.JWT_SECRET,
+    encryptionKey: process.env.DATA_ENCRYPTION_KEY || process.env.JWT_SECRET,
     geminiApiKey: process.env.GEMINI_API_KEY,
     vapid: {
         publicKey: process.env.VAPID_PUBLIC_KEY,

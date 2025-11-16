@@ -7,6 +7,8 @@ import type { Budget } from "@/lib/definitions";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import Link from 'next/link';
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 interface JourneyMapCardProps {
     budgets: Budget[];
@@ -19,6 +21,7 @@ const getProgressColor = (percentage: number) => {
 };
 
 export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
+    const router = useRouter();
     const foodBudget = budgets.find(b => b.category?.nome === 'Alimentacao');
     const leisureBudget = budgets.find(b => b.category?.nome === 'Lazer');
 
@@ -26,7 +29,7 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
 
     return (
          <Link href="/dashboard/orcamentos" className="group">
-            <Card className="shadow-md h-full transition-all group-hover:shadow-xl group-hover:border-primary/50">
+        <Card className="shadow-md h-full transition-all group-hover:shadow-xl group-hover:border-primary/50">
                  <CardHeader>
                     <div className="flex items-center gap-3">
                        <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-lg">
@@ -62,6 +65,18 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
                         </div>
                     )}
                 </CardContent>
+                <div className="px-6 pb-6">
+                    <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            router.push('/dashboard/orcamentos?create=true');
+                        }}
+                    >
+                        Criar orçamento agora
+                    </Button>
+                </div>
             </Card>
         </Link>
     );

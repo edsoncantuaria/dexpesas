@@ -1,0 +1,89 @@
+<svg
+  width="360"
+  height="96"
+  viewBox="0 0 360 96"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <defs>
+    <!-- Gradiente principal do ícone (Mint + Sky) -->
+    <linearGradient id="dexpesas-mint-sky" x1="16" y1="16" x2="88" y2="72" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#A5F3D2"/>   <!-- Mint Cloud -->
+      <stop offset="1" stop-color="#3B82F6"/>   <!-- Sky Core -->
+    </linearGradient>
+
+    <!-- Gradiente de brilho interno (overlay suave) -->
+    <radialGradient id="dexpesas-inner-light" cx="0" cy="0" r="1"
+      gradientUnits="userSpaceOnUse"
+      gradientTransform="translate(60 28) rotate(45) scale(40 32)">
+      <stop offset="0" stop-color="#F8FAFC" stop-opacity="0.85"/> <!-- Cloud White -->
+      <stop offset="1" stop-color="#F8FAFC" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Máscara para limitar o brilho ao símbolo dos 3 círculos -->
+    <mask id="dexpesas-icon-mask">
+      <g fill="white">
+        <circle cx="32" cy="48" r="18"/>
+        <circle cx="52" cy="32" r="18"/>
+        <circle cx="72" cy="48" r="18"/>
+      </g>
+    </mask>
+  </defs>
+
+  <!-- Grupo do ícone (3 círculos interligados) -->
+  <g id="dexpesas-icon" transform="translate(16,8)">
+
+    <!-- Base dos círculos em gradiente Mint -> Sky -->
+    <g fill="url(#dexpesas-mint-sky)">
+      <circle cx="32" cy="48" r="18"/>
+      <circle cx="52" cy="32" r="18"/>
+      <circle cx="72" cy="48" r="18"/>
+    </g>
+
+    <!-- Brilho interno suave, respeitando a máscara dos círculos -->
+    <rect x="14" y="14" width="60" height="52"
+      fill="url(#dexpesas-inner-light)"
+      mask="url(#dexpesas-icon-mask)"/>
+
+    <!-- “Sugestão” de gráfico financeiro dentro do símbolo -->
+    <path
+      d="M24 52 L36 40 L46 44 L60 32 L70 36"
+      fill="none"
+      stroke="#0F172A"       
+      stroke-width="2.4"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      opacity="0.75"
+    />
+
+    <!-- Ponto final do gráfico, destacando resultado positivo -->
+    <circle cx="70" cy="36" r="3.2" fill="#F8FAFC" opacity="0.95"/>
+  </g>
+
+  <!-- Wordmark: Dexpesas -->
+  <text
+    x="120"
+    y="60"
+    font-family="'Inter Tight', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-weight="600"
+    font-size="32"
+    letter-spacing="0.04em"
+    fill="#0F172A"
+  >
+    Dexpesas
+  </text>
+
+  <!-- Subtítulo opcional (pode remover se quiser só o logo) -->
+  <text
+    x="120"
+    y="78"
+    font-family="Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-weight="500"
+    font-size="13"
+    letter-spacing="0.16em"
+    fill="#64748B" 
+    text-transform="uppercase"
+  >
+    App de Finança
+  </text>
+</svg>

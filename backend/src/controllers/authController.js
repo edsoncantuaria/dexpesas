@@ -5,14 +5,21 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import config from '../config/config.js';
 import { defaultCategories } from '../config/seedData.js';
+import { encryptValue } from '../utils/fieldEncryption.js';
+import SecurityService from '../services/securityService.js';
 
 
 const prisma = new PrismaClient();
 
 class AuthController {
     async register(req, res, next) {
-        const { name, username, email, password } = req.body;
+        const { name, username, email, password, phoneNumber } = req.body;
         try {
+            const strongPasswordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+            if (!strongPasswordRegex.test(password)) {
+                return res.status(400).json({ message: 'A senha deve ter pelo menos 8 caracteres e incluir letras e números.' });
+            }
+
             const hashedPassword = await bcrypt.hash(password, 10);
             
             const user = await prisma.$transaction(async (tx) => {
@@ -26,6 +33,8 @@ class AuthController {
                         // Inicializa os campos de gamificação diretamente
                         level: 1,
                         xp: 0,
+                        phoneNumber: phoneNumber ? encryptValue(phoneNumber) : null,
+                        phoneVerified: false,
                     },
                 });
 
@@ -53,7 +62,7 @@ class AuthController {
     }
 
     async login(req, res, next) {
-        const { identifier, password } = req.body;
+        const { identifier, password, deviceInfo } = req.body;
         try {
             const user = await prisma.user.findFirst({
                 where: {
@@ -78,6 +87,11 @@ class AuthController {
                 config.jwtSecret,
                 { expiresIn: '1d' }
             );
+
+            const requestDeviceInfo = deviceInfo || { userAgent: req.get('user-agent') || 'web' };
+            SecurityService.recordDeviceLogin(user, requestDeviceInfo, req.ip).catch((error) => {
+                console.error('Falha ao registrar dispositivo:', error.message);
+            });
 
             res.json({
                 message: 'Login bem-sucedido!',

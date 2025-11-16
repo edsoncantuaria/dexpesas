@@ -6,12 +6,15 @@ import { Castle } from "lucide-react";
 import type { Goal } from "@/lib/definitions";
 import { Progress } from "@/components/ui/progress";
 import Link from 'next/link';
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 interface ChallengeTowerCardProps {
     goal?: Goal;
 }
 
 export function ChallengeTowerCard({ goal }: ChallengeTowerCardProps) {
+    const router = useRouter();
     const percentage = goal ? (Number(goal.currentAmount) / Number(goal.targetAmount)) * 100 : 0;
 
     return (
@@ -48,6 +51,18 @@ export function ChallengeTowerCard({ goal }: ChallengeTowerCardProps) {
                         </div>
                     )}
                 </CardContent>
+                <div className="px-6 pb-6">
+                    <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            router.push('/dashboard/metas?create=true');
+                        }}
+                    >
+                        Nova meta
+                    </Button>
+                </div>
             </Card>
         </Link>
     );

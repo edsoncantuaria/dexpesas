@@ -4,7 +4,7 @@ import express from 'express';
 import userController from '../controllers/userController.js';
 import authMiddleware from '../middlewares/authMiddleware.js';
 import validate from '../middlewares/validate.js';
-import { updateProfileSchema, updatePreferencesSchema, updateAccountInfoSchema, changePasswordSchema } from '../validators/userSchema.js';
+import { updateProfileSchema, updatePreferencesSchema, updateAccountInfoSchema, changePasswordSchema, updateSecuritySchema } from '../validators/userSchema.js';
 
 const router = express.Router();
 
@@ -15,6 +15,7 @@ router.put('/profile', validate(updateProfileSchema), userController.updateProfi
 router.put('/preferences', validate(updatePreferencesSchema), userController.updatePreferences);
 router.put('/account-info', validate(updateAccountInfoSchema), userController.updateAccountInfo);
 router.post('/change-password', validate(changePasswordSchema), userController.changePassword);
+router.put('/security', validate(updateSecuritySchema), userController.updateSecuritySettings);
 
 // Rota para marcar o onboarding como concluído
 router.post('/complete-onboarding', userController.completeOnboarding);

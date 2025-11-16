@@ -8,6 +8,7 @@ import { useMemo } from 'react';
 import Link from 'next/link';
 import { getInvoicePeriod } from "@/lib/date-helpers";
 import { setDate, isBefore, differenceInDays } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 
 interface CreditPactCardProps {
     cards: CardType[];
@@ -37,6 +38,9 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
     const availableLimit = cardToDisplay
         ? Number(cardToDisplay.availableLimit ?? (Number(cardToDisplay.limite) - Number(cardToDisplay.currentInvoiceAmount ?? 0)))
         : 0;
+    const usagePercentage = cardToDisplay
+        ? (Number(cardToDisplay.currentInvoiceAmount ?? 0) / Number(cardToDisplay.limite || 1)) * 100
+        : 0;
 
     return (
         <Link href="/dashboard/cartoes" className="group">
@@ -49,6 +53,11 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                         <div>
                             <CardTitle className="font-headline text-xl">O Pacto de Prata</CardTitle>
                             <CardDescription>Gerencie seu poder de crédito.</CardDescription>
+                            {usagePercentage > 85 && (
+                                <Badge variant="destructive" className="mt-1">
+                                    Limite crítico
+                                </Badge>
+                            )}
                         </div>
                     </div>
                 </CardHeader>
@@ -65,6 +74,9 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                                 <div>
                                     <p className="text-muted-foreground">Fatura Atual</p>
                                     <p className="font-bold text-destructive text-lg">{formatCurrency(cardToDisplay.currentInvoiceAmount ?? 0)}</p>
+                                    {usagePercentage > 85 && (
+                                        <p className="text-xs text-destructive">Você já usou {usagePercentage.toFixed(0)}% do limite.</p>
+                                    )}
                                 </div>
                                 <div className="text-right">
                                     <p className="text-muted-foreground">Limite Disponível</p>

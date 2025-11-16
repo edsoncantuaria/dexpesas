@@ -95,6 +95,8 @@ enum NotificationType {
   BUDGET_ALERT
   UPCOMING_PAYMENT
   STREAK_AWARDED
+  SECURITY_ALERT
+  FAMILY_UPDATE
 }
 
 enum AutomationType {
@@ -152,6 +154,12 @@ enum AiAnalysisType {
 enum CurrencyType {
   BRL
   USD
+}
+
+enum SecurityEventType {
+  NEW_DEVICE
+  PASSWORD_RESET
+  TWO_FACTOR_CHALLENGE
 }
 
 enum MissionScope {
@@ -228,6 +236,15 @@ model User {
   monthlyIncomeRange   String?
   investmentProfile    String?
   mainFinancialGoal    String?
+  fixedMonthlyIncome   Decimal? @db.Decimal(18, 2)
+  phoneNumber          String?
+  phoneVerified        Boolean @default(false)
+  twoFactorEnabled     Boolean @default(false)
+  twoFactorSecret      String?
+  favoriteCategories   Json? @default("[]")
+  dashboardPreferences Json? @default("{}")
+  hideFamilyMode       Boolean @default(false)
+  lastSecurityNotificationAt DateTime?
   pushSubscription     String? @db.Text
   level                Int @default(1)
   xp                   Int @default(0)
@@ -262,6 +279,9 @@ model User {
   legacyRuins          LegacyRuin[]
   recurringBills       RecurringBill[]
   attachments          Attachment[]
+  devices              UserDevice[]
+  securityEvents       SecurityEvent[]
+  favoriteCategoryLinks UserFavoriteCategory[]
 
 }
 
@@ -716,6 +736,7 @@ model Category {
   recurringBills       RecurringBill[] @relation("RecurringBill_category")
   parentCategory       Category? @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subcategories        Category[] @relation("CategoryHierarchy")
+  favoriteUsers        UserFavoriteCategory[]
   user                 User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, nome])
@@ -981,6 +1002,53 @@ model Item {
   userItems            UserItem[]
   gameEvents           GameEvent[]
 
+}
+
+model UserFavoriteCategory {
+  id                   String @id @default(cuid())
+  userId               String
+  categoryId           String
+  priority             Int @default(0)
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category             Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId])
+  @@map("user_favorite_categories")
+}
+
+model UserDevice {
+  id                   String @id @default(cuid())
+  userId               String
+  deviceId             String
+  deviceName           String?
+  platform             String?
+  ipAddress            String?
+  trusted              Boolean @default(false)
+  lastLoginAt          DateTime @default(now())
+  createdAt            DateTime @default(now())
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@map("user_devices")
+}
+
+model SecurityEvent {
+  id                   String @id @default(cuid())
+  userId               String
+  type                 SecurityEventType
+  message              String
+  metadata             Json?
+  createdAt            DateTime @default(now())
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("security_events")
 }
 
 model Boss {

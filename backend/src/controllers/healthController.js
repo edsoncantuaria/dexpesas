@@ -1,6 +1,7 @@
 // backend/src/controllers/healthController.js
 import prisma from '../config/prismaClient.js';
 import { redisClient } from '../config/redis.js';
+import MetricsService from '../services/metricsService.js';
 
 class HealthController {
     /**
@@ -33,6 +34,10 @@ class HealthController {
             // Passa o erro para o middleware de tratamento de erros
             next(error);
         }
+    }
+
+    async metrics(req, res) {
+        res.status(200).json(MetricsService.snapshot());
     }
 }
 

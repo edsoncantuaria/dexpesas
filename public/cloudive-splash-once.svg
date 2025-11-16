@@ -1,0 +1,33 @@
+<svg width="220" height="220" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .bubble {
+      opacity: 0;
+      transform: scale(0.4);
+      transform-origin: center;
+      transform-box: fill-box;
+      animation: fadeScale 1.2s ease-out forwards;
+    }
+    .b2 { animation-delay: 0.15s; }
+    .b3 { animation-delay: 0.3s; }
+    .pulse-once {
+      transform-origin: center;
+      transform-box: fill-box;
+      animation: pulseOnce 1.2s 1s ease-in-out forwards;
+    }
+    @keyframes fadeScale {
+      0% { opacity: 0; transform: scale(0.4); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes pulseOnce {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.06); }
+      100% { transform: scale(1); }
+    }
+  </style>
+  <rect x="0" y="0" width="220" height="220" fill="#020617"/>
+  <g class="pulse-once">
+    <circle class="bubble b1" cx="90" cy="115" r="38" fill="#3B82F6"/>
+    <circle class="bubble b2" cx="130" cy="95" r="38" fill="#A7D5FF"/>
+    <circle class="bubble b3" cx="130" cy="135" r="38" fill="#C7C8FF"/>
+  </g>
+</svg>

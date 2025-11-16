@@ -16,6 +16,7 @@ router.get('/gamification/profile', dataController.getGamificationProfile);
 router.get('/gamification/profile/:userId', dataController.getGamificationProfile);
 router.get('/achievements/unlocked', dataController.getUnlockedAchievements);
 router.get('/data/inventory', dataController.getInventory);
+router.get('/dashboard/overview', dataController.getFinancialOverview);
 
 
 export default router;

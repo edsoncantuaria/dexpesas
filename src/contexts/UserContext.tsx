@@ -16,6 +16,43 @@ interface UserContextType {
   fetchUser: () => Promise<void>; // Expor a função de busca
 }
 
+const parseJsonArray = (value: unknown): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value as string[];
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as string[]) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const parseJsonObject = (value: unknown): Record<string, unknown> => {
+  if (!value) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+};
+
+const normalizeUserPayload = (payload: UserContextType['user']) => {
+  if (!payload) return payload;
+  return {
+    ...payload,
+    favoriteCategories: parseJsonArray(payload.favoriteCategories || []),
+    dashboardPreferences: parseJsonObject(payload.dashboardPreferences || {}),
+  };
+};
+
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
@@ -26,7 +63,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     // Não reseta isLoading para true aqui para evitar piscar na tela em re-fetches
     try {
       const response = await api.get('/user');
-      setUser(response.data);
+      setUser(normalizeUserPayload(response.data));
     } catch (error) {
       console.error("Failed to fetch user for context", error);
       setUser(null);

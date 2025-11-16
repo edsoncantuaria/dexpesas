@@ -3,6 +3,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import GamificationService from '../services/gamificationService.js';
+import { decryptValue, encryptValue } from '../utils/fieldEncryption.js';
 
 const prisma = new PrismaClient();
 
@@ -37,6 +38,14 @@ class UserController {
                     monthlyIncomeRange: true,
                     investmentProfile: true,
                     mainFinancialGoal: true,
+                    fixedMonthlyIncome: true,
+                    favoriteCategories: true,
+                    dashboardPreferences: true,
+                    hideFamilyMode: true,
+                    phoneNumber: true,
+                    phoneVerified: true,
+                    twoFactorEnabled: true,
+                    lastSecurityNotificationAt: true,
                     isAdmin: true,
                     level: true,
                     // Correção: Acessar a relação ClanMember para obter o clanId e role
@@ -57,6 +66,7 @@ class UserController {
             const primaryMembership = clanMemberships[0] ?? null;
             const userResponse = {
                 ...userData,
+                phoneNumber: userData.phoneNumber ? decryptValue(userData.phoneNumber) : null,
                 clanMemberships,
                 clanMembership: primaryMembership,
                 clanId: primaryMembership?.clanId || null,
@@ -69,7 +79,7 @@ class UserController {
     }
 
     async updateProfile(req, res, next) {
-        const { name, gender, age, avatarUrl, professionalSituation, monthlyIncomeRange, investmentProfile, mainFinancialGoal } = req.body;
+        const { name, gender, age, avatarUrl, professionalSituation, monthlyIncomeRange, investmentProfile, mainFinancialGoal, fixedMonthlyIncome } = req.body;
         try {
             const updatedUser = await prisma.user.update({
                 where: { id: req.user.id },
@@ -82,11 +92,12 @@ class UserController {
                     monthlyIncomeRange,
                     investmentProfile,
                     mainFinancialGoal,
+                    fixedMonthlyIncome: fixedMonthlyIncome !== undefined && fixedMonthlyIncome !== null ? parseFloat(fixedMonthlyIncome) : null,
                 },
                  select: { 
                     id: true, email: true, username: true, name: true, age: true, gender: true, avatarUrl: true, futureProjectionCount: true,
                     daysUntilDueReminder: true, enableAchievementNotifications: true, enableBudgetNotifications: true, enableLimitAlerts: true, enableUpcomingPaymentNotifications: true,
-                    professionalSituation: true, monthlyIncomeRange: true, investmentProfile: true, mainFinancialGoal: true,
+                    professionalSituation: true, monthlyIncomeRange: true, investmentProfile: true, mainFinancialGoal: true, fixedMonthlyIncome: true,
                 }
             });
             res.json(updatedUser);
@@ -109,7 +120,10 @@ class UserController {
             enableReconciliationAi,
             enableGoalProjection,
             habilitarDescricaoInteligente,
-            dashboardLayout
+            dashboardLayout,
+            favoriteCategoryIds,
+            dashboardPreferences,
+            hideFamilyMode
         } = req.body;
         const userId = req.user.id;
 
@@ -129,6 +143,12 @@ class UserController {
                 // Correção: Garante que o layout seja sempre uma string JSON
                 dashboardLayout: typeof dashboardLayout === 'object' ? JSON.stringify(dashboardLayout) : dashboardLayout,
             };
+            if (typeof hideFamilyMode === 'boolean') {
+                dataToUpdate.hideFamilyMode = hideFamilyMode;
+            }
+            if (dashboardPreferences !== undefined) {
+                dataToUpdate.dashboardPreferences = dashboardPreferences;
+            }
 
             if (futureProjectionCount !== undefined) {
                 const count = Number(futureProjectionCount);
@@ -139,13 +159,48 @@ class UserController {
             }
 
 
-            const updatedUser = await prisma.user.update({
-                where: { id: userId },
-                data: dataToUpdate,
-                 select: {
-                    id: true, email: true, username: true, name: true, futureProjectionCount: true,
-                    daysUntilDueReminder: true, enableAchievementNotifications: true, enableBudgetNotifications: true, enableLimitAlerts: true, enableUpcomingPaymentNotifications: true, enableOcr: true, enableDailySummary: true, enableBudgetSuggestion: true, enableReconciliationAi: true, enableGoalProjection: true, habilitarDescricaoInteligente: true, dashboardLayout: true
+            const updatedUser = await prisma.$transaction(async (tx) => {
+                if (Array.isArray(favoriteCategoryIds)) {
+                    await tx.userFavoriteCategory.deleteMany({ where: { userId } });
+                    if (favoriteCategoryIds.length > 0) {
+                        await tx.userFavoriteCategory.createMany({
+                            data: favoriteCategoryIds.map((categoryId, index) => ({
+                                userId,
+                                categoryId,
+                                priority: index,
+                            })),
+                            skipDuplicates: true,
+                        });
+                    }
+                    dataToUpdate.favoriteCategories = favoriteCategoryIds;
                 }
+
+                return tx.user.update({
+                    where: { id: userId },
+                    data: dataToUpdate,
+                    select: {
+                        id: true,
+                        email: true,
+                        username: true,
+                        name: true,
+                        futureProjectionCount: true,
+                        daysUntilDueReminder: true,
+                        enableAchievementNotifications: true,
+                        enableBudgetNotifications: true,
+                        enableLimitAlerts: true,
+                        enableUpcomingPaymentNotifications: true,
+                        enableOcr: true,
+                        enableDailySummary: true,
+                        enableBudgetSuggestion: true,
+                        enableReconciliationAi: true,
+                        enableGoalProjection: true,
+                        habilitarDescricaoInteligente: true,
+                        dashboardLayout: true,
+                        favoriteCategories: true,
+                        dashboardPreferences: true,
+                        hideFamilyMode: true,
+                    },
+                });
             });
 
             res.json(updatedUser);
@@ -190,6 +245,55 @@ class UserController {
                 data: { password: hashedNewPassword }
             });
             res.json({ message: "Senha alterada com sucesso." });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateSecuritySettings(req, res, next) {
+        const userId = req.user.id;
+        const { phoneNumber, twoFactorEnabled } = req.body;
+        try {
+            const existingUser = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { phoneNumber: true },
+            });
+            if (!existingUser) {
+                return res.status(404).json({ message: 'Usuário não encontrado.' });
+            }
+
+            if (twoFactorEnabled === true && !(phoneNumber || existingUser.phoneNumber)) {
+                return res.status(400).json({ message: 'Informe um telefone para ativar a verificação em duas etapas.' });
+            }
+
+            const data = {};
+            if (phoneNumber !== undefined) {
+                data.phoneNumber = phoneNumber ? encryptValue(phoneNumber) : null;
+                data.phoneVerified = false;
+            }
+            if (typeof twoFactorEnabled === 'boolean') {
+                data.twoFactorEnabled = twoFactorEnabled;
+            }
+
+            if (Object.keys(data).length === 0) {
+                return res.status(400).json({ message: 'Nenhuma alteração informada.' });
+            }
+
+            const updated = await prisma.user.update({
+                where: { id: userId },
+                data,
+                select: {
+                    id: true,
+                    phoneNumber: true,
+                    phoneVerified: true,
+                    twoFactorEnabled: true,
+                },
+            });
+
+            res.json({
+                ...updated,
+                phoneNumber: updated.phoneNumber ? decryptValue(updated.phoneNumber) : null,
+            });
         } catch (error) {
             next(error);
         }

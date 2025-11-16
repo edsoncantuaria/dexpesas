@@ -4,7 +4,7 @@
 self.addEventListener('push', function(event) {
   const data = event.data.json();
   
-  const title = data.title || 'Jornada Financeira';
+  const title = data.title || 'Dexpesas';
   const options = {
     body: data.body,
     icon: '/logo-192.png', // Ícone que aparece na notificação

@@ -1,0 +1,18 @@
+<svg width="220" height="220" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cloudiveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6">
+        <animate attributeName="stop-color" values="#3B82F6; #A5F3D2; #C7C8FF; #3B82F6" dur="6s" repeatCount="indefinite" />
+      </stop>
+      <stop offset="100%" stop-color="#A7D5FF">
+        <animate attributeName="stop-color" values="#A7D5FF; #C7C8FF; #3B82F6; #A7D5FF" dur="6s" repeatCount="indefinite" />
+      </stop>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="220" height="220" fill="#020617"/>
+  <g>
+    <circle cx="90" cy="115" r="38" fill="url(#cloudiveGrad)"/>
+    <circle cx="130" cy="95" r="38" fill="url(#cloudiveGrad)"/>
+    <circle cx="130" cy="135" r="38" fill="url(#cloudiveGrad)"/>
+  </g>
+</svg>

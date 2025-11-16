@@ -27,9 +27,9 @@ export function DesktopSidebar({ links }: DesktopSidebarProps) {
 
   return (
     <aside className="fixed left-0 top-0 z-50 hidden h-screen w-[5rem] flex-col border-r bg-background md:flex">
-      <div className="flex h-16 items-center justify-center border-b">
-        <Link href="/dashboard">
-          <Logo isIconOnly />
+      <div className="flex h-16 items-center justify-center border-b px-2">
+        <Link href="/dashboard" className="w-full flex justify-center">
+          <Logo className="[&_svg]:h-8 [&_svg]:w-auto" />
         </Link>
       </div>
       <nav className="flex flex-1 flex-col items-center gap-4 py-4">

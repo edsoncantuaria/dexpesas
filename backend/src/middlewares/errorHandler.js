@@ -1,7 +1,10 @@
 // src/middlewares/errorHandler.js
+import MetricsService from '../services/metricsService.js';
+
 const errorHandler = (err, req, res, next) => {
     // Log completo do erro no console do servidor para depuração
     console.error('❌ Ocorreu um erro:', err);
+    MetricsService.recordError();
 
     // Identifica erros conhecidos do Prisma
     if (err.name === 'PrismaClientKnownRequestError') {

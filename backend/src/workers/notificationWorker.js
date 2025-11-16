@@ -4,36 +4,9 @@ import { redisClient } from '../config/redis.js';
 import NotificationService from '../services/notificationService.js';
 import webpush from 'web-push';
 import config from '../config/config.js';
-import crypto from 'crypto';
+import { decryptJson } from '../utils/fieldEncryption.js';
 
 const QUEUE_NAME = 'notifications';
-
-// Chave de criptografia deve ter 32 bytes para aes-256-cbc.
-// Usamos uma chave de 16 bytes (128 bits) em hexadecimal (32 caracteres) e a convertemos para um buffer de 16 bytes.
-const ENCRYPTION_KEY = Buffer.from(process.env.ENCRYPTION_KEY || '', 'hex');
-const IV_LENGTH = 16; // Para AES, o IV é sempre 16 bytes
-
-// Função para descriptografar dados
-function decrypt(text) {
-  if (!text || !ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 16) {
-      console.error("Chave de criptografia inválida ou ausente para descriptografia.");
-      return null;
-  }
-  try {
-    const textParts = text.split(':');
-    if (textParts.length !== 2) throw new Error("Texto criptografado em formato inválido.");
-    
-    const iv = Buffer.from(textParts.shift(), 'hex');
-    const encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    const decipher = crypto.createDecipheriv('aes-256-cbc', ENCRYPTION_KEY, iv);
-    let decrypted = decipher.update(encryptedText);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return JSON.parse(decrypted.toString());
-  } catch (error) {
-      console.error("Erro ao descriptografar:", error);
-      return null;
-  }
-}
 
 class NotificationWorker {
     constructor() {
@@ -87,7 +60,7 @@ class NotificationWorker {
                 console.log(`📲 Enviando notificação push...`);
                 try {
                     // Descriptografa a subscription antes de usar
-                    const decryptedSubscription = decrypt(data.encryptedSubscription);
+                    const decryptedSubscription = decryptJson(data.encryptedSubscription);
                     if (!decryptedSubscription) {
                         throw new Error("Falha ao descriptografar inscrição de push.");
                     }

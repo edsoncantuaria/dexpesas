@@ -1,6 +1,6 @@
-# Backend da Jornada Financeira (Express.js + Prisma)
+# Backend do Dexpesas (Express.js + Prisma)
 
-Este diretório contém a aplicação de backend completa para o projeto Jornada Financeira. Ele é construído com Express.js e utiliza o Prisma como ORM para se comunicar com um banco de dados MySQL e o MinIO para armazenamento de arquivos.
+Este diretório contém a aplicação de backend completa para o projeto Dexpesas. Ele é construído com Express.js e utiliza o Prisma como ORM para se comunicar com um banco de dados MySQL e o MinIO para armazenamento de arquivos.
 
 A arquitetura foi recentemente atualizada para incluir **BullMQ** e **Redis**, permitindo o processamento de tarefas pesadas (como notificações) em background, melhorando a performance e a escalabilidade.
 
@@ -57,6 +57,7 @@ As chaves de acesso e URLs de conexão são gerenciadas através de um arquivo `
     Abra o arquivo `/backend/.env` e preencha as variáveis. A maioria já estará configurada para funcionar com o Docker Compose.
     *   `DATABASE_URL`: A URL de conexão com o banco MySQL. O valor no `.env.example` já deve funcionar com o Docker.
     *   `JWT_SECRET`: Crie uma chave secreta forte para a autenticação JWT.
+    *   `DATA_ENCRYPTION_KEY`: **Obrigatório para produção.** Uma string de no mínimo 32 caracteres usada para criptografar `phoneNumber`, `pushSubscription` e segredos 2FA. Caso não seja definida, o backend emitirá um aviso e armazenará esses campos em texto plano.
     *   `GEMINI_API_KEY`: Sua chave de API para o Google AI Studio.
     *   `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`: Já configurados para o contêiner Redis.
     *   `MINIO_*`: Já configurados para o contêiner MinIO.

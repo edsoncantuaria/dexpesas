@@ -28,7 +28,7 @@ import type { Account, Card, Transaction, Category, OcrData, User, Tag } from '@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { CalendarIcon, Loader2, Sparkles, Info, Camera, Repeat, Check, MessageSquareText, ChevronDown, Repeat1, Layers, Tags as TagsIcon, Paperclip, PencilLine, CircleDollarSign, Shapes, Wallet, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addYears, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Switch } from '@/components/ui/switch';
 import api from '@/lib/api';
@@ -114,6 +114,15 @@ const formSchema = z.object({
 }, {
     message: "Selecione uma frequência para a recorrência.",
     path: ['recurrenceType']
+})
+.refine(data => {
+    const selectedDate = data.data;
+    const minDate = subYears(new Date(), 5);
+    const maxDate = addYears(new Date(), 2);
+    return selectedDate >= minDate && selectedDate <= maxDate;
+}, {
+    message: "Escolha uma data dentro de um intervalo válido.",
+    path: ['data'],
 });
 
 
@@ -290,6 +299,27 @@ export function AddTransactionForm({
     return categories.filter(c => c.type === watchTipo);
   }, [categories, watchTipo]);
 
+  const favoriteCategoryIds = useMemo(() => {
+    if (!user?.favoriteCategories) return [];
+    if (Array.isArray(user.favoriteCategories)) return user.favoriteCategories;
+    if (typeof user.favoriteCategories === 'string') {
+        try {
+            const parsed = JSON.parse(user.favoriteCategories);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            return [];
+        }
+    }
+    return [];
+  }, [user]);
+
+  const favoriteCategorySuggestions = useMemo(() => {
+    if (!favoriteCategoryIds.length) return [];
+    return favoriteCategoryIds
+      .map((id) => categories.find((cat) => cat.id === id))
+      .filter(Boolean) as Category[];
+  }, [favoriteCategoryIds, categories]);
+
   return (
     <>
     <Form {...form}>
@@ -374,7 +404,43 @@ export function AddTransactionForm({
                     <CollapsibleContent asChild>
                         <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
                             <div className="space-y-4 pt-2">
-                                <FormField control={form.control} name="categoryId" render={({ field }) => ( <FormItem><FormLabel>Categoria</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger></FormControl><SelectContent>{filteredCategories.map(cat => ( <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)}/>
+                                <FormField control={form.control} name="categoryId" render={({ field }) => ( 
+                                    <FormItem>
+                                        <FormLabel>Categoria</FormLabel>
+                                        <Select onValueChange={field.onChange} value={field.value}>
+                                            <FormControl>
+                                                <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {filteredCategories.map(cat => (
+                                                    <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {favoriteCategorySuggestions.length > 0 && (
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                <span className="w-full text-[11px] uppercase tracking-wide text-muted-foreground">
+                                                    Sugestões
+                                                </span>
+                                                {favoriteCategorySuggestions.map((cat) => (
+                                                    <Button
+                                                        key={cat.id}
+                                                        type="button"
+                                                        size="xs"
+                                                        variant={field.value === cat.id ? 'default' : 'outline'}
+                                                        onClick={(event) => {
+                                                            event.preventDefault();
+                                                            field.onChange(cat.id);
+                                                        }}
+                                                    >
+                                                        {cat.label}
+                                                    </Button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <FormMessage />
+                                    </FormItem>
+                                )}/>
                                 <FormField control={form.control} name="tags" render={({ field }) => (<FormItem><FormLabel>Tags</FormLabel><FormControl><TagInput allTags={userTags} selectedTags={field.value || []} onChange={(newTags) => field.onChange(newTags)} onTagsUpdate={setUserTags}/></FormControl><FormMessage /></FormItem>)}/>
                                 <FormField control={form.control} name="attachmentUrl" render={({ field }) => (<FormItem><FormLabel>Comprovante</FormLabel><FormControl>{field.value ? (<AttachmentPreviewer objectName={field.value} onRemove={() => form.setValue('attachmentUrl', null)}/>) : (<FileUpload onValueChange={(objectName) => field.onChange(objectName)}/>)}</FormControl><FormMessage /></FormItem>)}/>
                                 <FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais..." {...field}/></FormControl><FormMessage /></FormItem>)}/>

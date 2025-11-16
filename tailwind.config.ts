@@ -10,8 +10,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        body: ['Inter', 'sans-serif'],
-        headline: ['Inter', 'sans-serif'],
+        body: ['Inter', '"Inter Tight"', 'sans-serif'],
+        headline: ['"Inter Tight"', 'Inter', 'sans-serif'],
         code: ['monospace'],
       },
       colors: {
@@ -65,11 +65,21 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        cloudive: {
+          sky: '#3B82F6',
+          blue: '#A7D5FF',
+          lavender: '#C7C8FF',
+          ink: '#0F172A',
+          mint: '#A5F3D2',
+          amber: '#FBBF24',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+        xl: '20px',
+        '2xl': '24px',
       },
       keyframes: {
         'accordion-down': {
@@ -92,6 +102,10 @@ export default {
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
+      },
+      boxShadow: {
+        soft: '0 4px 12px rgba(15, 23, 42, 0.08)',
+        floating: '0 6px 24px rgba(15, 23, 42, 0.12)',
       },
     },
   },

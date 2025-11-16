@@ -11,7 +11,7 @@ export default function LoginPage() {
         </div>
       <div className="w-full max-w-md space-y-8">
         <div className="flex justify-center">
-          <Logo />
+          <Logo isIconOnly />
         </div>
         <Card className="shadow-lg">
           <CardHeader className="text-center">

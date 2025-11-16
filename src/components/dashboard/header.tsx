@@ -12,6 +12,7 @@ import {
 import { NotificationPanel } from './notifications/notification-panel';
 import { useState } from 'react';
 import { useTransactionForm } from '@/contexts/TransactionFormContext';
+import { Logo } from '@/components/logo';
 
 export function Header() {
   const [open, setOpen] = useState(false);
@@ -30,10 +31,9 @@ export function Header() {
 
       {/* Título da Página - Visível apenas em mobile para dar contexto */}
       <div className="md:hidden">
-         {/* O título pode ser dinâmico no futuro */}
-         <h1 className="text-lg font-bold">Dashboard</h1>
+         <Logo isIconOnly className="[&_svg]:h-10 [&_svg]:w-auto" />
       </div>
-      
+
       <div className="flex items-center gap-2">
          <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>

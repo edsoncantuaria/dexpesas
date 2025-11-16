@@ -26,6 +26,8 @@ import tagRoutes from './routes/tagRoutes.js';
 import sugestoesRoutes from './routes/sugestoesRoutes.js';
 import errorHandler from './middlewares/errorHandler.js';
 import achievementRoutes from './routes/achievementRoutes.js';
+import healthRoutes from './routes/healthRoutes.js';
+import requestMetrics from './middlewares/requestMetrics.js';
 
 const app = express();
 
@@ -37,11 +39,12 @@ app.use(cors({
 // Aumenta o limite do corpo da requisição para aceitar imagens em Base64
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(requestMetrics);
 
 
 // Rotas da API
 app.get('/api', (req, res) => {
-    res.json({ message: 'Bem-vindo à API da Jornada Financeira!' });
+    res.json({ message: 'Bem-vindo à API do Dexpesas!' });
 });
 
 app.use('/api/auth', authRoutes);
@@ -68,6 +71,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/sugestoes', sugestoesRoutes);
 app.use('/api', dataRoutes);
+app.use('/api/health', healthRoutes);
 
 // Middleware de tratamento de erros
 app.use(errorHandler);

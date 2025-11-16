@@ -55,6 +55,9 @@ class NotificationService {
             case 'PAYMENT_DUE': // Notificações de pagamento vencido são sempre importantes
                 canNotify = true;
                 break;
+            case 'SECURITY_ALERT':
+                canNotify = true;
+                break;
             default:
                 break;
         }

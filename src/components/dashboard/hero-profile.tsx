@@ -9,7 +9,7 @@ import { useEffect, useState, useMemo } from 'react';
 import api from '@/lib/api';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { iconMap } from '@/lib/icon-map';
-import { Crown, Star, Users } from 'lucide-react';
+import { Crown, Star, Users, Banknote } from 'lucide-react';
 import Link from 'next/link';
 
 interface HeroProfileProps {
@@ -18,11 +18,14 @@ interface HeroProfileProps {
   clan: Clan | null;
   allAchievements: Achievement[];
   unlockedAchievements: UnlockedAchievement[];
+  familyBalance?: number | null;
 }
 
 const xpNeeded = (level: number) => Math.floor(100 * Math.pow(level, 1.15));
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchievements }: HeroProfileProps) {
+export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchievements, familyBalance }: HeroProfileProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,6 +83,12 @@ export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchi
                     <Crown className="h-4 w-4 text-yellow-500" />
                     {playerClass} - Nível {profile.level}
                 </p>
+                {typeof familyBalance === 'number' && (
+                  <div className="text-xs flex items-center gap-2 text-muted-foreground">
+                    <Banknote className="h-3.5 w-3.5 text-green-500" />
+                    Saldo familiar: <span className="text-green-600 font-semibold">{formatCurrency(familyBalance)}</span>
+                  </div>
+                )}
             </div>
         </div>
 
