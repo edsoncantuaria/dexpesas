@@ -17,18 +17,30 @@ export default function ProgressoPage() {
     const [user, setUser] = useState<User | null>(null);
     const [inventory, setInventory] = useState<UserItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isGamificationEnabled, setIsGamificationEnabled] = useState(true);
     const { toast } = useToast();
 
     const fetchData = useCallback(async (showLoading = true) => {
         if (showLoading) setIsLoading(true);
         try {
-            const [profileRes, userRes, inventoryRes] = await Promise.all([
+            const userRes = await api.get('/user');
+            const currentUser = userRes.data;
+            setUser(currentUser);
+
+            if (currentUser.gamificationMode === 'OFF') {
+                setIsGamificationEnabled(false);
+                setProfile(null);
+                setInventory([]);
+                if (showLoading) setIsLoading(false);
+                return;
+            }
+
+            setIsGamificationEnabled(true);
+            const [profileRes, inventoryRes] = await Promise.all([
                 api.get('/gamification/profile'),
-                api.get('/user'),
                 api.get('/data/inventory')
             ]);
             setProfile(profileRes.data);
-            setUser(userRes.data);
             setInventory(inventoryRes.data);
         } catch (error) {
             toast({
@@ -44,7 +56,30 @@ export default function ProgressoPage() {
         fetchData();
     }, [fetchData]);
     
-    if (isLoading || !profile || !user) {
+    if (isLoading || !user) {
+        return <LoadingScreen />;
+    }
+
+    if (!isGamificationEnabled) {
+        return (
+            <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                    <Link href="/dashboard" className="p-2 rounded-md hover:bg-muted">
+                       <ChevronLeft className="h-5 w-5" />
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-bold font-headline">Modo Financeiro Clássico</h1>
+                        <p className="text-muted-foreground">Ative a gamificação nas configurações para acompanhar conquistas e atributos.</p>
+                    </div>
+                </div>
+                <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
+                    Sua conta está em modo financeiro tradicional. Todos os recursos de RPG ficam ocultos, mas seu progresso ainda é registrado nos bastidores.
+                </div>
+            </div>
+        );
+    }
+
+    if (!profile) {
         return <LoadingScreen />;
     }
 

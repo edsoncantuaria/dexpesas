@@ -4,7 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, BrainCircuit, CheckCircle, CreditCard, Gamepad2, Landmark, PartyPopper, Rocket, Target, User as UserIcon, Wallet, Shield } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BrainCircuit, CheckCircle, CreditCard, Gamepad2, Landmark, Loader2, PartyPopper, Rocket, Target, User as UserIcon, Wallet, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/logo';
 import api from '@/lib/api';
@@ -48,6 +48,7 @@ export default function WelcomePage() {
   const [direction, setDirection] = useState(0);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [gamificationMode, setGamificationMode] = useState<'FULL' | 'LITE' | 'OFF'>('FULL');
   const router = useRouter();
   const { toast } = useToast();
   
@@ -55,21 +56,47 @@ export default function WelcomePage() {
     setDirection(newDirection);
     setStep(prev => prev + newDirection);
   };
+  const handleGamificationModeSelect = async (mode: 'FULL' | 'LITE' | 'OFF') => {
+    setIsSubmitting(true);
+    try {
+        await api.put('/user/preferences', { gamificationMode: mode });
+        setGamificationMode(mode);
+        toast({ title: mode === 'OFF' ? 'Modo financeiro ativado' : 'Gamificação configurada!' });
+        paginate(1);
+    } catch (error) {
+        toast({ variant: 'destructive', title: 'Não foi possível salvar sua preferência' });
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+  const isGamified = gamificationMode !== 'OFF';
 
   const onboardingSteps = [
     {
+      component: GamificationModeStep,
+      props: {
+        selectedMode: gamificationMode,
+        onConfirm: handleGamificationModeSelect,
+        isSubmitting
+      }
+    },
+    {
       component: InfoStep,
       props: { 
-        icon: Gamepad2,
-        title: "Sua jornada no Dexpesas começa!",
-        description: "Prepare-se para transformar suas finanças em uma aventura épica. Vamos criar seu herói financeiro."
+        icon: isGamified ? Gamepad2 : Wallet,
+        title: isGamified ? "Sua jornada no Dexpesas começa!" : "Bem-vindo ao Dexpesas!",
+        description: isGamified
+          ? "Prepare-se para transformar suas finanças em uma aventura épica. Vamos criar seu herói financeiro."
+          : "Vamos organizar suas finanças com clareza desde o primeiro passo."
       }
     },
     {
       component: AddAccountStep,
       props: { 
-          title: "Forje sua Arma Principal: A Conta",
-          description: "Toda jornada precisa de um ponto de partida. Cadastre sua conta corrente para começar a rastrear seus tesouros.",
+          title: isGamified ? "Forje sua Arma Principal: A Conta" : "Cadastre sua primeira conta",
+          description: isGamified
+            ? "Toda jornada precisa de um ponto de partida. Cadastre sua conta corrente para começar a rastrear seus tesouros."
+            : "Conecte sua conta principal para acompanhar saldos e movimentações em um só lugar.",
           onSave: async (data: Omit<Account, 'id'|'userId'>) => {
               setIsSubmitting(true);
               try {
@@ -89,8 +116,10 @@ export default function WelcomePage() {
      {
       component: AddCardStep,
       props: {
-          title: "Equipe seu Escudo: O Cartão",
-          description: "O cartão de crédito é uma ferramenta poderosa. Cadastre o seu para gerenciar seu poder de compra com sabedoria.",
+          title: isGamified ? "Equipe seu Escudo: O Cartão" : "Adicione seu cartão",
+          description: isGamified
+            ? "O cartão de crédito é uma ferramenta poderosa. Cadastre o seu para gerenciar seu poder de compra com sabedoria."
+            : "Cadastre seu cartão de crédito para acompanhar limites, faturas e despesas com mais precisão.",
           onSave: async (data: Omit<CardType, 'id'|'userId'|'bestDayToBuy' | 'currentInvoiceAmount' | 'availableLimit'>) => {
               setIsSubmitting(true);
               try {
@@ -110,6 +139,10 @@ export default function WelcomePage() {
     {
         component: AddProfileStep,
         props: {
+            title: isGamified ? "Defina seu Arquétipo (Opcional)" : "Conte um pouco sobre você",
+            description: isGamified
+                ? "Suas escolhas moldam seu herói. Isso nos ajuda a personalizar suas futuras missões e dicas."
+                : "Algumas informações ajudam a personalizar recomendações e projeções.",
             onSaveAndContinue: async (data: any) => {
                 const hasData = Object.values(data).some(v => v !== null && v !== undefined && v !== '');
                 if (hasData) {
@@ -133,6 +166,10 @@ export default function WelcomePage() {
     {
       component: FinancialSetupStep,
       props: {
+        title: isGamified ? "Monte sua estratégia financeira" : "Monte seu plano financeiro",
+        description: isGamified
+            ? "Defina renda, metas e categorias favoritas para destravar missões personalizadas."
+            : "Podemos personalizar seu dashboard se você informar renda, metas e categorias principais.",
         onSave: async ({ fixedMonthlyIncome, favoriteCategoryIds, mainGoal }: { fixedMonthlyIncome: number; favoriteCategoryIds: string[]; mainGoal: string }) => {
             const hasIncome = fixedMonthlyIncome > 0;
             const hasGoal = !!mainGoal;
@@ -274,6 +311,91 @@ export default function WelcomePage() {
 
 
 // Step Components
+const GAMIFICATION_MODE_OPTIONS: Array<{
+  value: 'FULL' | 'LITE' | 'OFF';
+  title: string;
+  description: string;
+  icon: LucideIcon;
+}> = [
+  {
+    value: 'FULL',
+    title: 'Modo Jornada',
+    description: 'Experiência completa com missões, conquistas, chefes e progressão RPG.',
+    icon: Gamepad2,
+  },
+  {
+    value: 'LITE',
+    title: 'Modo Lite',
+    description: 'Elementos de gamificação leves (XP e conquistas) sem os eventos épicos.',
+    icon: BrainCircuit,
+  },
+  {
+    value: 'OFF',
+    title: 'Modo Financeiro',
+    description: 'Interface 100% focada em finanças. Sem metáforas de jogo, mas progresso guardado.',
+    icon: Wallet,
+  },
+];
+
+function GamificationModeStep({
+  selectedMode,
+  onConfirm,
+  isSubmitting,
+}: {
+  selectedMode: 'FULL' | 'LITE' | 'OFF';
+  onConfirm: (mode: 'FULL' | 'LITE' | 'OFF') => void;
+  isSubmitting: boolean;
+}) {
+  const [value, setValue] = useState<'FULL' | 'LITE' | 'OFF'>(selectedMode);
+
+  useEffect(() => {
+    setValue(selectedMode);
+  }, [selectedMode]);
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center space-y-2">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">Passo 1</p>
+        <h1 className="text-2xl font-bold font-headline">Como você quer usar o Dexpesas?</h1>
+        <p className="text-muted-foreground">
+          Você pode mudar essa escolha depois em Configurações.
+        </p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        {GAMIFICATION_MODE_OPTIONS.map((option) => {
+          const Icon = option.icon;
+          const isActive = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setValue(option.value)}
+              className={cn(
+                'rounded-2xl border p-4 text-left transition-all hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                isActive ? 'border-primary bg-primary/5 shadow-lg' : 'border-muted'
+              )}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className={cn('p-2 rounded-full', isActive ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground')}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <span className="font-semibold">{option.title}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{option.description}</p>
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex justify-end">
+        <Button disabled={!value || isSubmitting} onClick={() => value && onConfirm(value)}>
+          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Continuar
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 function InfoStep({ icon: Icon, title, description }: { icon: LucideIcon, title: string, description: string }) {
   return (
@@ -338,7 +460,7 @@ const profileSchema = z.object({
   mainFinancialGoal: z.string().optional().nullable(),
 });
 
-function AddProfileStep({ onSaveAndContinue, isSubmitting }: { onSaveAndContinue: (data: any) => void, isSubmitting: boolean }) {
+function AddProfileStep({ onSaveAndContinue, isSubmitting, title, description }: { onSaveAndContinue: (data: any) => void, isSubmitting: boolean, title: string, description: string }) {
   const form = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -357,8 +479,8 @@ function AddProfileStep({ onSaveAndContinue, isSubmitting }: { onSaveAndContinue
                     <UserIcon className="h-10 w-10" />
                 </div>
             </div>
-            <h2 className="text-xl font-bold font-headline">Defina seu Arquétipo (Opcional)</h2>
-            <p className="text-sm text-muted-foreground">Suas escolhas moldam seu herói. Isso nos ajuda a personalizar suas futuras missões e dicas.</p>
+            <h2 className="text-xl font-bold font-headline">{title}</h2>
+            <p className="text-sm text-muted-foreground">{description}</p>
         </div>
          <Form {...form}>
             <form onSubmit={form.handleSubmit(onSaveAndContinue)} className="space-y-4">
@@ -390,9 +512,11 @@ function AddProfileStep({ onSaveAndContinue, isSubmitting }: { onSaveAndContinue
 type FinancialSetupStepProps = {
     onSave: (payload: { fixedMonthlyIncome: number; favoriteCategoryIds: string[]; mainGoal: string }) => Promise<void>;
     isSubmitting: boolean;
+    title: string;
+    description: string;
 };
 
-function FinancialSetupStep({ onSave, isSubmitting }: FinancialSetupStepProps) {
+function FinancialSetupStep({ onSave, isSubmitting, title, description }: FinancialSetupStepProps) {
     const [categories, setCategories] = useState<Category[]>([]);
     const [favoriteCategoryIds, setFavoriteCategoryIds] = useState<string[]>([]);
     const [fixedIncome, setFixedIncome] = useState(0);
@@ -432,9 +556,9 @@ function FinancialSetupStep({ onSave, isSubmitting }: FinancialSetupStepProps) {
 
     return (
         <div className="w-full max-h-[70vh] overflow-y-auto px-1 space-y-4">
-            <div className="text-center mb-4 space-y-2">
-                <h2 className="text-xl font-bold font-headline">Monte seu plano financeiro</h2>
-                <p className="text-sm text-muted-foreground">Defina renda, metas e categorias favoritas para personalizarmos seu dashboard.</p>
+        <div className="text-center mb-4 space-y-2">
+            <h2 className="text-xl font-bold font-headline">{title}</h2>
+            <p className="text-sm text-muted-foreground">{description}</p>
             </div>
             <div className="space-y-4">
                 <div>

@@ -12,6 +12,7 @@ import { budgetSuggestionFlow } from '../ai/flows/budget-suggestion-flow.js';
 import { goalProjectionFlow } from '../ai/flows/goal-projection-flow.js';
 import { startOfDay, endOfDay, subMonths } from 'date-fns';
 import AuditService from '../services/auditService.js';
+import GamificationService from '../services/gamificationService.js';
 
 const prisma = new PrismaClient();
 
@@ -200,6 +201,11 @@ class AiController {
             };
 
             const result = await dailySummaryFlow(input);
+
+            await prisma.$transaction(async (tx) => {
+                await GamificationService.triggerXpEvent(tx, userId, 'DAILY_CHECKIN');
+            });
+
             res.json(result);
 
         } catch (error) {

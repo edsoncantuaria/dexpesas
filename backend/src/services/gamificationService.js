@@ -1,7 +1,7 @@
 
 // backend/src/services/gamificationService.js
 import { PrismaClient } from '@prisma/client';
-import { differenceInDays, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { differenceInDays, subMonths, startOfMonth, endOfMonth, startOfDay, startOfWeek } from 'date-fns';
 import NotificationService from './notificationService.js';
 import AuditService from './auditService.js';
 
@@ -65,12 +65,17 @@ const gamificationEvents = {
     // Penalidades
     PAYMENT_DUE: { xp: -75, description: 'Deixou uma conta vencer.' },
     BUDGET_EXCEEDED: { xp: -50, description: 'Estourou o limite de um orçamento.' },
-    VICE_SPENDING: { xp: -15, description: 'Gasto em uma categoria de "Vício".' }
+    VICE_SPENDING: { xp: -15, description: 'Gasto em uma categoria de "Vício".' },
+    GUILD_CONTRIBUTION: { xp: 25, description: 'Contribuiu para o banco da família.', limit: { period: 'daily', max: 3 } },
+    GUILD_MISSION_COMPLETED: { xp: 100, description: 'Completou uma missão cooperativa.', limit: { period: 'weekly', max: 2 } },
+    RECONCILIATION_STREAK: { xp: 40, description: 'Manteve a rotina de reconciliação.', limit: { period: 'daily', max: 1 } },
+    DAILY_CHECKIN: { xp: 12, description: 'Realizou o check-in diário.', limit: { period: 'daily', max: 1 } },
 };
 
 
 // Fórmula de XP para o próximo nível
 const xpNeeded = (level) => Math.floor(100 * Math.pow(level, 1.15));
+export const getXpNeededForLevel = xpNeeded;
 
 /**
  * Nova árvore de classes.
@@ -136,6 +141,36 @@ const getHeroClass = (level, attributes) => {
 
 
 class GamificationService {
+    static getXpNeeded(level) {
+        return xpNeeded(Math.max(level, 1));
+    }
+
+    static getLimitWindowStart(period) {
+        if (period === 'daily') {
+            return startOfDay(new Date());
+        }
+        if (period === 'weekly') {
+            return startOfWeek(new Date(), { weekStartsOn: 1 });
+        }
+        return null;
+    }
+
+    static async hasReachedEventLimit(userId, eventType, limit) {
+        if (!limit) return false;
+        const windowStart = this.getLimitWindowStart(limit.period);
+        if (!windowStart) return false;
+
+        const count = await prisma.auditLog.count({
+            where: {
+                userId,
+                action: 'GAMIFICATION_EVENT',
+                entityId: eventType,
+                createdAt: { gte: windowStart },
+            },
+        });
+
+        return count >= limit.max;
+    }
 
      /**
      * Processa a mudança de XP de um usuário, lidando com level-ups.
@@ -256,12 +291,34 @@ class GamificationService {
         const event = gamificationEvents[eventType];
         if (!event) return;
 
-        const xpToAward = event.xp;
+        if (await this.hasReachedEventLimit(userId, eventType, event.limit)) {
+            console.log(`⚠️ Evento ${eventType} ignorado para usuário ${userId} (limite atingido).`);
+            return;
+        }
+
+        let xpToAward = event.xp;
+
+        if (['BILL_PAID', 'GOAL_CONTRIBUTION', 'TRANSACTION_CREATED', 'GUILD_CONTRIBUTION'].includes(eventType) && details.amount) {
+            xpToAward = Math.max(1, Math.floor(Math.sqrt(details.amount / 10)));
+        }
 
         if (xpToAward === 0) return;
 
         console.log(`✨ Evento de Gamificação: ${eventType} para usuário ${userId}. XP: ${xpToAward}`);
         await this.processXpChange(tx, userId, xpToAward);
+
+        await AuditService.log({
+            userId,
+            action: 'GAMIFICATION_EVENT',
+            entity: 'GAMIFICATION_EVENT',
+            entityId: eventType,
+            details: {
+                eventType,
+                xpAwarded: xpToAward,
+                description: event.description,
+                meta: details || {},
+            },
+        });
     }
 
     
@@ -430,6 +487,9 @@ class GamificationService {
     static async completeUserMission(tx, userId, userMission, finalProgress) {
         console.log(`Missão "${userMission.mission.title}" completada por ${userId}!`);
         await this.processXpChange(tx, userId, userMission.mission.xpReward);
+        if (userMission.mission.scope === 'GUILD') {
+            await this.triggerXpEvent(tx, userId, 'GUILD_MISSION_COMPLETED', { missionId: userMission.missionId });
+        }
         if (userMission.mission.itemRewardId) {
             const existingItem = await tx.userItem.findUnique({
                 where: { userId_itemId: { userId, itemId: userMission.mission.itemRewardId } }

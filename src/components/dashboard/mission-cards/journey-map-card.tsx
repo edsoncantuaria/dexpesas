@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { useGamificationMode } from "@/hooks/use-gamification-mode";
+import { getGamificationCopy } from "@/lib/gamification-copy";
 
 interface JourneyMapCardProps {
     budgets: Budget[];
@@ -26,6 +28,8 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
     const leisureBudget = budgets.find(b => b.category?.nome === 'Lazer');
 
     const budgetsToShow = [foodBudget, leisureBudget].filter(Boolean) as Budget[];
+    const { mode } = useGamificationMode();
+    const copy = getGamificationCopy('journeyMap', mode);
 
     return (
          <Link href="/dashboard/orcamentos" className="group">
@@ -36,8 +40,8 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
                          <Map className="h-6 w-6 text-green-600 dark:text-green-400" />
                        </div>
                         <div>
-                            <CardTitle className="font-headline text-xl">O Mapa da Jornada</CardTitle>
-                            <CardDescription>Gerencie suas provisões e recursos.</CardDescription>
+                            <CardTitle className="font-headline text-xl">{copy.title}</CardTitle>
+                            <CardDescription>{copy.description}</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -61,7 +65,7 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
                         })
                     ) : (
                          <div className="text-center text-muted-foreground pt-8">
-                            <p>Nenhum orçamento de Alimentação ou Lazer definido para este mês.</p>
+                            <p>{copy.emptyState}</p>
                         </div>
                     )}
                 </CardContent>
@@ -74,7 +78,7 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
                             router.push('/dashboard/orcamentos?create=true');
                         }}
                     >
-                        Criar orçamento agora
+                        {copy.buttonLabel}
                     </Button>
                 </div>
             </Card>

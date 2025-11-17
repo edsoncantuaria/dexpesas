@@ -17,6 +17,12 @@ enum Role {
   ADMIN
 }
 
+enum GamificationMode {
+  FULL
+  LITE
+  OFF
+}
+
 enum ClanRole {
   LEADER
   ADMIN
@@ -246,6 +252,7 @@ model User {
   hideFamilyMode       Boolean @default(false)
   lastSecurityNotificationAt DateTime?
   pushSubscription     String? @db.Text
+  gamificationMode     GamificationMode @default(FULL)
   level                Int @default(1)
   xp                   Int @default(0)
   heroClass            String?

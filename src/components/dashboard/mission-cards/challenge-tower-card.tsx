@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { useGamificationMode } from "@/hooks/use-gamification-mode";
+import { getGamificationCopy } from "@/lib/gamification-copy";
 
 interface ChallengeTowerCardProps {
     goal?: Goal;
@@ -16,6 +18,8 @@ interface ChallengeTowerCardProps {
 export function ChallengeTowerCard({ goal }: ChallengeTowerCardProps) {
     const router = useRouter();
     const percentage = goal ? (Number(goal.currentAmount) / Number(goal.targetAmount)) * 100 : 0;
+    const { mode } = useGamificationMode();
+    const copy = getGamificationCopy('challengeTower', mode);
 
     return (
          <Link href="/dashboard/metas" className="group">
@@ -26,8 +30,8 @@ export function ChallengeTowerCard({ goal }: ChallengeTowerCardProps) {
                          <Castle className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
                        </div>
                         <div>
-                            <CardTitle className="font-headline text-xl">A Torre dos Desafios</CardTitle>
-                            <CardDescription>Sua próxima grande missão.</CardDescription>
+                            <CardTitle className="font-headline text-xl">{copy.title}</CardTitle>
+                            <CardDescription>{copy.description}</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
@@ -47,7 +51,7 @@ export function ChallengeTowerCard({ goal }: ChallengeTowerCardProps) {
                         </>
                     ) : (
                          <div className="text-center text-muted-foreground pt-8">
-                            <p>Nenhuma missão ativa. Defina uma nova meta para começar!</p>
+                            <p>{copy.emptyState}</p>
                         </div>
                     )}
                 </CardContent>
@@ -60,7 +64,7 @@ export function ChallengeTowerCard({ goal }: ChallengeTowerCardProps) {
                             router.push('/dashboard/metas?create=true');
                         }}
                     >
-                        Nova meta
+                        {copy.buttonLabel}
                     </Button>
                 </div>
             </Card>

@@ -7,6 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { BookMarked, Shield, Sword, ArrowUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useGamificationMode } from '@/hooks/use-gamification-mode';
+import { getGamificationCopy } from '@/lib/gamification-copy';
 
 interface TimelineCardProps {
     logs: AuditLog[];
@@ -43,11 +45,14 @@ const getLogMessage = (log: AuditLog): string => {
 
 
 export function TimelineCard({ logs }: TimelineCardProps) {
+    const { mode } = useGamificationMode();
+    const copy = getGamificationCopy('timeline', mode);
+
     return (
          <Card className="shadow-md transition-all group-hover:shadow-xl group-hover:border-primary/50 flex flex-col h-full">
             <CardHeader>
-                <CardTitle className="font-headline text-xl">Mural da Guilda</CardTitle>
-                <CardDescription>As últimas aventuras de seus companheiros.</CardDescription>
+                <CardTitle className="font-headline text-xl">{copy.title}</CardTitle>
+                <CardDescription>{copy.description}</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow">
                 {logs.length > 0 ? (
@@ -74,7 +79,7 @@ export function TimelineCard({ logs }: TimelineCardProps) {
                     </ScrollArea>
                 ) : (
                      <div className="text-center text-muted-foreground py-8 h-full flex items-center justify-center">
-                        <p>Nenhuma atividade recente na guilda.</p>
+                        <p>{copy.emptyState}</p>
                     </div>
                 )}
             </CardContent>

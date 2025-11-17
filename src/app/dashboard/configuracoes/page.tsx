@@ -10,8 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, ShieldCheck, Repeat, Loader2, Palette, FileClock, LayoutDashboard, Tags } from 'lucide-react';
-import { useEffect, useState, useCallback, type ReactNode } from 'react';
+import { Settings, ShieldCheck, Repeat, Loader2, Palette, FileClock, LayoutDashboard, Tags, Sparkles } from 'lucide-react';
+import { useEffect, useState, useCallback, type ReactNode, useRef, useMemo } from 'react';
 import type { User } from '@/lib/definitions';
 import api from '@/lib/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -21,10 +21,11 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTheme } from '@/components/theme-provider';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
+import { useGamificationMode } from '@/hooks/use-gamification-mode';
+import { useUser } from '@/contexts/UserContext';
 
 // Schemas para cada formulário
 const accountInfoSchema = z.object({
@@ -55,6 +56,9 @@ const preferencesSchema = z.object({
     habilitarDescricaoInteligente: z.boolean(),
 });
 
+const gamificationModeSchema = z.object({
+    gamificationMode: z.enum(['FULL', 'LITE', 'OFF']),
+});
 
 function SectionFooter({ isSubmitting, isDirty }: { isSubmitting: boolean, isDirty: boolean }) {
   return (
@@ -290,6 +294,79 @@ function PreferencesForm({ user }: { user: User }) {
   )
 }
 
+function GamificationModeForm({ user }: { user: User }) {
+  const { toast } = useToast();
+  const { fetchUser } = useUser();
+  const form = useForm<z.infer<typeof gamificationModeSchema>>({
+    resolver: zodResolver(gamificationModeSchema),
+    defaultValues: { gamificationMode: user.gamificationMode ?? 'FULL' },
+  });
+
+  const onSubmit: SubmitHandler<z.infer<typeof gamificationModeSchema>> = async (data) => {
+    try {
+      await api.put('/user/preferences', data);
+      await fetchUser();
+      toast({ title: 'Modo atualizado!' });
+      form.reset(data, { keepDirty: false });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro ao atualizar modo' });
+    }
+  };
+
+  const options = [
+    { value: 'FULL', title: 'Modo Jornada', description: 'Experiência completa com missões, conquistas e feedback em tempo real.' },
+    { value: 'LITE', title: 'Modo Lite', description: 'Mantém XP e conquistas visíveis, mas reduz metáforas épicas.' },
+    { value: 'OFF', title: 'Modo Financeiro', description: 'Interface tradicional, sem elementos de RPG (o progresso continua sendo registrado).' },
+  ] as const;
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Modo de Experiência</CardTitle>
+            <CardDescription>Escolha como o Dexpesas se comporta visualmente.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <FormField
+              control={form.control}
+              name="gamificationMode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <RadioGroup value={field.value} onValueChange={field.onChange} className="space-y-3">
+                      {options.map((option) => (
+                        <label
+                          key={option.value}
+                          htmlFor={`mode-${option.value}`}
+                          className={cn(
+                            'flex flex-col gap-1 rounded-xl border p-4 cursor-pointer transition',
+                            field.value === option.value ? 'border-primary bg-primary/5' : 'border-muted hover:border-primary/50'
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-semibold">{option.title}</p>
+                              <p className="text-sm text-muted-foreground">{option.description}</p>
+                            </div>
+                            <RadioGroupItem value={option.value} id={`mode-${option.value}`} />
+                          </div>
+                        </label>
+                      ))}
+                    </RadioGroup>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+          <SectionFooter isSubmitting={form.formState.isSubmitting} isDirty={form.formState.isDirty} />
+        </Card>
+      </form>
+    </Form>
+  );
+}
+
 function AppearanceForm() {
   const { theme, setTheme } = useTheme();
 
@@ -350,6 +427,177 @@ export default function ConfiguracoesPage() {
     }
   }, [toast]);
 
+  const { isClassic, isLite } = useGamificationMode();
+  const prefersFinancialCopy = isClassic || isLite;
+
+  const dashboardCardCopy = useMemo(() => {
+    if (prefersFinancialCopy) {
+      return {
+        title: 'Layout do Dashboard',
+        description: 'Organize os cards financeiros para destacar o que importa.',
+        cta: 'Personalizar dashboard',
+      };
+    }
+    return {
+      title: 'Layout da Tela de Aventura',
+      description: 'Reordene ou oculte os cards que aparecem na sua jornada.',
+      cta: 'Customizar tela',
+    };
+  }, [prefersFinancialCopy]);
+
+  const sections = useMemo(() => {
+    if (!user) return [];
+    return [
+      {
+        id: 'experience',
+        title: 'Experiência do aplicativo',
+        description: 'Escolha o modo visual e como os elementos de gamificação se comportam.',
+        icon: Sparkles,
+        content: (
+          <div className="space-y-6">
+            <GamificationModeForm user={user} />
+          </div>
+        ),
+      },
+      {
+        id: 'account-security',
+        title: 'Conta e segurança',
+        description: 'Atualize informações de acesso e mantenha sua conta protegida.',
+        icon: ShieldCheck,
+        content: (
+          <div className="space-y-6">
+            <AccountInfoForm user={user} />
+            <PasswordForm />
+          </div>
+        ),
+      },
+      {
+        id: 'preferences',
+        title: 'Preferências de uso',
+        description: 'Controle projeções, alertas, notificações e recursos inteligentes.',
+        icon: Repeat,
+        content: (
+          <div className="space-y-6">
+            <PreferencesForm user={user} />
+          </div>
+        ),
+      },
+      {
+        id: 'appearance',
+        title: 'Aparência e dashboard',
+        description: 'Ajuste o tema e personalize o layout do painel principal.',
+        icon: Palette,
+        content: (
+          <div className="space-y-6">
+            <AppearanceForm />
+            <Card>
+              <CardHeader>
+                <CardTitle>{dashboardCardCopy.title}</CardTitle>
+                <CardDescription>{dashboardCardCopy.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Clique abaixo para abrir o editor e reorganizar os cards.
+                </p>
+                <Button asChild variant="outline">
+                  <Link href="/dashboard/customizar">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    {dashboardCardCopy.cta}
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        ),
+      },
+      {
+        id: 'tools',
+        title: 'Ferramentas da conta',
+        description: 'Acompanhe suas tags personalizadas e a trilha de auditoria.',
+        icon: Tags,
+        content: (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Gerenciar Tags</CardTitle>
+                <CardDescription>Mantenha sua taxonomia de transações sempre atualizada.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Edite ou exclua tags utilizadas nos seus lançamentos.
+                </p>
+                <Button asChild variant="outline">
+                  <Link href="/dashboard/tags">
+                    <Tags className="mr-2 h-4 w-4" />
+                    Ir para tags
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Trilha de Auditoria</CardTitle>
+                <CardDescription>Consulte rapidamente o histórico de ações da sua conta.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Todas as alterações importantes ficam registradas e podem ser revisadas.
+                </p>
+                <Button asChild variant="outline">
+                  <Link href="/dashboard/auditoria">
+                    <FileClock className="mr-2 h-4 w-4" />
+                    Ver histórico
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        ),
+      },
+    ];
+  }, [user, dashboardCardCopy]);
+
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const [activeSection, setActiveSection] = useState(sections[0]?.id ?? 'experience');
+  const registerSectionRef = useCallback(
+    (id: string) => (el: HTMLElement | null) => {
+      sectionRefs.current[id] = el;
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!sections.length) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visibleEntry?.target?.id) {
+          setActiveSection(visibleEntry.target.id);
+        }
+      },
+      { rootMargin: '-40% 0px -40% 0px', threshold: 0.2 }
+    );
+
+    sections.forEach((section) => {
+      const element = sectionRefs.current[section.id];
+      if (element) {
+        observer.observe(element);
+      }
+    });
+
+    return () => observer.disconnect();
+  }, [sections]);
+
+  const scrollToSection = useCallback((id: string) => {
+    const element = sectionRefs.current[id];
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActiveSection(id);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
@@ -359,81 +607,63 @@ export default function ConfiguracoesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Settings className="h-8 w-8 text-primary" />
-        <div>
-          <h1 className="text-3xl font-bold font-headline">Configurações</h1>
-          <p className="text-muted-foreground">Gerencie suas informações, segurança e preferências.</p>
+    <div className="space-y-8">
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <Settings className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-3xl font-bold font-headline">Configurações</h1>
+            <p className="text-muted-foreground">
+              Controle o modo visual, a segurança e todas as preferências da sua conta.
+            </p>
+          </div>
         </div>
       </div>
-      <Tabs defaultValue="appearance" className="w-full flex flex-col md:flex-row gap-6 md:gap-8">
-        <TabsList className="grid w-full md:w-48 grid-cols-2 md:grid-cols-1 h-auto shrink-0">
-          <TabsTrigger value="appearance" className="justify-start gap-2"><Palette className="h-4 w-4"/> Aparência</TabsTrigger>
-          <TabsTrigger value="dashboard" className="justify-start gap-2"><LayoutDashboard className="h-4 w-4"/> Dashboard</TabsTrigger>
-          <TabsTrigger value="security" className="justify-start gap-2"><ShieldCheck className="h-4 w-4"/> Conta</TabsTrigger>
-          <TabsTrigger value="preferences" className="justify-start gap-2"><Repeat className="h-4 w-4"/> Preferências</TabsTrigger>
-        </TabsList>
-        <div className="flex-1">
-          <TabsContent value="appearance">
-            <AppearanceForm />
-          </TabsContent>
-          <TabsContent value="dashboard">
-             <Card>
-                <CardHeader>
-                    <CardTitle>Layout da Tela de Aventura</CardTitle>
-                    <CardDescription>Reordene ou oculte os cards que aparecem em sua tela inicial para uma experiência totalmente personalizada.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">Clique no botão abaixo para ir para a tela de customização.</p>
-                    <Button asChild variant="outline">
-                        <Link href="/dashboard/customizar">
-                            <LayoutDashboard className="mr-2 h-4 w-4" />
-                            Customizar Tela de Aventura
-                        </Link>
-                    </Button>
-                </CardContent>
-             </Card>
-          </TabsContent>
-          <TabsContent value="security" className="space-y-6">
-              <AccountInfoForm user={user} />
-              <PasswordForm />
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Gerenciar Tags</CardTitle>
-                      <CardDescription>Edite ou exclua suas tags personalizadas de transações.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">Mantenha suas tags organizadas. Clique no botão abaixo para ir para a página de gerenciamento.</p>
-                      <Button asChild variant="outline">
-                          <Link href="/dashboard/tags">
-                              <Tags className="mr-2 h-4 w-4" />
-                              Gerenciar Tags
-                          </Link>
-                      </Button>
-                  </CardContent>
-              </Card>
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Trilha de Auditoria</CardTitle>
-                      <CardDescription>Veja o histórico de todas as ações importantes realizadas na sua conta.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">Para sua segurança, todas as atividades são registradas. Clique no botão abaixo para visualizar o histórico completo.</p>
-                      <Button asChild variant="outline">
-                          <Link href="/dashboard/auditoria">
-                              <FileClock className="mr-2 h-4 w-4" />
-                              Ver Histórico de Auditoria
-                          </Link>
-                      </Button>
-                  </CardContent>
-              </Card>
-          </TabsContent>
-          <TabsContent value="preferences">
-              <PreferencesForm user={user} />
-          </TabsContent>
+
+      <div className="grid gap-8 lg:grid-cols-[260px,1fr]">
+        <nav className="rounded-2xl border bg-card p-4 h-max lg:sticky lg:top-24 lg:self-start">
+          <p className="text-xs uppercase text-muted-foreground mb-3">Seções</p>
+          <div className="flex flex-col gap-1">
+            {sections.map((section) => {
+              const Icon = section.icon;
+              const isActive = activeSection === section.id;
+              return (
+                <button
+                  key={section.id}
+                  onClick={() => scrollToSection(section.id)}
+                  className={cn(
+                    'flex items-start gap-3 rounded-xl px-3 py-2 text-left transition',
+                    isActive ? 'bg-primary/10 text-primary' : 'hover:bg-muted text-muted-foreground'
+                  )}
+                >
+                  <Icon className="h-4 w-4 mt-1" />
+                  <div>
+                    <p className="font-semibold text-sm">{section.title}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{section.description}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </nav>
+
+        <div className="space-y-12">
+          {sections.map((section) => (
+            <section
+              key={section.id}
+              id={section.id}
+              ref={registerSectionRef(section.id)}
+              className="scroll-mt-24 space-y-5"
+            >
+              <div>
+                <p className="text-sm font-semibold text-primary">{section.title}</p>
+                <p className="text-muted-foreground">{section.description}</p>
+              </div>
+              <div className="space-y-6">{section.content}</div>
+            </section>
+          ))}
         </div>
-      </Tabs>
+      </div>
     </div>
   );
 }

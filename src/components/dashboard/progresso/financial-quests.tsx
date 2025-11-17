@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import api from "@/lib/api";
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 interface QuestProps {
     user: User;
@@ -71,16 +72,37 @@ export function FinancialQuests({ user }: QuestProps) {
                            <div className="space-y-3">
                                <h4 className="font-semibold text-sm">Em Andamento</h4>
                                <ul className="space-y-4">
-                                   {inProgressMissions.map(userMission => (
-                                       <li key={userMission.id} className="flex items-center gap-4">
-                                            <Circle className="h-6 w-6 text-blue-500" />
-                                            <div className="flex-1">
-                                               <p className="font-semibold">{userMission.mission.title}</p>
-                                               <p className="text-sm text-muted-foreground">{userMission.mission.description}</p>
-                                            </div>
-                                            <div className="text-right"><p className="font-bold text-accent">+{userMission.mission.xpReward} XP</p></div>
-                                       </li>
-                                   ))}
+                                   {inProgressMissions.map(userMission => {
+                                       const progress = userMission.progressJson || {};
+                                       const targetCount = userMission.mission.triggerSpec?.count ?? progress.target ?? null;
+                                       const currentCount = progress.count ?? progress.current ?? 0;
+                                       const progressPercent = targetCount ? Math.min(100, (currentCount / targetCount) * 100) : 0;
+                                       const remaining = targetCount ? Math.max(targetCount - currentCount, 0) : null;
+                                       return (
+                                           <li key={userMission.id} className="flex items-start gap-4">
+                                                <Circle className="h-6 w-6 text-blue-500 mt-1" />
+                                                <div className="flex-1 space-y-2">
+                                                   <div>
+                                                       <p className="font-semibold">{userMission.mission.title}</p>
+                                                       <p className="text-sm text-muted-foreground">{userMission.mission.description}</p>
+                                                   </div>
+                                                   {targetCount && (
+                                                       <div className="space-y-1">
+                                                           <Progress value={progressPercent} className="h-2" />
+                                                           <p className="text-xs text-muted-foreground">
+                                                               {remaining === 0
+                                                                   ? 'Último passo para concluir!'
+                                                                   : `Faltam ${remaining} de ${targetCount} ações`}
+                                                           </p>
+                                                       </div>
+                                                   )}
+                                                </div>
+                                                <div className="text-right whitespace-nowrap">
+                                                    <p className="font-bold text-accent">+{userMission.mission.xpReward} XP</p>
+                                                </div>
+                                           </li>
+                                       );
+                                   })}
                                </ul>
                            </div>
                        )}

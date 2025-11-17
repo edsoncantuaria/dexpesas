@@ -33,6 +33,7 @@
 
 ## ✅ Personalização Simples
 - Preferências de layout e “hide family mode” armazenadas rapidamente via endpoint /user/preferences.
+- Novo card “Modo de Experiência” nas Configurações permite alternar entre FULL, LITE ou OFF a qualquer momento.
 
 ## ✅ Segurança e Recuperação
 - Cadastro exige senha forte (letras+números) e coleta telefone/2FA após onboarding.

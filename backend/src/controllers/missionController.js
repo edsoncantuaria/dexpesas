@@ -2,6 +2,31 @@
 import prisma from '../config/prismaClient.js';
 import AuditService from '../services/auditService.js';
 
+const ALLOWED_MODES = {
+    FULL: 'FULL',
+    LITE: 'LITE',
+    OFF: 'OFF',
+};
+
+async function ensureGamificationAccess(userId, { requireFull = false } = {}) {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { gamificationMode: true }
+    });
+    const mode = user?.gamificationMode || ALLOWED_MODES.FULL;
+    if (mode === ALLOWED_MODES.OFF) {
+        const error = new Error('Gamificação desativada para este usuário.');
+        error.statusCode = 403;
+        throw error;
+    }
+    if (requireFull && mode !== ALLOWED_MODES.FULL) {
+        const error = new Error('Este recurso está disponível apenas no modo completo.');
+        error.statusCode = 403;
+        throw error;
+    }
+    return mode;
+}
+
 class MissionController {
     /**
      * Busca todas as missões ativas que o usuário ainda não aceitou.
@@ -9,6 +34,7 @@ class MissionController {
     async getAvailableMissions(req, res, next) {
         const userId = req.user.id;
         try {
+            const mode = await ensureGamificationAccess(userId);
             const user = await prisma.user.findUnique({ where: { id: userId } });
             if (!user) {
                 return res.status(404).json({ message: 'Usuário não encontrado.' });
@@ -20,11 +46,18 @@ class MissionController {
             });
             const acceptedIds = acceptedMissionIds.map(um => um.missionId);
 
+            const missionFilters = {
+                isActive: true,
+                id: { notIn: acceptedIds },
+                minLevel: { lte: user.level || 1 },
+            };
+            if (mode === ALLOWED_MODES.LITE) {
+                missionFilters.scope = 'USER';
+            }
+
             const availableMissions = await prisma.mission.findMany({
                 where: {
-                    isActive: true,
-                    id: { notIn: acceptedIds }, // Exclui missões já aceitas
-                    minLevel: { lte: user.level || 1 }, // Filtra por nível
+                    ...missionFilters,
                 },
                 orderBy: { minLevel: 'asc' },
             });
@@ -40,12 +73,16 @@ class MissionController {
     async getMyMissions(req, res, next) {
         const userId = req.user.id;
         try {
+            const mode = await ensureGamificationAccess(userId);
             const myMissions = await prisma.userMission.findMany({
                 where: { userId },
                 include: { mission: true },
                 orderBy: { acceptedAt: 'desc' },
             });
-            res.json(myMissions);
+            const filtered = mode === ALLOWED_MODES.LITE
+                ? myMissions.filter(m => m.mission.scope === 'USER')
+                : myMissions;
+            res.json(filtered);
         } catch (error) {
             next(error);
         }
@@ -58,6 +95,7 @@ class MissionController {
      */
     async getGuildMissions(req, res, next) {
         try {
+            await ensureGamificationAccess(req.user.id, { requireFull: true });
             const guildMissions = await prisma.mission.findMany({
                 where: {
                     isActive: true,
@@ -82,12 +120,17 @@ class MissionController {
         const userId = req.user.id;
 
         try {
+            const mode = await ensureGamificationAccess(userId);
             // Verifica se a missão existe e está ativa
             const missionToAccept = await prisma.mission.findFirst({
                 where: { id: missionId, isActive: true },
             });
             if (!missionToAccept) {
                 return res.status(404).json({ message: 'Missão não encontrada ou inativa.' });
+            }
+
+            if (mode === ALLOWED_MODES.LITE && missionToAccept.scope === 'GUILD') {
+                return res.status(403).json({ message: 'Missões de guilda requerem o modo completo.' });
             }
             
             // Verifica se o usuário já aceitou esta missão

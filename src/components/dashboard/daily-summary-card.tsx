@@ -17,6 +17,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useGamificationMode } from '@/hooks/use-gamification-mode';
+import { useClassicModeNotice } from '@/hooks/use-classic-mode-notice';
 
 interface DailySummary {
     summary: string;
@@ -36,10 +38,55 @@ export default function DashboardPage() {
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryData, setSummaryData] = useState<DailySummary | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [isGamificationEnabled, setIsGamificationEnabled] = useState(true);
+  const [isGamificationLoading, setIsGamificationLoading] = useState(false);
   const { toast } = useToast();
+  const { isClassic, isLite } = useGamificationMode();
+  const prefersFinancialCopy = isClassic || isLite;
+  const { showClassicNotice, dismissClassicNotice } = useClassicModeNotice({
+    isClassicModeActive: !isGamificationEnabled,
+    userId: user?.id,
+  });
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+
+  const fetchGamificationData = useCallback(
+    async (enabled: boolean) => {
+      if (!enabled) {
+        setProfile(null);
+        setUnlockedAchievements([]);
+        setAllAchievements([]);
+        setIsGamificationLoading(false);
+        return;
+      }
+
+      setIsGamificationLoading(true);
+      try {
+        const [profileData, unlockedRes, achievementsRes] = await Promise.all([
+          api.get('/gamification/profile'),
+          api.get('/achievements/unlocked'),
+          api.get('/achievements/all'),
+        ]);
+        setProfile(profileData.data);
+        setUnlockedAchievements(unlockedRes.data);
+        setAllAchievements(achievementsRes.data);
+      } catch (error) {
+        console.warn('Erro ao carregar dados de gamificação (Resumo Diário)', error);
+        toast({
+          variant: 'destructive',
+          title: 'Gamificação indisponível',
+          description: 'Resumo diário carregado sem dados de gamificação.',
+        });
+        setProfile(null);
+        setUnlockedAchievements([]);
+        setAllAchievements([]);
+      } finally {
+        setIsGamificationLoading(false);
+      }
+    },
+    [toast]
+  );
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -47,34 +94,34 @@ export default function DashboardPage() {
         const [
             userData, 
             transactionsData, 
-            profileData, 
-            unlockedAchievementsData, 
-            allAchievementsData,
             accRes,
         ] = await Promise.all([
             api.get('/user'),
             api.get('/transactions/all'),
-            api.get('/gamification/profile'),
-            api.get('/achievements/unlocked'),
-            api.get('/achievements/all'),
             api.get('/accounts'),
         ]);
-        setUser(userData.data);
+        const nextUser = userData.data;
+        setUser(nextUser);
         setAllTransactions(transactionsData.data);
-        setProfile(profileData.data);
-        setUnlockedAchievements(unlockedAchievementsData.data);
-        setAllAchievements(allAchievementsData.data);
         setAccounts(accRes.data);
+
+        const mode = nextUser.gamificationMode ?? 'FULL';
+        const shouldEnable = mode !== 'OFF';
+        setIsGamificationEnabled(shouldEnable);
+        fetchGamificationData(shouldEnable);
     } catch(error) {
         toast({
             variant: 'destructive',
             title: 'Erro ao carregar dashboard',
             description: 'Não foi possível buscar as informações do servidor.'
         });
+        setProfile(null);
+        setUnlockedAchievements([]);
+        setAllAchievements([]);
     } finally {
         setIsLoading(false);
     }
-  }, [toast]);
+  }, [fetchGamificationData, toast]);
 
   useEffect(() => {
     fetchData();
@@ -152,7 +199,7 @@ export default function DashboardPage() {
     setDateRange(undefined);
   }
 
-  if (isLoading || !user || !profile) {
+  if (isLoading || !user) {
     return <LoadingScreen />;
   }
 
@@ -161,7 +208,9 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4">
         <div>
             <h1 className="text-2xl font-bold">Olá, {user.name.split(' ')[0]}!</h1>
-            <p className="text-muted-foreground">Bem-vindo(a) de volta à sua jornada.</p>
+            <p className="text-muted-foreground">
+              {prefersFinancialCopy ? 'Bem-vindo(a) de volta ao seu painel financeiro.' : 'Bem-vindo(a) de volta à sua jornada.'}
+            </p>
         </div>
         {user.enableDailySummary && (
             <div className="flex-shrink-0">
@@ -279,17 +328,39 @@ export default function DashboardPage() {
           </CardContent>
       </UICard>
 
-       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-             <GamificationProfile profile={profile} />
-          </div>
-          <div className="lg:col-span-1">
-            <Achievements 
-                unlockedAchievements={unlockedAchievements} 
-                allAchievements={allAchievements} 
-            />
-          </div>
-       </div>
+       {showClassicNotice && (
+         <Alert className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <AlertTitle>Modo financeiro clássico</AlertTitle>
+              <AlertDescription>Os elementos de gamificação ficam ocultos, mas seu progresso continua sendo registrado nos bastidores.</AlertDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={dismissClassicNotice}>
+              Entendido
+            </Button>
+         </Alert>
+       )}
+
+       {isGamificationEnabled && (
+         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+               {profile ? (
+                 <GamificationProfile profile={profile} />
+               ) : (
+                 <UICard className="h-full flex items-center justify-center">
+                   <CardContent className="text-sm text-muted-foreground">
+                     {isGamificationLoading ? 'Carregando perfil de progresso...' : 'Dados de gamificação indisponíveis.'}
+                   </CardContent>
+                 </UICard>
+               )}
+            </div>
+            <div className="lg:col-span-1">
+              <Achievements 
+                  unlockedAchievements={unlockedAchievements} 
+                  allAchievements={allAchievements} 
+              />
+            </div>
+         </div>
+       )}
     </div>
   );
 }

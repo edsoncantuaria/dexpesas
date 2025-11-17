@@ -167,6 +167,7 @@ class DataController {
                     level: true,
                     xp: true,
                     heroClass: true,
+                    gamificationMode: true,
                 }
             });
 
@@ -174,13 +175,24 @@ class DataController {
                 return res.status(404).json({ message: 'Perfil de gamificação não encontrado.' });
             }
 
+            if (user.gamificationMode === 'OFF') {
+                return res.status(403).json({ message: 'Recursos de gamificação desativados para este usuário.' });
+            }
+
             // Invoca o serviço para calcular os atributos dinamicamente
             const calculatedAttributes = await GamificationService.calculateAllAttributes(userId);
+
+            const xpTarget = GamificationService.getXpNeeded(user.level);
+            const xpToNextLevel = Math.max(xpTarget - user.xp, 0);
 
             const profileData = {
                 level: user.level,
                 xp: user.xp,
                 heroClass: user.heroClass,
+                xpTarget,
+                xpToNextLevel,
+                xpProgressPercent: xpTarget > 0 ? Math.min(100, Math.round((user.xp / xpTarget) * 100)) : 0,
+                gamificationMode: user.gamificationMode,
                 ...calculatedAttributes // Combina os atributos calculados
             };
             

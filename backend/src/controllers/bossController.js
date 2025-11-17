@@ -8,6 +8,17 @@ class BossController {
      */
     async getActiveBosses(req, res, next) {
         try {
+            const user = await prisma.user.findUnique({
+                where: { id: req.user.id },
+                select: { gamificationMode: true }
+            });
+            if (!user || user.gamificationMode === 'OFF') {
+                return res.status(403).json({ message: 'Gamificação desativada para este usuário.' });
+            }
+            if (user.gamificationMode === 'LITE') {
+                return res.status(403).json({ message: 'Batalhas de chefe estão disponíveis apenas no modo completo.' });
+            }
+
             const activeBosses = await prisma.boss.findMany({
                 where: {
                     isActive: true,

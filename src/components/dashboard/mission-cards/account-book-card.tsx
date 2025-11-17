@@ -2,18 +2,18 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Scale, Eye, EyeOff, ChevronDown, ChevronUp, ArrowRight, TrendingDown, TrendingUp, CircleHelp, ChevronLeft, ChevronRight } from "lucide-react";
+import { BookOpen, Eye, EyeOff, ChevronDown, ChevronUp, TrendingDown, TrendingUp, CircleHelp, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Account, Transaction } from "@/lib/definitions";
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { format, addMonths, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import api from "@/lib/api";
+import { useGamificationMode } from "@/hooks/use-gamification-mode";
+import { getGamificationCopy } from "@/lib/gamification-copy";
 
 interface AccountBookCardProps {
     accounts: Account[];
@@ -84,6 +84,9 @@ export function AccountBookCard({ accounts, transactions }: AccountBookCardProps
         return { totalBalance, received, paid, toReceive, toPay, monthBalance, projectedBalance };
     }, [accounts, monthlyTransactions]);
 
+    const { mode } = useGamificationMode();
+    const cardCopy = getGamificationCopy('accountBook', mode);
+
     return (
         <Card className="shadow-md h-full transition-all group-hover:shadow-xl group-hover:border-primary/50 flex flex-col">
             <CardHeader>
@@ -93,7 +96,7 @@ export function AccountBookCard({ accounts, transactions }: AccountBookCardProps
                             <BookOpen className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                         </div>
                         <div>
-                            <CardTitle className="font-headline text-xl">O Livro de Contas</CardTitle>
+                            <CardTitle className="font-headline text-xl">{cardCopy.title}</CardTitle>
                              <div className="flex items-center gap-2">
                                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSelectedDate(prev => subMonths(prev, 1))}>
                                     <ChevronLeft className="h-4 w-4" />
@@ -110,7 +113,7 @@ export function AccountBookCard({ accounts, transactions }: AccountBookCardProps
             <CardContent className="space-y-4 flex-grow flex flex-col">
                 <div className="flex-grow space-y-4">
                     <div className="text-center">
-                        <p className="text-xs text-muted-foreground font-semibold">Ouro na Bolsa</p>
+                        <p className="text-xs text-muted-foreground font-semibold">{cardCopy.highlightLabel}</p>
                         <div className="flex items-center justify-center gap-1">
                             <p className="text-3xl font-bold">{showBalance ? formatCurrency(totalBalance) : 'R$ ••••••'}</p>
                             <button type="button" onClick={(e) => {e.preventDefault(); setShowBalance(!showBalance);}}>
@@ -126,7 +129,7 @@ export function AccountBookCard({ accounts, transactions }: AccountBookCardProps
                         </div>
                         <div>
                             <div className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
-                                Balanço Projetado
+                                {cardCopy.projectedLabel}
                                 <TooltipProvider>
                                     <Tooltip>
                                         <TooltipTrigger asChild>

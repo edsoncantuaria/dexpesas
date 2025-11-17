@@ -7,6 +7,8 @@ import type { DateRange } from "react-day-picker"
  * consistência entre as duas aplicações.
  */
 
+export type GamificationMode = 'FULL' | 'LITE' | 'OFF';
+
 export type User = {
     id: string;
     name: string;
@@ -37,7 +39,9 @@ export type User = {
     favoriteCategories?: string[] | string | null;
     dashboardPreferences?: Record<string, unknown> | string | null;
     hideFamilyMode?: boolean;
+    gamificationMode?: GamificationMode;
     isAdmin: boolean;
+    gamificationMode?: 'FULL' | 'LITE' | 'OFF';
     level: number;
     clanId?: string | null;
     clanMembership?: {
@@ -70,6 +74,10 @@ export type GamificationProfile = {
     userId: string;
     level: number;
     xp: number;
+    heroClass?: string | null;
+    xpTarget?: number;
+    xpToNextLevel?: number;
+    xpProgressPercent?: number;
     Forca: number;
     Resistencia: number;
     Sabedoria: number;

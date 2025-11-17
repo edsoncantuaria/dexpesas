@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
-import type { User, GamificationProfile, Account, Card as CardType, Goal, Budget, Achievement, UnlockedAchievement, AuditLog, Boss, Clan } from '@/lib/definitions';
+import type { User, GamificationProfile, Account, Card as CardType, Goal, Budget, Achievement, UnlockedAchievement, AuditLog, Boss, Clan, Transaction } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { LoadingScreen } from '@/components/ui/loading-screen';
@@ -14,6 +14,9 @@ import { ChallengeTowerCard } from '@/components/dashboard/mission-cards/challen
 import { TimelineCard } from '@/components/dashboard/progresso/timeline-card';
 import { BossBattleCard } from '@/components/dashboard/boss/boss-battle-card';
 import { format } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { useClassicModeNotice } from '@/hooks/use-classic-mode-notice';
 
 const cardComponents: { [key: string]: React.ComponentType<any> } = {
     account_book: AccountBookCard,
@@ -29,15 +32,139 @@ function DashboardPageContent() {
   const [cards, setCards] = useState<CardType[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]); // Estado para transações
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clan, setClan] = useState<Clan | null>(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievement[]>([]);
   const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
   const [timelineLogs, setTimelineLogs] = useState<AuditLog[]>([]);
   const [activeBoss, setActiveBoss] = useState<Boss | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGamificationEnabled, setIsGamificationEnabled] = useState(true);
+  const [isLiteMode, setIsLiteMode] = useState(false);
+  const [isGamificationLoading, setIsGamificationLoading] = useState(false);
   const [layout, setLayout] = useState<string[]>(['account_book', 'journey_map', 'credit_pact', 'challenge_tower']);
   const { toast } = useToast();
+  const { showClassicNotice, dismissClassicNotice } = useClassicModeNotice({
+    isClassicModeActive: !isGamificationEnabled,
+    userId: user?.id,
+  });
+
+  const fetchGamificationData = useCallback(
+    async (enabled: boolean, currentUser?: User | null) => {
+      if (!enabled) {
+        setProfile(null);
+        setUnlockedAchievements([]);
+        setAllAchievements([]);
+        setTimelineLogs([]);
+        setActiveBoss(null);
+        setClan(null);
+        setIsGamificationLoading(false);
+        return;
+      }
+
+      const userMode = currentUser?.gamificationMode ?? 'FULL';
+      const shouldLoadExtendedModules = userMode !== 'LITE';
+
+      if (!shouldLoadExtendedModules) {
+        setTimelineLogs([]);
+        setActiveBoss(null);
+      }
+
+      setIsGamificationLoading(true);
+      try {
+        const requestDefinitions = [
+          {
+            key: 'profile',
+            enabled: true,
+            request: () => api.get('/gamification/profile'),
+            onSuccess: (res: any) => setProfile(res.data),
+            onError: () => setProfile(null),
+          },
+          {
+            key: 'unlockedAchievements',
+            enabled: true,
+            request: () => api.get('/achievements/unlocked'),
+            onSuccess: (res: any) => setUnlockedAchievements(res.data),
+            onError: () => setUnlockedAchievements([]),
+          },
+          {
+            key: 'allAchievements',
+            enabled: true,
+            request: () => api.get('/achievements/all'),
+            onSuccess: (res: any) => setAllAchievements(res.data),
+            onError: () => setAllAchievements([]),
+          },
+          {
+            key: 'timeline',
+            enabled: shouldLoadExtendedModules,
+            request: () => api.get('/audit/timeline'),
+            onSuccess: (res: any) => setTimelineLogs(res.data),
+            onError: () => setTimelineLogs([]),
+          },
+          {
+            key: 'boss',
+            enabled: shouldLoadExtendedModules,
+            request: () => api.get('/bosses'),
+            onSuccess: (res: any) => setActiveBoss(res.data?.[0] || null),
+            onError: () => setActiveBoss(null),
+          },
+        ] as const;
+
+        const activeRequests = requestDefinitions.filter((item) => item.enabled);
+        const responses = await Promise.allSettled(
+          activeRequests.map((item) => item.request())
+        );
+
+        let hadError = false;
+        responses.forEach((result, index) => {
+          const definition = activeRequests[index];
+          if (result.status === 'fulfilled') {
+            definition.onSuccess(result.value);
+          } else {
+            hadError = true;
+            definition.onError();
+            console.warn(`Erro ao carregar ${definition.key}`, result.reason);
+          }
+        });
+
+        if (hadError) {
+          toast({
+            variant: 'destructive',
+            title: 'Dados parciais carregados',
+            description: 'Alguns recursos de gamificação não responderam, mas o dashboard foi carregado.',
+          });
+        }
+
+        if (currentUser?.clanId) {
+          try {
+            const clanRes = await api.get(`/familia/${currentUser.clanId}`);
+            setClan(clanRes.data);
+          } catch (clanError) {
+            console.warn('Não foi possível buscar os dados da família. O usuário pode ter saído.', clanError);
+            setClan(null);
+          }
+        } else {
+          setClan(null);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar dados de gamificação', error);
+        toast({
+          variant: 'destructive',
+          title: 'Gamificação indisponível',
+          description: 'Não foi possível carregar os recursos de gamificação.',
+        });
+        setProfile(null);
+        setUnlockedAchievements([]);
+        setAllAchievements([]);
+        setTimelineLogs([]);
+        setActiveBoss(null);
+        setClan(null);
+      } finally {
+        setIsGamificationLoading(false);
+      }
+    },
+    [toast]
+  );
 
   const fetchData = useCallback(async () => {
     // Não reseta o loading em re-fetches para evitar piscar na tela
@@ -45,55 +172,34 @@ function DashboardPageContent() {
         const currentMonth = format(new Date(), 'yyyy-MM');
         const [
             userData, 
-            profileData, 
             accountsData,
             cardsData,
             goalsData,
             budgetsData,
-            unlockedAchievementsData,
-            allAchievementsData,
-            timelineData,
-            bossData,
             transactionsData,
         ] = await Promise.all([
             api.get('/user'),
-            api.get('/gamification/profile'),
             api.get('/accounts'),
             api.get('/cards'),
             api.get('/goals'),
             api.get(`/budgets?month=${currentMonth}`),
-            api.get('/achievements/unlocked'),
-            api.get('/achievements/all'),
-            api.get('/audit/timeline'),
-            api.get('/bosses'),
             api.get(`/transactions?month=${currentMonth}&includePending=true`),
         ]);
 
         const user = userData.data;
         setUser(user);
-        setProfile(profileData.data);
         setAccounts(accountsData.data);
         setCards(cardsData.data);
         setGoals(goalsData.data);
         setBudgets(budgetsData.data);
         setTransactions(transactionsData.data);
-        setUnlockedAchievements(unlockedAchievementsData.data);
-        setAllAchievements(allAchievementsData.data);
-        setTimelineLogs(timelineData.data);
-        setActiveBoss(bossData.data?.[0] || null);
-        
-        if (user.clanId) {
-           try {
-                const clanRes = await api.get(`/familia/${user.clanId}`);
-                setClan(clanRes.data);
-           } catch (clanError) {
-                console.warn("Não foi possível buscar os dados da família. O usuário pode ter saído.", clanError);
-                setClan(null); 
-           }
-        } else {
-            setClan(null); 
-        }
-        
+
+        const mode = user.gamificationMode ?? 'FULL';
+        const shouldEnable = mode !== 'OFF';
+        setIsGamificationEnabled(shouldEnable);
+        setIsLiteMode(mode === 'LITE');
+        fetchGamificationData(shouldEnable, user);
+
         let userLayout: string[] = [];
         try {
             if (typeof user.dashboardLayout === 'string' && user.dashboardLayout.startsWith('[')) {
@@ -118,7 +224,7 @@ function DashboardPageContent() {
     } finally {
         setIsLoading(false);
     }
-  }, [toast]);
+  }, [fetchGamificationData, toast]);
 
   useEffect(() => {
     fetchData();
@@ -133,7 +239,7 @@ function DashboardPageContent() {
     }
   }, [fetchData]);
   
-  if (isLoading || !user || !profile) {
+  if (isLoading || !user) {
     return <LoadingScreen />;
   }
   
@@ -149,14 +255,34 @@ function DashboardPageContent() {
 
   return (
     <div className="space-y-6">
-      <HeroProfile 
-        user={user} 
-        profile={profile} 
-        clan={clan}
-        allAchievements={allAchievements}
-        unlockedAchievements={unlockedAchievements}
-      />
-      {activeBoss && <BossBattleCard boss={activeBoss} />}
+      {isGamificationEnabled && profile && (
+        <HeroProfile 
+          user={user} 
+          profile={profile} 
+          clan={clan}
+          allAchievements={allAchievements}
+          unlockedAchievements={unlockedAchievements}
+        />
+      )}
+      {isGamificationEnabled && !profile && (
+        <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">
+          {isGamificationLoading ? 'Carregando progressos da sua jornada...' : 'Módulo de gamificação desativado para este usuário.'}
+        </div>
+      )}
+      {showClassicNotice && (
+        <Alert className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <AlertTitle>Modo financeiro clássico ativado</AlertTitle>
+            <AlertDescription>
+              Os cards épicos ficam ocultos, mas você pode reativar a gamificação nas configurações quando quiser.
+            </AlertDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={dismissClassicNotice}>
+            Entendido
+          </Button>
+        </Alert>
+      )}
+      {isGamificationEnabled && !isLiteMode && activeBoss && <BossBattleCard boss={activeBoss} />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -169,9 +295,11 @@ function DashboardPageContent() {
                 )
             })}
         </div>
-        <div className="lg:col-span-1 space-y-6">
-            <TimelineCard logs={timelineLogs} />
-        </div>
+        {isGamificationEnabled && !isLiteMode && (
+          <div className="lg:col-span-1 space-y-6">
+              <TimelineCard logs={timelineLogs} />
+          </div>
+        )}
       </div>
     </div>
   );

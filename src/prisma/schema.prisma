@@ -17,6 +17,12 @@ enum Role {
   ADMIN
 }
 
+enum GamificationMode {
+  FULL
+  LITE
+  OFF
+}
+
 enum AccountType {
   corrente
   poupanca
@@ -517,6 +523,7 @@ model User {
   investmentProfile    String?
   mainFinancialGoal    String?
   pushSubscription     Json?
+  gamificationMode     GamificationMode @default(FULL)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 

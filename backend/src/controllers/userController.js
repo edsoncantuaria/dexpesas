@@ -7,6 +7,8 @@ import { decryptValue, encryptValue } from '../utils/fieldEncryption.js';
 
 const prisma = new PrismaClient();
 
+const ALLOWED_GAMIFICATION_MODES = ['FULL', 'LITE', 'OFF'];
+
 class UserController {
     async getUser(req, res, next) {
         try {
@@ -46,6 +48,7 @@ class UserController {
                     phoneVerified: true,
                     twoFactorEnabled: true,
                     lastSecurityNotificationAt: true,
+                    gamificationMode: true,
                     isAdmin: true,
                     level: true,
                     // Correção: Acessar a relação ClanMember para obter o clanId e role
@@ -123,7 +126,8 @@ class UserController {
             dashboardLayout,
             favoriteCategoryIds,
             dashboardPreferences,
-            hideFamilyMode
+            hideFamilyMode,
+            gamificationMode,
         } = req.body;
         const userId = req.user.id;
 
@@ -148,6 +152,14 @@ class UserController {
             }
             if (dashboardPreferences !== undefined) {
                 dataToUpdate.dashboardPreferences = dashboardPreferences;
+            }
+
+            if (gamificationMode !== undefined) {
+                const upperMode = typeof gamificationMode === 'string' ? gamificationMode.toUpperCase() : gamificationMode;
+                if (!ALLOWED_GAMIFICATION_MODES.includes(upperMode)) {
+                    return res.status(400).json({ message: 'Modo de gamificação inválido.' });
+                }
+                dataToUpdate.gamificationMode = upperMode;
             }
 
             if (futureProjectionCount !== undefined) {
@@ -198,6 +210,7 @@ class UserController {
                         dashboardLayout: true,
                         favoriteCategories: true,
                         dashboardPreferences: true,
+                        gamificationMode: true,
                         hideFamilyMode: true,
                     },
                 });

@@ -11,8 +11,6 @@ type GamificationProfileProps = {
   profile: GamificationProfileType;
 };
 
-const xpForNextLevel = 1000;
-
 const iconMap: Record<string, LucideIcon> = {
     Utensils,
     Gamepad2,
@@ -41,8 +39,10 @@ const SkullIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 
 export function GamificationProfile({ profile }: GamificationProfileProps) {
-  const { level, xp, ...attributes } = profile;
-  const xpPercentage = (xp / xpForNextLevel) * 100;
+  const { level, xp, xpTarget, xpToNextLevel, heroClass: _heroClass, xpProgressPercent: _xpProgressPercent, ...attributes } = profile;
+  const xpGoal = xpTarget ?? (xp + (xpToNextLevel ?? 0)) || 1;
+  const normalizedXp = Math.min(xp, xpGoal);
+  const xpPercentage = (normalizedXp / xpGoal) * 100;
   
   const topAttributes = Object.entries(attributes)
     .filter(([key]) => key !== 'id' && key !== 'userId')
@@ -61,9 +61,11 @@ export function GamificationProfile({ profile }: GamificationProfileProps) {
               </CardTitle>
               <CardDescription>Level {level} - Clique para ver mais</CardDescription>
             </div>
-            <div className="text-right w-full sm:w-1/3">
-               <p className="text-sm font-semibold">{xp} / {xpForNextLevel} XP</p>
-               <Progress value={xpPercentage} className="h-2 mt-1" aria-label={`${xpPercentage}% para o próximo nível`} />
+                <div className="text-right w-full sm:w-1/3">
+                   <p className="text-sm font-semibold">
+                     {xp.toLocaleString('pt-BR')} / {xpGoal.toLocaleString('pt-BR')} XP
+                   </p>
+                   <Progress value={xpPercentage} className="h-2 mt-1" aria-label={`${xpPercentage.toFixed(0)}% para o próximo nível`} />
             </div>
           </div>
         </CardHeader>

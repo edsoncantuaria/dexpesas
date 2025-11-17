@@ -2,6 +2,7 @@
 {
   "enums": {
     "Role": ["USER", "ADMIN"],
+    "GamificationMode": ["FULL", "LITE", "OFF"],
     "ClanRole": ["LEADER", "ADMIN", "MEMBER"],
     "ClanInviteStatus": ["PENDING", "ACCEPTED", "DECLINED"],
     "AccountType": ["corrente", "poupanca", "investimento"],
@@ -74,6 +75,7 @@
         "hideFamilyMode": { "type": "Boolean", "attributes": ["@default(false)"] },
         "lastSecurityNotificationAt": { "type": "DateTime", "optional": true },
         "pushSubscription": { "type": "String", "optional": true, "attributes": ["@db.Text"] },
+        "gamificationMode": { "type": "GamificationMode", "attributes": ["@default(FULL)"] },
         "level": { "type": "Int", "attributes": ["@default(1)"] },
         "xp": { "type": "Int", "attributes": ["@default(0)"] },
         "heroClass": { "type": "String", "optional": true },

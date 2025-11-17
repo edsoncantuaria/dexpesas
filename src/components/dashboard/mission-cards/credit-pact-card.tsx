@@ -6,9 +6,10 @@ import { ShieldHalf } from "lucide-react";
 import type { Card as CardType } from "@/lib/definitions";
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { getInvoicePeriod } from "@/lib/date-helpers";
 import { setDate, isBefore, differenceInDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { useGamificationMode } from "@/hooks/use-gamification-mode";
+import { getGamificationCopy } from "@/lib/gamification-copy";
 
 interface CreditPactCardProps {
     cards: CardType[];
@@ -42,6 +43,9 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
         ? (Number(cardToDisplay.currentInvoiceAmount ?? 0) / Number(cardToDisplay.limite || 1)) * 100
         : 0;
 
+    const { mode } = useGamificationMode();
+    const copy = getGamificationCopy('creditPact', mode);
+
     return (
         <Link href="/dashboard/cartoes" className="group">
             <Card className="shadow-md h-full transition-all group-hover:shadow-xl group-hover:border-primary/50">
@@ -51,8 +55,8 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                          <ShieldHalf className="h-6 w-6 text-red-600 dark:text-red-400" />
                        </div>
                         <div>
-                            <CardTitle className="font-headline text-xl">O Pacto de Prata</CardTitle>
-                            <CardDescription>Gerencie seu poder de crédito.</CardDescription>
+                            <CardTitle className="font-headline text-xl">{copy.title}</CardTitle>
+                            <CardDescription>{copy.description}</CardDescription>
                             {usagePercentage > 85 && (
                                 <Badge variant="destructive" className="mt-1">
                                     Limite crítico
@@ -86,7 +90,7 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                         </>
                     ) : (
                          <div className="text-center text-muted-foreground pt-8">
-                            <p>Nenhum cartão de crédito cadastrado.</p>
+                            <p>{copy.emptyState}</p>
                         </div>
                     )}
                 </CardContent>

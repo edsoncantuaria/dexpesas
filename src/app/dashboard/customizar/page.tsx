@@ -1,7 +1,7 @@
 // src/app/dashboard/customizar/page.tsx
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingScreen } from '@/components/ui/loading-screen';
@@ -14,13 +14,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Info, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-
-const ALL_CARDS_CONFIG: Omit<DashboardCard, 'enabled'>[] = [
-    { id: 'account_book', title: 'O Livro de Contas' },
-    { id: 'journey_map', title: 'O Mapa da Jornada' },
-    { id: 'credit_pact', title: 'O Pacto de Prata' },
-    { id: 'challenge_tower', title: 'A Torre dos Desafios' },
-];
+import { useGamificationMode } from '@/hooks/use-gamification-mode';
+import { getGamificationCopy } from '@/lib/gamification-copy';
 
 
 export default function CustomizarPage() {
@@ -28,6 +23,31 @@ export default function CustomizarPage() {
     const [cards, setCards] = useState<DashboardCard[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User | null>(null);
+    const { mode, isClassic, isLite } = useGamificationMode();
+
+    const cardDefinitions = useMemo<Omit<DashboardCard, 'enabled'>[]>(() => [
+        { id: 'account_book', title: getGamificationCopy('accountBook', mode).title },
+        { id: 'journey_map', title: getGamificationCopy('journeyMap', mode).title },
+        { id: 'credit_pact', title: getGamificationCopy('creditPact', mode).title },
+        { id: 'challenge_tower', title: getGamificationCopy('challengeTower', mode).title },
+    ], [mode]);
+
+    const prefersFinancialCopy = isClassic || isLite;
+
+    const layoutCopy = useMemo(() => {
+        if (prefersFinancialCopy) {
+            return {
+                cardSectionTitle: 'Cards do painel financeiro',
+                cardSectionDescription: 'Organize os cards essenciais do painel principal.',
+                toastDescription: 'Seu painel financeiro foi atualizado.',
+            };
+        }
+        return {
+            cardSectionTitle: 'Cards da Tela de Aventura',
+            cardSectionDescription: 'Organize os cards na ordem que fizer mais sentido para você.',
+            toastDescription: 'Sua tela de aventura foi atualizada.',
+        };
+    }, [prefersFinancialCopy]);
 
      const fetchUser = useCallback(async () => {
         setIsLoading(true);
@@ -61,7 +81,7 @@ export default function CustomizarPage() {
 
         const enabledCardIds = new Set(userLayout);
         
-        const initialCards: DashboardCard[] = ALL_CARDS_CONFIG.map(config => ({
+        const initialCards: DashboardCard[] = cardDefinitions.map(config => ({
             ...config,
             enabled: enabledCardIds.has(config.id),
         }));
@@ -77,7 +97,7 @@ export default function CustomizarPage() {
         
         setCards(initialCards);
         setIsLoading(false);
-    }, [user]);
+    }, [user, cardDefinitions]);
 
     useEffect(() => {
         if(user) {
@@ -93,7 +113,7 @@ export default function CustomizarPage() {
                 
             // Correção: Garante que o layout seja sempre salvo como string JSON
             await api.put('/user/preferences', { dashboardLayout: JSON.stringify(layoutToSave) });
-            toast({ title: 'Layout salvo!', description: 'Sua tela de aventura foi atualizada.'});
+            toast({ title: 'Layout salvo!', description: layoutCopy.toastDescription });
         } catch (error) {
             toast({ variant: 'destructive', title: 'Erro ao salvar layout' });
             initializeLayout(); // Reverte em caso de erro
@@ -133,8 +153,8 @@ export default function CustomizarPage() {
             </div>
             <Card>
                 <CardHeader>
-                    <CardTitle>Cards da Tela de Aventura</CardTitle>
-                    <CardDescription>Organize os cards na ordem que fizer mais sentido para você.</CardDescription>
+                    <CardTitle>{layoutCopy.cardSectionTitle}</CardTitle>
+                    <CardDescription>{layoutCopy.cardSectionDescription}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Alert>

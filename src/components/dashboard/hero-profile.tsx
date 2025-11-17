@@ -11,6 +11,8 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { iconMap } from '@/lib/icon-map';
 import { Crown, Star, Users, Banknote } from 'lucide-react';
 import Link from 'next/link';
+import { useGamificationMode } from '@/hooks/use-gamification-mode';
+import { getGamificationCopy } from '@/lib/gamification-copy';
 
 interface HeroProfileProps {
   user: User;
@@ -27,6 +29,8 @@ const formatCurrency = (value: number) =>
 
 export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchievements, familyBalance }: HeroProfileProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const { mode, isClassic } = useGamificationMode();
+  const heroCopy = getGamificationCopy('hero', mode);
 
   useEffect(() => {
     const fetchAvatar = async () => {
@@ -61,6 +65,11 @@ export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchi
   const xpPercentage = (profile.xp / xpNeeded(profile.level)) * 100;
   const showGlow = xpPercentage > 90;
   const playerClass = profile.heroClass || 'Aventureiro';
+  const levelLabel = `${playerClass} - Nível ${profile.level}`;
+  const subtitle =
+    typeof heroCopy.subtitle === 'function'
+      ? heroCopy.subtitle(levelLabel)
+      : heroCopy.subtitle || levelLabel;
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl bg-card p-4 shadow-lg border">
@@ -81,12 +90,12 @@ export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchi
                 </div>
                 <p className="font-semibold text-sm text-primary flex items-center gap-2 flex-wrap">
                     <Crown className="h-4 w-4 text-yellow-500" />
-                    {playerClass} - Nível {profile.level}
+                    {subtitle}
                 </p>
                 {typeof familyBalance === 'number' && (
                   <div className="text-xs flex items-center gap-2 text-muted-foreground">
                     <Banknote className="h-3.5 w-3.5 text-green-500" />
-                    Saldo familiar: <span className="text-green-600 font-semibold">{formatCurrency(familyBalance)}</span>
+                    {heroCopy.familyLabel}: <span className="text-green-600 font-semibold">{formatCurrency(familyBalance)}</span>
                   </div>
                 )}
             </div>
@@ -94,6 +103,7 @@ export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchi
 
         {/* Seção de Progresso */}
         <div className="space-y-3">
+            {heroCopy.showXp && (
             <div className="space-y-1">
                 <div className="relative w-full">
                     <Progress value={xpPercentage} className="h-3" />
@@ -111,9 +121,10 @@ export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchi
                 </div>
                 <p className="text-xs text-muted-foreground text-right">{profile.xp} / {xpNeeded(profile.level)} XP</p>
             </div>
-            {highlightedAchievements.length > 0 && (
+            )}
+            {!isClassic && highlightedAchievements.length > 0 && (
                 <div className="flex items-center gap-2 pt-2">
-                    <p className="text-xs font-semibold text-muted-foreground">Medalhas:</p>
+                    <p className="text-xs font-semibold text-muted-foreground">{heroCopy.badgesLabel}:</p>
                     <TooltipProvider>
                     {highlightedAchievements.map(ach => {
                         const Icon = iconMap[ach.icon] || Star;

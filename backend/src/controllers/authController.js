@@ -13,7 +13,7 @@ const prisma = new PrismaClient();
 
 class AuthController {
     async register(req, res, next) {
-        const { name, username, email, password, phoneNumber } = req.body;
+        const { name, username, email, password, phoneNumber, gamificationMode } = req.body;
         try {
             const strongPasswordRegex = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
             if (!strongPasswordRegex.test(password)) {
@@ -24,12 +24,18 @@ class AuthController {
             
             const user = await prisma.$transaction(async (tx) => {
                 // 1. Cria o novo usuário
+                const normalizedMode = gamificationMode && typeof gamificationMode === 'string'
+                    ? gamificationMode.toUpperCase()
+                    : undefined;
+                const allowedModes = ['FULL', 'LITE', 'OFF'];
+
                 const newUser = await tx.user.create({
                     data: {
                         name,
                         username,
                         email,
                         password: hashedPassword,
+                        gamificationMode: allowedModes.includes(normalizedMode) ? normalizedMode : 'FULL',
                         // Inicializa os campos de gamificação diretamente
                         level: 1,
                         xp: 0,

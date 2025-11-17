@@ -2,6 +2,7 @@
 import { PrismaClient } from '@prisma/client';
 import { reconciliationQueue } from '../queues/reconciliationQueue.js';
 import AuditService from '../services/auditService.js';
+import GamificationService from '../services/gamificationService.js';
 import minioClient from '../config/minioClient.js';
 import config from '../config/config.js';
 import crypto from 'crypto';
@@ -348,6 +349,8 @@ class ReconciliationController {
                     },
                     data: { status: 'DISCARDED' },
                 });
+
+                await GamificationService.triggerXpEvent(tx, userId, 'RECONCILIATION_STREAK', { reconciliationId });
             });
 
             await AuditService.log({

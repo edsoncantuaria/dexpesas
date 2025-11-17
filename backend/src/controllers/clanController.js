@@ -6,6 +6,7 @@ import { stringify as stringifyCsv } from "csv-stringify/sync";
 import { format } from "date-fns";
 import pkg from "date-fns/locale/pt-BR/index.js";
 const { ptBR } = pkg;
+import GamificationService from "../services/gamificationService.js";
 
 // Função helper para serializar BigInts em um objeto ou array de objetos
 const serializeBigInts = (data) => {
@@ -245,6 +246,8 @@ class ClanController {
           ipAddress: req.ip,
           details: { amount, memberName: user?.name },
         });
+
+        await GamificationService.triggerXpEvent(tx, userId, 'GUILD_CONTRIBUTION', { amount, clanId });
       });
 
       res.status(200).json({ message: "Contribuição realizada com sucesso." });

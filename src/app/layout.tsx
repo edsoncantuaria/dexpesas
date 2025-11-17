@@ -9,7 +9,6 @@ import { RootClientShell } from '@/components/layout/root-client-shell';
 export const metadata: Metadata = {
   title: 'Cloudive • Dexpesas',
   description: 'Cloudive: tecnologia leve, modular e acessível guiando a sua jornada financeira.',
-  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
