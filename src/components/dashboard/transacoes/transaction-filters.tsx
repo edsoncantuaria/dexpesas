@@ -1,7 +1,7 @@
 // src/components/dashboard/transacoes/transaction-filters.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -128,6 +128,10 @@ export function TransactionFilters({
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    setLocalFilters(currentFilters);
+  }, [currentFilters]);
 
   const handleSetDateRange = (preset: '30d' | '90d' | '1y') => {
     const today = new Date();

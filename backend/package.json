@@ -13,7 +13,8 @@
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:worker\"",
     "dev:server": "nodemon server.js",
     "dev:worker": "nodemon worker.js",
-    "test": "node --test ./tests/**/*.test.js"
+    "test": "node --test ./tests/**/*.test.js",
+    "categories:reset": "node scripts/reset-categories.js"
   },
   "keywords": [
     "express",

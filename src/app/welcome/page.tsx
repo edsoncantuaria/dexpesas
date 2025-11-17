@@ -1,7 +1,7 @@
 // src/app/welcome/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ComponentType } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, ArrowRight, BrainCircuit, CheckCircle, CreditCard, Gamepad2, Landmark, Loader2, PartyPopper, Rocket, Target, User as UserIcon, Wallet, Shield } from 'lucide-react';
@@ -43,12 +43,103 @@ const variants = {
   }),
 };
 
+type OnboardingStepConfig = {
+  component: ComponentType<any>;
+  props: Record<string, any>;
+  skipNav?: boolean;
+};
+
+type InfoSlide = {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+};
+
+const GAMIFIED_FULL_INTRO: InfoSlide[] = [
+  {
+    icon: Gamepad2,
+    title: 'Sua jornada no Dexpesas começa!',
+    description: 'Transforme suas finanças em uma aventura épica com missões, conquistas e feedback em tempo real.',
+  },
+  {
+    icon: BrainCircuit,
+    title: 'Como funciona o modo Jornada',
+    description: 'Complete tarefas financeiras, ganhe XP, suba de nível e desbloqueie novas classes e habilidades.',
+  },
+];
+
+const GAMIFIED_LITE_INTRO: InfoSlide[] = [
+  {
+    icon: BrainCircuit,
+    title: 'Modo Lite ativado',
+    description: 'Você acompanha XP e conquistas com uma linguagem direta e sem metáforas exageradas.',
+  },
+  {
+    icon: Shield,
+    title: 'Equilíbrio entre foco e motivação',
+    description: 'Receba incentivos visuais e alertas essenciais sem transformar tudo em RPG completo.',
+  },
+];
+
+const CLASSIC_INTRO: InfoSlide[] = [
+  {
+    icon: Wallet,
+    title: 'Bem-vindo ao Dexpesas!',
+    description: 'Organize suas finanças com clareza desde o primeiro acesso e veja tudo em um só lugar.',
+  },
+  {
+    icon: Landmark,
+    title: 'Controle financeiro profissional',
+    description: 'Painéis objetivos, sem linguagem gamificada, focados em saldos, contas e metas reais.',
+  },
+];
+
+const GAMIFIED_FULL_OUTRO: InfoSlide[] = [
+  {
+    icon: Rocket,
+    title: 'Evolua seu Herói Financeiro',
+    description: 'Pague contas, economize e conclua metas para ganhar XP e desbloquear novas conquistas.',
+  },
+  {
+    icon: PartyPopper,
+    title: 'A aventura te aguarda!',
+    description: 'Tudo pronto para começar. Clique abaixo e entre no reino financeiro do Dexpesas.',
+  },
+];
+
+const GAMIFIED_LITE_OUTRO: InfoSlide[] = [
+  {
+    icon: CheckCircle,
+    title: 'Painel Lite pronto',
+    description: 'Você terá lembretes motivadores e indicadores-chave sem excessos visuais.',
+  },
+  {
+    icon: Rocket,
+    title: 'Continue evoluindo',
+    description: 'O XP continua registrando seu progresso, mas o foco fica nas decisões financeiras.',
+  },
+];
+
+const CLASSIC_OUTRO: InfoSlide[] = [
+  {
+    icon: Shield,
+    title: 'Modo financeiro clássico ativado',
+    description: 'Interface tradicional, com alertas e relatórios objetivos para decisões rápidas.',
+  },
+  {
+    icon: CheckCircle,
+    title: 'Tudo pronto para começar',
+    description: 'Seu painel já está preparado. Clique abaixo para acessar o dashboard.',
+  },
+];
+
 export default function WelcomePage() {
   const [step, setStep] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gamificationMode, setGamificationMode] = useState<'FULL' | 'LITE' | 'OFF'>('FULL');
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const router = useRouter();
   const { toast } = useToast();
   
@@ -70,155 +161,215 @@ export default function WelcomePage() {
     }
   };
   const isGamified = gamificationMode !== 'OFF';
+  const isLite = gamificationMode === 'LITE';
 
-  const onboardingSteps = [
+  const introSlides = isGamified
+    ? (isLite ? GAMIFIED_LITE_INTRO : GAMIFIED_FULL_INTRO)
+    : CLASSIC_INTRO;
+  const outroSlides = isGamified
+    ? (isLite ? GAMIFIED_LITE_OUTRO : GAMIFIED_FULL_OUTRO)
+    : CLASSIC_OUTRO;
+
+  const introSteps: OnboardingStepConfig[] = introSlides.map((slide) => ({
+    component: InfoStep,
+    props: slide,
+  }));
+
+  const outroSteps: OnboardingStepConfig[] = outroSlides.map((slide) => ({
+    component: InfoStep,
+    props: slide,
+  }));
+
+  const accountTitle = isGamified
+    ? isLite
+      ? 'Conecte suas contas principais'
+      : 'Forje sua Arma Principal: A Conta'
+    : 'Cadastre sua primeira conta';
+  const accountDescription = isGamified
+    ? isLite
+      ? 'Integre as contas essenciais para acompanhar o saldo e ganhar XP conforme evolui.'
+      : 'Toda jornada precisa de um ponto de partida. Cadastre sua conta corrente para rastrear seus tesouros.'
+    : 'Conecte sua conta principal para acompanhar saldos e movimentações em um só lugar.';
+
+  const cardTitle = isGamified
+    ? isLite
+      ? 'Adicione seu cartão principal'
+      : 'Equipe seu Escudo: O Cartão'
+    : 'Adicione seu cartão';
+  const cardDescription = isGamified
+    ? isLite
+      ? 'Cadastre o cartão de crédito para controlar limites e alertas, mantendo o modo Lite.'
+      : 'O cartão de crédito é uma ferramenta poderosa. Cadastre o seu para gerenciar seu poder de compra com sabedoria.'
+    : 'Cadastre seu cartão de crédito para acompanhar limites, faturas e despesas com precisão.';
+
+  const profileTitle = isGamified
+    ? isLite
+      ? 'Preferências Lite (Opcional)'
+      : 'Defina seu Arquétipo (Opcional)'
+    : 'Conte um pouco sobre você';
+  const profileDescription = isGamified
+    ? isLite
+      ? 'Algumas preferências ajudam a ajustar XP e sugestões sem exagero épico.'
+      : 'Suas escolhas moldam seu herói. Isso nos ajuda a personalizar missões e dicas.'
+    : 'Algumas informações ajudam a personalizar recomendações e projeções.';
+
+  const planTitle = isGamified
+    ? isLite
+      ? 'Monte seu plano Lite'
+      : 'Monte sua estratégia financeira'
+    : 'Monte seu plano financeiro';
+  const planDescription = isGamified
+    ? isLite
+      ? 'Informe renda, metas e categorias favoritas para receber alertas motivadores sem exageros.'
+      : 'Defina renda, metas e categorias favoritas para destravar missões personalizadas.'
+    : 'Informe renda, metas e categorias principais para personalizar seu dashboard.';
+
+  const setupSteps: OnboardingStepConfig[] = [
+    {
+      component: AddAccountStep,
+      skipNav: true,
+      props: {
+        title: accountTitle,
+        description: accountDescription,
+        onSave: async (data: Omit<Account, 'id' | 'userId'>) => {
+          setIsSubmitting(true);
+          try {
+            await api.post('/accounts', data);
+            toast({ title: 'Conta criada com sucesso!' });
+            paginate(1);
+          } catch (error) {
+            toast({ variant: 'destructive', title: 'Erro ao criar conta' });
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+        isSubmitting,
+        onSkip: () => paginate(1),
+      },
+    },
+    {
+      component: AddCardStep,
+      skipNav: true,
+      props: {
+        title: cardTitle,
+        description: cardDescription,
+        onSave: async (data: Omit<CardType, 'id' | 'userId' | 'bestDayToBuy' | 'currentInvoiceAmount' | 'availableLimit'>) => {
+          setIsSubmitting(true);
+          try {
+            await api.post('/cards', data);
+            toast({ title: 'Cartão adicionado com sucesso!' });
+            paginate(1);
+          } catch (error) {
+            toast({ variant: 'destructive', title: 'Erro ao adicionar cartão' });
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+        isSubmitting,
+        onSkip: () => paginate(1),
+      },
+    },
+    {
+      component: AddProfileStep,
+      skipNav: true,
+      props: {
+        title: profileTitle,
+        description: profileDescription,
+        onSaveAndContinue: async (data: any) => {
+          const hasData = Object.values(data).some((v) => v !== null && v !== undefined && v !== '');
+          if (hasData) {
+            setIsSubmitting(true);
+            try {
+              await api.put('/user/profile', data);
+              toast({ title: isGamified ? 'Arquétipo definido!' : 'Perfil atualizado!' });
+            } catch (error) {
+              toast({ variant: 'destructive', title: 'Erro ao salvar perfil' });
+              setIsSubmitting(false);
+              return;
+            } finally {
+              setIsSubmitting(false);
+            }
+          }
+          paginate(1);
+        },
+        isSubmitting,
+      },
+    },
+    {
+      component: FinancialSetupStep,
+      skipNav: true,
+      props: {
+        title: planTitle,
+        description: planDescription,
+        onSave: async ({ fixedMonthlyIncome, favoriteCategoryIds, mainGoal }: { fixedMonthlyIncome: number; favoriteCategoryIds: string[]; mainGoal: string }) => {
+          const hasIncome = fixedMonthlyIncome > 0;
+          const hasGoal = !!mainGoal;
+          const hasCategories = favoriteCategoryIds.length > 0;
+          if (!hasIncome && !hasGoal && !hasCategories) {
+            paginate(1);
+            return;
+          }
+          setIsSubmitting(true);
+          try {
+            const requests: Promise<any>[] = [];
+            if (hasIncome || hasGoal) {
+              requests.push(
+                api.put('/user/profile', {
+                  fixedMonthlyIncome: hasIncome ? fixedMonthlyIncome : null,
+                  mainFinancialGoal: hasGoal ? mainGoal : null,
+                })
+              );
+            }
+            if (hasCategories) {
+              requests.push(api.put('/user/preferences', { favoriteCategoryIds }));
+            }
+            await Promise.all(requests);
+            toast({ title: 'Preferências financeiras salvas!' });
+            paginate(1);
+          } catch (error) {
+            toast({ variant: 'destructive', title: 'Erro ao salvar preferências' });
+          } finally {
+            setIsSubmitting(false);
+          }
+        },
+        isSubmitting,
+      },
+    },
+  ];
+
+  const onboardingSteps: OnboardingStepConfig[] = [
     {
       component: GamificationModeStep,
       props: {
         selectedMode: gamificationMode,
         onConfirm: handleGamificationModeSelect,
-        isSubmitting
-      }
-    },
-    {
-      component: InfoStep,
-      props: { 
-        icon: isGamified ? Gamepad2 : Wallet,
-        title: isGamified ? "Sua jornada no Dexpesas começa!" : "Bem-vindo ao Dexpesas!",
-        description: isGamified
-          ? "Prepare-se para transformar suas finanças em uma aventura épica. Vamos criar seu herói financeiro."
-          : "Vamos organizar suas finanças com clareza desde o primeiro passo."
-      }
-    },
-    {
-      component: AddAccountStep,
-      props: { 
-          title: isGamified ? "Forje sua Arma Principal: A Conta" : "Cadastre sua primeira conta",
-          description: isGamified
-            ? "Toda jornada precisa de um ponto de partida. Cadastre sua conta corrente para começar a rastrear seus tesouros."
-            : "Conecte sua conta principal para acompanhar saldos e movimentações em um só lugar.",
-          onSave: async (data: Omit<Account, 'id'|'userId'>) => {
-              setIsSubmitting(true);
-              try {
-                  await api.post('/accounts', data);
-                  toast({ title: 'Conta criada com sucesso!' });
-                  paginate(1);
-              } catch (error) {
-                  toast({ variant: 'destructive', title: 'Erro ao criar conta' });
-              } finally {
-                  setIsSubmitting(false);
-              }
-          },
-          isSubmitting: isSubmitting,
-          onSkip: () => paginate(1),
-      }
-    },
-     {
-      component: AddCardStep,
-      props: {
-          title: isGamified ? "Equipe seu Escudo: O Cartão" : "Adicione seu cartão",
-          description: isGamified
-            ? "O cartão de crédito é uma ferramenta poderosa. Cadastre o seu para gerenciar seu poder de compra com sabedoria."
-            : "Cadastre seu cartão de crédito para acompanhar limites, faturas e despesas com mais precisão.",
-          onSave: async (data: Omit<CardType, 'id'|'userId'|'bestDayToBuy' | 'currentInvoiceAmount' | 'availableLimit'>) => {
-              setIsSubmitting(true);
-              try {
-                  await api.post('/cards', data);
-                  toast({ title: 'Cartão adicionado com sucesso!' });
-                  paginate(1);
-              } catch (error) {
-                  toast({ variant: 'destructive', title: 'Erro ao adicionar cartão' });
-              } finally {
-                  setIsSubmitting(false);
-              }
-          },
-          isSubmitting: isSubmitting,
-          onSkip: () => paginate(1),
-      }
-    },
-    {
-        component: AddProfileStep,
-        props: {
-            title: isGamified ? "Defina seu Arquétipo (Opcional)" : "Conte um pouco sobre você",
-            description: isGamified
-                ? "Suas escolhas moldam seu herói. Isso nos ajuda a personalizar suas futuras missões e dicas."
-                : "Algumas informações ajudam a personalizar recomendações e projeções.",
-            onSaveAndContinue: async (data: any) => {
-                const hasData = Object.values(data).some(v => v !== null && v !== undefined && v !== '');
-                if (hasData) {
-                    setIsSubmitting(true);
-                    try {
-                        await api.put('/user/profile', data);
-                        toast({ title: 'Arquétipo definido!' });
-                    } catch (error) {
-                        toast({ variant: 'destructive', title: 'Erro ao salvar perfil' });
-                        setIsSubmitting(false); // Para o loading em caso de erro
-                        return; // Não avança se der erro
-                    } finally {
-                        setIsSubmitting(false);
-                    }
-                }
-                paginate(1);
-            },
-            isSubmitting: isSubmitting,
-        }
-    },
-    {
-      component: FinancialSetupStep,
-      props: {
-        title: isGamified ? "Monte sua estratégia financeira" : "Monte seu plano financeiro",
-        description: isGamified
-            ? "Defina renda, metas e categorias favoritas para destravar missões personalizadas."
-            : "Podemos personalizar seu dashboard se você informar renda, metas e categorias principais.",
-        onSave: async ({ fixedMonthlyIncome, favoriteCategoryIds, mainGoal }: { fixedMonthlyIncome: number; favoriteCategoryIds: string[]; mainGoal: string }) => {
-            const hasIncome = fixedMonthlyIncome > 0;
-            const hasGoal = !!mainGoal;
-            const hasCategories = favoriteCategoryIds.length > 0;
-            if (!hasIncome && !hasGoal && !hasCategories) {
-                paginate(1);
-                return;
-            }
-            setIsSubmitting(true);
-            try {
-                const requests: Promise<any>[] = [];
-                if (hasIncome || hasGoal) {
-                    requests.push(api.put('/user/profile', {
-                        fixedMonthlyIncome: hasIncome ? fixedMonthlyIncome : null,
-                        mainFinancialGoal: hasGoal ? mainGoal : null,
-                    }));
-                }
-                if (hasCategories) {
-                    requests.push(api.put('/user/preferences', { favoriteCategoryIds }));
-                }
-                await Promise.all(requests);
-                toast({ title: 'Preferências financeiras salvas!' });
-                paginate(1);
-            } catch (error) {
-                toast({ variant: 'destructive', title: 'Erro ao salvar preferências' });
-            } finally {
-                setIsSubmitting(false);
-            }
-        },
         isSubmitting,
-      }
+      },
     },
-    {
-      component: InfoStep,
-      props: { 
-        icon: Rocket,
-        title: "Evolua seu Herói Financeiro",
-        description: "Cada ação positiva, como pagar contas em dia e economizar, concede XP e aumenta o nível do seu herói, desbloqueando novas classes e habilidades."
-      }
-    },
-     {
-      component: InfoStep,
-      props: { 
-        icon: PartyPopper,
-        title: "A Aventura te Aguarda!",
-        description: "Tudo pronto para começar. Sua jornada para a maestria financeira começa agora. Clique abaixo para entrar no reino!"
-      }
-    }
+    ...introSteps,
+    ...setupSteps,
+    ...outroSteps,
   ];
+
+  useEffect(() => {
+    const bootstrapMode = async () => {
+      try {
+        const response = await api.get('/user');
+        const normalizedMode = (response.data?.gamificationMode ?? 'FULL') as 'FULL' | 'LITE' | 'OFF';
+        setGamificationMode(normalizedMode);
+      } catch (error) {
+        console.error('Erro ao carregar preferências do usuário no onboarding', error);
+      } finally {
+        setIsBootstrapping(false);
+      }
+    };
+
+    bootstrapMode();
+  }, []);
+
+  useEffect(() => {
+    setStep((prev) => Math.min(prev, onboardingSteps.length - 1));
+  }, [onboardingSteps.length]);
 
   const handleComplete = async () => {
     setIsCompleting(true);
@@ -235,75 +386,89 @@ export default function WelcomePage() {
     }
   };
   
-  if (isCompleting) {
-    return <LoadingScreen />
+  if (isCompleting || isBootstrapping) {
+    return <LoadingScreen />;
   }
 
-  const { component: StepComponent, props: stepProps } = onboardingSteps[step];
-  const isFinalStep = step === onboardingSteps.length - 1;
-  const isFirstStep = step === 0;
+  const currentIndex = Math.min(step, onboardingSteps.length - 1);
+  const currentStep = onboardingSteps[currentIndex];
+  const StepComponent = currentStep.component;
+  const stepProps = currentStep.props;
+  const hideDefaultNav = currentStep.skipNav;
+  const isFinalStep = currentIndex === onboardingSteps.length - 1;
+  const isFirstStep = currentIndex === 0;
+  const finalCtaLabel = !isGamified ? 'Ir para o painel' : isLite ? 'Ir para o painel' : 'Entrar no Reino';
+  const startCtaLabel = !isGamified ? 'Começar' : isLite ? 'Começar no modo Lite' : 'Criar Herói';
 
   return (
-    <div className="flex h-svh w-full flex-col items-center justify-between bg-background p-4 sm:p-6">
-      <Logo />
-      
-      <div className="relative flex h-full w-full max-w-lg items-start sm:items-center justify-center overflow-hidden py-4">
-        <AnimatePresence initial={false} custom={direction}>
-          <motion.div
-            key={step}
-            custom={direction}
-            variants={variants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="absolute flex w-full flex-col items-center justify-start sm:justify-center"
-          >
-            <StepComponent {...stepProps} onNext={() => paginate(1)} />
-          </motion.div>
-        </AnimatePresence>
-      </div>
+    <div className="min-h-screen w-full bg-background">
+      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-6 px-4 pb-10 pt-6 sm:px-6">
+        <Logo className="justify-center" />
 
-      <div className="w-full max-w-lg space-y-4">
-        <div className="flex justify-center gap-2">
-          {onboardingSteps.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => {
-                setDirection(i > step ? 1 : -1);
-                setStep(i);
-              }}
-              className={`h-2 rounded-full transition-all ${step === i ? 'w-6 bg-primary' : 'w-2 bg-muted hover:bg-muted-foreground/50'}`}
-              aria-label={`Ir para o passo ${i + 1}`}
-            />
-          ))}
+        <div className="flex-1">
+          <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border bg-card/80 px-4 py-6 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-card/70">
+            <AnimatePresence initial={false} custom={direction} mode="wait">
+              <motion.div
+                key={step}
+                custom={direction}
+                variants={variants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                className="w-full"
+              >
+                <StepComponent {...stepProps} onNext={() => paginate(1)} />
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
-        
-        { ![2, 3].includes(step) && ( // Não renderiza a navegação padrão nos passos com formulário
-             isFinalStep ? (
-              <Button onClick={handleComplete} className="w-full" size="lg">
-                Entrar no Reino
+
+        <div className="w-full rounded-3xl border bg-card/80 p-4 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-card/70">
+          <div className="flex flex-wrap justify-center gap-2">
+            {onboardingSteps.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  setDirection(i > currentIndex ? 1 : -1);
+                  setStep(i);
+                }}
+                className={`h-2 rounded-full transition-all ${currentIndex === i ? 'w-6 bg-primary' : 'w-2 bg-muted hover:bg-muted-foreground/50'}`}
+                aria-label={`Ir para o passo ${i + 1}`}
+              />
+            ))}
+          </div>
+
+          {!hideDefaultNav &&
+            (isFinalStep ? (
+              <Button onClick={handleComplete} className="mt-4 w-full" size="lg">
+                {finalCtaLabel}
               </Button>
             ) : (
-              <div className="flex items-center justify-between">
-                <Button variant="ghost" onClick={() => paginate(-1)} disabled={isFirstStep}>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  variant="ghost"
+                  onClick={() => paginate(-1)}
+                  disabled={isFirstStep}
+                  className="w-full sm:w-auto"
+                >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Voltar
                 </Button>
                 {isFirstStep ? (
-                    <Button onClick={() => paginate(1)}>
-                        Criar Herói
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                  <Button className="w-full sm:w-auto" onClick={() => paginate(1)}>
+                    {startCtaLabel}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
                 ) : (
-                    <Button variant="secondary" onClick={() => paginate(1)}>
-                        Continuar
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
+                  <Button variant="secondary" className="w-full sm:w-auto" onClick={() => paginate(1)}>
+                    Continuar
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
                 )}
               </div>
-            )
-        )}
+            ))}
+        </div>
       </div>
     </div>
   );
@@ -413,7 +578,7 @@ function InfoStep({ icon: Icon, title, description }: { icon: LucideIcon, title:
 
 function AddAccountStep({ title, description, onSave, isSubmitting, onSkip }: { title: string, description: string, onSave: (data: any) => void, isSubmitting: boolean, onSkip: () => void }) {
   return (
-    <div className="w-full max-h-[70vh] overflow-y-auto px-1 space-y-4">
+    <div className="w-full space-y-4 px-1">
         <div className="text-center mb-6">
              <div className="flex justify-center mb-4">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -434,7 +599,7 @@ function AddAccountStep({ title, description, onSave, isSubmitting, onSkip }: { 
 
 function AddCardStep({ title, description, onSave, isSubmitting, onSkip }: { title: string, description: string, onSave: (data: any) => void, isSubmitting: boolean, onSkip: () => void }) {
   return (
-     <div className="w-full max-h-[70vh] overflow-y-auto px-1 space-y-4">
+     <div className="w-full space-y-4 px-1">
         <div className="text-center mb-6">
             <div className="flex justify-center mb-4">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -472,7 +637,7 @@ function AddProfileStep({ onSaveAndContinue, isSubmitting, title, description }:
   });
 
   return (
-    <div className="w-full max-h-[70vh] overflow-y-auto px-1 space-y-4">
+    <div className="w-full space-y-4 px-1">
         <div className="text-center mb-6">
             <div className="flex justify-center mb-4">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
@@ -555,7 +720,7 @@ function FinancialSetupStep({ onSave, isSubmitting, title, description }: Financ
     const recommendedCategories = categories.slice(0, 8);
 
     return (
-        <div className="w-full max-h-[70vh] overflow-y-auto px-1 space-y-4">
+        <div className="w-full space-y-4 px-1">
         <div className="text-center mb-4 space-y-2">
             <h2 className="text-xl font-bold font-headline">{title}</h2>
             <p className="text-sm text-muted-foreground">{description}</p>

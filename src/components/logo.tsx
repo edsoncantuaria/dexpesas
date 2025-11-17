@@ -17,8 +17,7 @@ function LogoMark({ className }: LogoMarkProps) {
 
   return (
  <svg
-    width={360}
-    height={96}
+    className={cn('h-12 w-auto max-w-full', className)}
     viewBox="0 0 360 96"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"

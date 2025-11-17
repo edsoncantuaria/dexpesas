@@ -23,13 +23,27 @@ interface AccountBookCardProps {
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 
-const MetricCard = ({ title, value, icon: Icon, colorClass }: { title: string, value: number, icon: React.ElementType, colorClass: string }) => (
+const MetricCard = ({
+    title,
+    value,
+    icon: Icon,
+    colorClass,
+    hideValue,
+}: {
+    title: string;
+    value: number;
+    icon: React.ElementType;
+    colorClass: string;
+    hideValue?: boolean;
+}) => (
     <div className="flex items-center justify-between rounded-lg border p-3">
         <div className="flex items-center gap-2">
             <Icon className={cn("h-5 w-5", colorClass)} />
             <span className="text-sm font-semibold">{title}</span>
         </div>
-        <span className={cn("text-base font-bold", colorClass)}>{formatCurrency(value)}</span>
+        <span className={cn("text-base font-bold", colorClass)}>
+            {hideValue ? 'R$ ••••••' : formatCurrency(value)}
+        </span>
     </div>
 );
 
@@ -125,7 +139,9 @@ export function AccountBookCard({ accounts, transactions }: AccountBookCardProps
                     <div className="flex justify-between items-center text-center border-t pt-4">
                         <div>
                             <p className="text-xs text-muted-foreground font-semibold">Resultado do Mês</p>
-                            <p className={cn("text-lg font-bold", monthBalance >= 0 ? 'text-green-500' : 'text-red-500')}>{formatCurrency(monthBalance)}</p>
+                            <p className={cn("text-lg font-bold", monthBalance >= 0 ? 'text-green-500' : 'text-red-500')}>
+                                {showBalance ? formatCurrency(monthBalance) : 'R$ ••••••'}
+                            </p>
                         </div>
                         <div>
                             <div className="text-xs text-muted-foreground font-semibold flex items-center gap-1">
@@ -141,17 +157,19 @@ export function AccountBookCard({ accounts, transactions }: AccountBookCardProps
                                     </Tooltip>
                                 </TooltipProvider>
                             </div>
-                            <p className={cn("text-lg font-bold", projectedBalance >= 0 ? 'text-primary' : 'text-destructive')}>{formatCurrency(projectedBalance)}</p>
+                            <p className={cn("text-lg font-bold", projectedBalance >= 0 ? 'text-primary' : 'text-destructive')}>
+                                {showBalance ? formatCurrency(projectedBalance) : 'R$ ••••••'}
+                            </p>
                         </div>
                     </div>
                 </div>
 
                 <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
                     <CollapsibleContent className="space-y-2 pt-4">
-                        <MetricCard title="Recebido" value={received} icon={TrendingUp} colorClass="text-green-500" />
-                        <MetricCard title="Pago" value={paid} icon={TrendingDown} colorClass="text-red-500" />
-                        <MetricCard title="A Receber" value={toReceive} icon={TrendingUp} colorClass="text-yellow-500" />
-                        <MetricCard title="A Pagar" value={toPay} icon={TrendingDown} colorClass="text-orange-500" />
+                        <MetricCard title="Recebido" value={received} icon={TrendingUp} colorClass="text-green-500" hideValue={!showBalance} />
+                        <MetricCard title="Pago" value={paid} icon={TrendingDown} colorClass="text-red-500" hideValue={!showBalance} />
+                        <MetricCard title="A Receber" value={toReceive} icon={TrendingUp} colorClass="text-yellow-500" hideValue={!showBalance} />
+                        <MetricCard title="A Pagar" value={toPay} icon={TrendingDown} colorClass="text-orange-500" hideValue={!showBalance} />
                     </CollapsibleContent>
                     <div className="flex justify-center mt-2">
                         <CollapsibleTrigger asChild>

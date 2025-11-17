@@ -1,7 +1,7 @@
 // src/components/dashboard/transacoes/transactions-table.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import {
   flexRender,
@@ -48,6 +48,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type TransactionsTableProps = {
   data: Transaction[];
@@ -67,7 +68,12 @@ export function TransactionsTable({
     cards
 }: TransactionsTableProps) {
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 });
   
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+  }, [data]);
+
   const accountsAndCardsMap = new Map([...accounts, ...cards].map(item => [item.id, item.nome]));
 
   const columns: ColumnDef<Transaction>[] = [
@@ -269,11 +275,17 @@ export function TransactionsTable({
   const table = useReactTable({
     data,
     columns,
+    state: { pagination },
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
+  const totalRows = data.length;
+  const currentRows = table.getRowModel().rows;
+  const pageStart = totalRows === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1;
+  const pageEnd = totalRows === 0 ? 0 : pageStart + currentRows.length - 1;
 
   return (
     <>
@@ -300,8 +312,8 @@ export function TransactionsTable({
                 ))}
               </TableHeader>
               <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
+                {currentRows?.length ? (
+                  currentRows.map((row) => (
                     <TableRow
                       key={row.id}
                       data-state={row.getIsSelected() && 'selected'}
@@ -324,6 +336,48 @@ export function TransactionsTable({
                 )}
               </TableBody>
             </Table>
+          </div>
+          <div className="flex flex-col gap-4 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {totalRows === 0 ? 'Nenhuma transação disponível' : `Mostrando ${pageStart}–${pageEnd} de ${totalRows}`}
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+              <Select
+                value={String(pagination.pageSize)}
+                onValueChange={(value) =>
+                  setPagination((prev) => ({ ...prev, pageSize: Number(value), pageIndex: 0 }))
+                }
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Itens por página" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[10, 25, 50, 100].map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size} / página
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                >
+                  Próxima
+                </Button>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

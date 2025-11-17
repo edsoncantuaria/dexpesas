@@ -21,9 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import type { Account, Card, Transaction, Category, OcrData, User, Tag } from '@/lib/definitions';
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { CalendarIcon, Loader2, Sparkles, Info, Camera, Repeat, Check, MessageSquareText, ChevronDown, Repeat1, Layers, Tags as TagsIcon, Paperclip, PencilLine, CircleDollarSign, Shapes, Wallet, Landmark } from 'lucide-react';
@@ -47,6 +47,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 
 // Schema único e robusto com validação condicional
+const ENTRY_TYPE_OPTIONS = [
+  { value: 'single', title: 'Único', description: 'Vale para uma data', icon: Repeat1 },
+  { value: 'installment', title: 'Parcelado', description: 'Divide o valor', icon: Layers },
+  { value: 'recurring', title: 'Recorrente', description: 'Repete automaticamente', icon: Repeat },
+];
+
 const formSchema = z.object({
   tipo: z.enum(['despesa', 'receita', 'transferencia']),
   descricao: z.string().optional(), 
@@ -365,14 +371,39 @@ export function AddTransactionForm({
                 
                 <Separator className="my-4"/>
 
-                 <FormField control={form.control} name="entryType" render={({ field }) => (
-                    <FormItem className="space-y-3"><FormLabel className="flex items-center gap-2"><Shapes className="h-4 w-4" />Tipo de Lançamento</FormLabel><FormControl>
-                        <RadioGroup onValueChange={field.onChange} value={field.value} className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <FormItem><FormControl><RadioGroupItem value="single" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"><Repeat1 className="h-4 w-4 mr-2"/>Único</FormLabel></FormItem>
-                            <FormItem><FormControl><RadioGroupItem value="installment" className="sr-only peer" disabled={watchTipo !== 'despesa'}/></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer aria-disabled:opacity-50 aria-disabled:cursor-not-allowed"><Layers className="h-4 w-4 mr-2"/>Parcelado</FormLabel></FormItem>
-                            <FormItem><FormControl><RadioGroupItem value="recurring" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-3 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer"><Repeat className="h-4 w-4 mr-2"/>Recorrente</FormLabel></FormItem>
-                        </RadioGroup>
-                    </FormControl><FormMessage /></FormItem>
+                <FormField control={form.control} name="entryType" render={({ field }) => (
+                    <FormItem className="space-y-3">
+                        <FormLabel className="flex items-center gap-2"><Shapes className="h-4 w-4" />Tipo de Lançamento</FormLabel>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            {ENTRY_TYPE_OPTIONS.map((option) => {
+                                const Icon = option.icon;
+                                const disabled = option.value === 'installment' && watchTipo !== 'despesa';
+                                const isActive = field.value === option.value;
+                                return (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={isActive}
+                                        disabled={disabled}
+                                        onClick={() => field.onChange(option.value)}
+                                        className={cn(
+                                            'rounded-md border-2 p-3 text-left text-sm transition',
+                                            isActive ? 'border-primary/60 bg-primary/5' : 'border-muted',
+                                            disabled && 'opacity-40 pointer-events-none'
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-2 font-semibold">
+                                            <Icon className="h-4 w-4" />
+                                            {option.title}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <FormMessage />
+                    </FormItem>
                 )}/>
                 
                 <AnimatePresence>

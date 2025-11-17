@@ -28,14 +28,14 @@ function TransactionsPageContent() {
   const { openForm, setEditingTransaction } = useTransactionForm();
 
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [monthlyTransactions, setMonthlyTransactions] = useState<Transaction[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [cards, setCards] = useState<CardType[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [tags, setTags] = useState<Tag[]>([]); 
   
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -52,6 +52,7 @@ function TransactionsPageContent() {
   });
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const hasCustomRange = Boolean(filters.dateRange?.from);
 
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -64,65 +65,103 @@ function TransactionsPageContent() {
   }, [searchParams, router, openForm]);
 
   const fetchInitialData = useCallback(async () => {
-    setIsLoading(true);
     try {
-      const [accRes, cardRes, catRes, tagsRes, allTransRes] = await Promise.all([
+      const [accRes, cardRes, catRes, tagsRes] = await Promise.all([
         api.get('/accounts'),
         api.get('/cards'),
         api.get('/categories'),
         api.get('/tags'),
-        api.get('/transactions?month=all'), // Otimização: Carrega tudo uma vez
       ]);
       setAccounts(accRes.data);
       setCards(cardRes.data);
       setCategories(catRes.data);
       setTags(tagsRes.data);
-      setAllTransactions(allTransRes.data);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro ao buscar dados de suporte'});
-    } finally {
-      setIsLoading(false);
     }
   }, [toast]);
   
-  const fetchTransactionsForMonth = useCallback(async (date: Date) => {
-    setIsLoadingTransactions(true);
+  const fetchTransactionsForMonth = useCallback(async (date: Date, options?: { silent?: boolean; replaceVisible?: boolean }) => {
+    const { silent = false, replaceVisible = true } = options || {};
+    if (!silent) {
+      setIsLoadingTransactions(true);
+    }
     try {
       const month = format(date, 'yyyy-MM');
       const response = await api.get(`/transactions?month=${month}&includePending=true`);
-      setTransactions(response.data);
+      setMonthlyTransactions(response.data);
+      if (replaceVisible) {
+        setTransactions(response.data);
+      }
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro ao buscar transações'});
     } finally {
-      setIsLoadingTransactions(false);
+      if (!silent) {
+        setIsLoadingTransactions(false);
+      }
     }
   }, [toast]);
 
+  const fetchTransactionsForRange = useCallback(async (range?: FilterState['dateRange']) => {
+    if (!range?.from) {
+      setTransactions(monthlyTransactions);
+      return;
+    }
+    setIsLoadingTransactions(true);
+    try {
+      const params = new URLSearchParams();
+      params.set('includePending', 'true');
+      params.set('startDate', range.from.toISOString());
+      const endDate = range.to ?? range.from;
+      params.set('endDate', endDate.toISOString());
+      const response = await api.get(`/transactions?${params.toString()}`);
+      setTransactions(response.data);
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro ao buscar transações' });
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  }, [monthlyTransactions, toast]);
+
   useEffect(() => {
-    fetchInitialData();
+    let isMounted = true;
+    setIsLoading(true);
+    fetchInitialData()
+      .catch(() => {})
+      .finally(() => {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      });
+    return () => {
+      isMounted = false;
+    };
   }, [fetchInitialData]);
 
   useEffect(() => {
-    fetchTransactionsForMonth(selectedDate);
-  }, [selectedDate, fetchTransactionsForMonth]);
+    fetchTransactionsForMonth(selectedDate, { replaceVisible: !hasCustomRange });
+  }, [selectedDate, fetchTransactionsForMonth, hasCustomRange]);
 
   useEffect(() => {
     const handleTransactionUpdate = () => {
-        fetchTransactionsForMonth(selectedDate);
-        fetchInitialData(); // Re-fetch all data to ensure consistency across the app
+      fetchTransactionsForMonth(selectedDate, { silent: true, replaceVisible: !hasCustomRange });
+      if (filters.dateRange?.from) {
+        fetchTransactionsForRange(filters.dateRange);
+      }
+      fetchInitialData();
     };
     window.addEventListener('transaction-updated', handleTransactionUpdate);
     return () => {
-        window.removeEventListener('transaction-updated', handleTransactionUpdate);
+      window.removeEventListener('transaction-updated', handleTransactionUpdate);
     };
-  }, [selectedDate, fetchTransactionsForMonth, fetchInitialData]);
+  }, [selectedDate, fetchTransactionsForMonth, fetchInitialData, fetchTransactionsForRange, filters.dateRange, hasCustomRange]);
   
   const isFilterActive = useMemo(() => {
     return filters.text || filters.accounts.length > 0 || filters.cards.length > 0 || filters.categories.length > 0 || filters.methods.length > 0 || filters.tags.length > 0 || filters.type || filters.dateRange?.from;
   }, [filters]);
 
   const filteredTransactions = useMemo(() => {
-    let results = isFilterActive ? allTransactions : transactions;
+    let results = transactions;
 
     if (searchQuery) {
         results = results.filter(t => t.descricao.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -151,7 +190,7 @@ function TransactionsPageContent() {
     }
 
     return results;
-  }, [transactions, allTransactions, searchQuery, filters, isFilterActive]);
+  }, [transactions, searchQuery, filters]);
 
 
   const handleOpenForm = (transaction?: Transaction) => {
@@ -162,7 +201,10 @@ function TransactionsPageContent() {
   const handleDeleteTransaction = async (transactionId: string) => {
     try {
       await api.delete(`/transactions/${transactionId}`);
-      await fetchTransactionsForMonth(selectedDate);
+      await fetchTransactionsForMonth(selectedDate, { replaceVisible: !hasCustomRange });
+      if (filters.dateRange?.from) {
+        await fetchTransactionsForRange(filters.dateRange);
+      }
       toast({
         title: 'Transação excluída!',
         variant: 'destructive',
@@ -175,7 +217,10 @@ function TransactionsPageContent() {
   const handleTogglePaidStatus = async (transactionId: string) => {
     try {
       await api.patch(`/transactions/${transactionId}/toggle-paid`);
-      await fetchTransactionsForMonth(selectedDate);
+      await fetchTransactionsForMonth(selectedDate, { replaceVisible: !hasCustomRange });
+      if (filters.dateRange?.from) {
+        await fetchTransactionsForRange(filters.dateRange);
+      }
       toast({ title: 'Status da transação atualizado!' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro ao atualizar status' });
@@ -191,6 +236,11 @@ function TransactionsPageContent() {
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters);
     setIsFilterSheetOpen(false);
+    if (newFilters.dateRange?.from) {
+      void fetchTransactionsForRange(newFilters.dateRange);
+    } else {
+      setTransactions(monthlyTransactions);
+    }
   }
 
   if (isLoading) {
@@ -198,7 +248,7 @@ function TransactionsPageContent() {
   }
 
   const renderContent = () => {
-    if (isLoadingTransactions && !isFilterActive) {
+    if (isLoadingTransactions) {
       return <LoadingScreen />
     }
 
@@ -245,7 +295,7 @@ function TransactionsPageContent() {
         <FilteredSummary transactions={filteredTransactions} dateRange={filters.dateRange}/>
       ) : (
         <MonthlySummary
-            transactionsForMonth={transactions}
+            transactionsForMonth={monthlyTransactions}
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}
         />

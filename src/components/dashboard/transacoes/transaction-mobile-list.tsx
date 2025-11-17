@@ -16,7 +16,7 @@ import {
   MessageSquareText,
 } from 'lucide-react';
 import type { MouseEvent } from 'react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import {
@@ -53,6 +53,7 @@ type TransactionMobileListProps = {
 };
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const MOBILE_PAGE_SIZE = 30;
 
 
 // Componente para o cabeçalho de resumo diário
@@ -151,7 +152,12 @@ export function TransactionMobileList({
 }: TransactionMobileListProps) {
   const [viewingAttachment, setViewingAttachment] = useState<string | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [visibleCount, setVisibleCount] = useState(MOBILE_PAGE_SIZE);
   const accountsAndCardsMap = new Map([...accounts, ...cards].map(item => [item.id, item.nome]));
+
+  useEffect(() => {
+    setVisibleCount(MOBILE_PAGE_SIZE);
+  }, [data]);
 
   const handleDropdownClick = (e: MouseEvent) => {
     e.stopPropagation();
@@ -167,7 +173,12 @@ export function TransactionMobileList({
     setViewingAttachment(objectName);
   }
   
-  const groupedTransactions = data.reduce((acc, transaction) => {
+  const limitedTransactions = useMemo(
+    () => data.slice(0, visibleCount),
+    [data, visibleCount]
+  );
+
+  const groupedTransactions = limitedTransactions.reduce((acc, transaction) => {
     const dateKey = format(parseISO(transaction.data), 'yyyy-MM-dd');
     if (!acc[dateKey]) {
       acc[dateKey] = [];
@@ -177,6 +188,11 @@ export function TransactionMobileList({
   }, {} as Record<string, Transaction[]>);
 
   const sortedDates = Object.keys(groupedTransactions).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+  const hasMore = data.length > visibleCount;
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => Math.min(prev + MOBILE_PAGE_SIZE, data.length));
+  };
 
   return (
     <>
@@ -304,6 +320,13 @@ export function TransactionMobileList({
       ))}
       </AnimatePresence>
     </div>
+    {hasMore && (
+      <div className="flex justify-center px-3 pb-4">
+        <Button variant="outline" onClick={handleLoadMore}>
+          Carregar mais ({limitedTransactions.length}/{data.length})
+        </Button>
+      </div>
+    )}
     
     <DeleteTransactionDialog
       isOpen={!!deletingTransaction}

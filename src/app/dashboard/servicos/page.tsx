@@ -2,6 +2,7 @@
 'use client';
 
 import Link from "next/link";
+import { useMemo } from 'react';
 import { 
     Grid3x3, 
     Landmark, 
@@ -21,6 +22,7 @@ import {
     Swords
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useGamificationMode } from '@/hooks/use-gamification-mode';
 
 type ServiceItem = {
     href: string;
@@ -31,7 +33,7 @@ type ServiceItem = {
 };
 
 // Ordem revisada para melhor agrupamento e harmonia
-const serviceItems: ServiceItem[] = [
+const baseServiceItems: ServiceItem[] = [
     // Core Financeiro
     {
         href: '/dashboard/contas',
@@ -116,6 +118,34 @@ const serviceItems: ServiceItem[] = [
 ];
 
 export default function ServicosPage() {
+    const { isClassic, isLite } = useGamificationMode();
+    const serviceItems = useMemo(() => {
+        const liteOverrides: Record<string, Pick<ServiceItem, 'title' | 'description'>> = {
+            '/dashboard/progresso': {
+                title: 'Progresso Lite',
+                description: 'Veja XP e atributos essenciais sem excessos épicos.',
+            },
+            '/dashboard/conquistas': {
+                title: 'Conquistas em Destaque',
+                description: 'Acompanhe medalhas principais e marcos recentes.',
+            },
+        };
+
+        return baseServiceItems
+            .filter(item => {
+                if (isClassic && (item.href === '/dashboard/progresso' || item.href === '/dashboard/conquistas')) {
+                    return false;
+                }
+                return true;
+            })
+            .map(item => {
+                if (isLite && liteOverrides[item.href]) {
+                    return { ...item, ...liteOverrides[item.href]! };
+                }
+                return item;
+            });
+    }, [isClassic, isLite]);
+
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
