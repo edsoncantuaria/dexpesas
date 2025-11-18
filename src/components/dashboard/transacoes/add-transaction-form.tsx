@@ -21,12 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import type { Account, Card, Transaction, Category, OcrData, User, Tag } from '@/lib/definitions';
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { CalendarIcon, Loader2, Sparkles, Info, Camera, Repeat, Check, MessageSquareText, ChevronDown, Repeat1, Layers, Tags as TagsIcon, Paperclip, PencilLine, CircleDollarSign, Shapes, Wallet, Landmark } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import type { ReactNode } from 'react';
+import { CalendarIcon, Loader2, Camera, Repeat, Repeat1, Layers, PencilLine, CircleDollarSign, Shapes, Wallet, Landmark, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO, addYears, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -41,8 +41,6 @@ import { OcrUploadDialog } from '@/components/ui/ocr-upload-dialog';
 import { TagInput } from './tag-input';
 import { DescricaoInteligente, type SugestaoTransacao } from './descricao-inteligente';
 import { Textarea } from '@/components/ui/textarea';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Separator } from '@/components/ui/separator';
 import { AnimatePresence, motion } from 'framer-motion';
 
 
@@ -52,6 +50,51 @@ const ENTRY_TYPE_OPTIONS = [
   { value: 'installment', title: 'Parcelado', description: 'Divide o valor', icon: Layers },
   { value: 'recurring', title: 'Recorrente', description: 'Repete automaticamente', icon: Repeat },
 ];
+
+const TRANSACTION_TYPE_OPTIONS = [
+  { value: 'despesa', label: 'Despesa' },
+  { value: 'receita', label: 'Receita' },
+  { value: 'transferencia', label: 'Transferência' },
+] as const;
+
+type OptionalSectionProps = {
+  title: string;
+  description?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+};
+
+const OptionalSection = ({ title, description, isOpen, onToggle, children }: OptionalSectionProps) => (
+  <div className="rounded-2xl border bg-card/60 px-4 py-3 shadow-sm">
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={isOpen}
+      className="flex w-full items-center justify-between gap-3 text-left"
+    >
+      <div className="space-y-0.5">
+        <p className="text-sm font-semibold leading-tight">{title}</p>
+        {description && <p className="text-xs text-muted-foreground">{description}</p>}
+      </div>
+      <ChevronDown className={cn('h-4 w-4 transition-transform', isOpen && 'rotate-180')} />
+    </button>
+    <AnimatePresence initial={false}>
+      {isOpen && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          className="overflow-hidden"
+        >
+          <div className="pt-3">
+            <div className="space-y-4 text-sm text-foreground">{children}</div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  </div>
+);
 
 const formSchema = z.object({
   tipo: z.enum(['despesa', 'receita', 'transferencia']),
@@ -135,6 +178,32 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+type OptionalSectionName = 'status' | 'schedule' | 'extras';
+
+const OPTIONAL_FIELD_SECTION: Partial<Record<keyof FormValues, OptionalSectionName>> = {
+  pago: 'status',
+  entryType: 'schedule',
+  totalInstallments: 'schedule',
+  withInterest: 'schedule',
+  interestRate: 'schedule',
+  recurrenceType: 'schedule',
+  categoryId: 'extras',
+  tags: 'extras',
+  attachmentUrl: 'extras',
+  notes: 'extras',
+};
+
+const computeOptionalSectionState = (values: Partial<FormValues>): Record<OptionalSectionName, boolean> => ({
+  status: values.pago === false,
+  schedule: values.entryType === 'installment' || values.entryType === 'recurring',
+  extras: Boolean(
+    (values.tags && values.tags.length > 0) ||
+    values.categoryId ||
+    values.attachmentUrl ||
+    (values.notes && values.notes.length > 0)
+  ),
+});
+
 
 type AddTransactionFormProps = {
   transaction?: Transaction | null;
@@ -159,11 +228,6 @@ export function AddTransactionForm({
   const [categories, setCategories] = useState<Category[]>([]);
   const [userTags, setUserTags] = useState<Tag[]>([]);
   const [user, setUser] = useState<User | null>(null);
-  const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [openCollapsible, setOpenCollapsible] = useState<string | null>(null);
-  const { toast } = useToast();
-
   const defaultValues: Partial<FormValues> = {
     tipo: 'despesa',
     descricao: '', 
@@ -183,6 +247,27 @@ export function AddTransactionForm({
     withInterest: false, 
     interestRate: 0,
   };
+  const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [optionalSections, setOptionalSections] = useState<Record<OptionalSectionName, boolean>>(
+    computeOptionalSectionState(defaultValues as FormValues)
+  );
+  const { toast } = useToast();
+  const fieldRefs = useRef<Partial<Record<keyof FormValues, HTMLDivElement | null>>>({});
+  const registerFieldRef = useCallback(
+    (name: keyof FormValues) => (node: HTMLDivElement | null) => {
+      fieldRefs.current[name] = node;
+    },
+    []
+  );
+  const toggleOptionalSection = useCallback((section: OptionalSectionName) => {
+    setOptionalSections((prev) => ({ ...prev, [section]: !prev[section] }));
+  }, []);
+  const openSectionForField = useCallback((field: keyof FormValues) => {
+    const targetSection = OPTIONAL_FIELD_SECTION[field];
+    if (!targetSection) return;
+    setOptionalSections((prev) => (prev[targetSection] ? prev : { ...prev, [targetSection]: true }));
+  }, []);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -191,11 +276,12 @@ export function AddTransactionForm({
   
   const resetFormToDefault = () => {
     const currentTipo = form.getValues('tipo');
-    form.reset({
+    const nextValues = {
         ...(defaultValues as FormValues),
         tipo: currentTipo,
-    });
-    setOpenCollapsible(null);
+    };
+    form.reset(nextValues);
+    setOptionalSections(computeOptionalSectionState(nextValues));
   };
 
   const fetchInitialData = useCallback(async () => {
@@ -243,9 +329,12 @@ export function AddTransactionForm({
             withInterest: !!transaction.withInterest,
             interestRate: transaction.interestRate || 0,
         };
-        form.reset(valuesToReset);
+        const mergedValues = { ...(defaultValues as FormValues), ...valuesToReset };
+        form.reset(mergedValues as FormValues);
+        setOptionalSections(computeOptionalSectionState(mergedValues));
     } else if (!transaction) {
          form.reset(defaultValues as FormValues);
+         setOptionalSections(computeOptionalSectionState(defaultValues as FormValues));
     }
   }, [transaction, form, categories]);
 
@@ -272,6 +361,42 @@ export function AddTransactionForm({
   const watchTipo = form.watch('tipo');
   const watchMetodo = form.watch('metodoPagamento');
   const watchEntryType = form.watch('entryType');
+  useEffect(() => {
+    if (form.formState.submitCount === 0) return;
+    const firstErrorEntry = Object.entries(form.formState.errors)[0] as [keyof FormValues, unknown] | undefined;
+    if (!firstErrorEntry) return;
+    const fieldName = firstErrorEntry[0];
+    openSectionForField(fieldName);
+    let attempts = 0;
+    let scrollTimeout: number | null = null;
+    let highlightTimeout: number | null = null;
+
+    const tryScroll = () => {
+      const fieldNode = fieldRefs.current[fieldName];
+      if (!fieldNode && attempts < 5) {
+        attempts += 1;
+        scrollTimeout = window.setTimeout(tryScroll, 120);
+        return;
+      }
+      if (!fieldNode) return;
+      fieldNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      fieldNode.classList.add('ring-2', 'ring-destructive/40');
+      highlightTimeout = window.setTimeout(() => {
+        fieldNode.classList.remove('ring-2', 'ring-destructive/40');
+      }, 1800);
+    };
+
+    scrollTimeout = window.setTimeout(tryScroll, 120);
+
+    return () => {
+      if (scrollTimeout) window.clearTimeout(scrollTimeout);
+      if (highlightTimeout) {
+        window.clearTimeout(highlightTimeout);
+        const node = fieldRefs.current[fieldName];
+        node?.classList.remove('ring-2', 'ring-destructive/40');
+      }
+    };
+  }, [form.formState.errors, form.formState.submitCount, openSectionForField]);
   
   useEffect(() => {
     if (!isEditing) {
@@ -332,154 +457,590 @@ export function AddTransactionForm({
         <form className={cn("w-full max-w-full space-y-4", className)}>
         {/* Bloco Principal */}
         <div className="flex w-full flex-wrap items-center justify-between gap-4">
-            <FormField control={form.control} name="tipo" render={({ field }) => (
-                <FormItem>
-                    <FormControl>
-                        <RadioGroup onValueChange={(value) => field.onChange(value as 'despesa' | 'receita' | 'transferencia')} value={field.value} className="flex items-center space-x-2 sm:space-x-4">
-                           <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="despesa" /></FormControl><FormLabel className="font-normal text-sm sm:text-base">Despesa</FormLabel></FormItem>
-                           <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="receita" /></FormControl><FormLabel className="font-normal text-sm sm:text-base">Receita</FormLabel></FormItem>
-                           <FormItem className="flex items-center space-x-2 space-y-0"><FormControl><RadioGroupItem value="transferencia" /></FormControl><FormLabel className="font-normal text-sm sm:text-base">Transferência</FormLabel></FormItem>
-                        </RadioGroup>
-                    </FormControl>
+          <div className="flex-1 min-w-[220px] scroll-mt-28" ref={registerFieldRef('tipo')}>
+            <FormField
+              control={form.control}
+              name="tipo"
+              render={({ field }) => (
+                <FormItem className="space-y-2">
+                  <FormLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Tipo de operação
+                  </FormLabel>
+                  <FormControl>
+                    <div className="inline-flex w-full max-w-md items-center rounded-full border bg-card/70 p-1 shadow-sm">
+                      {TRANSACTION_TYPE_OPTIONS.map((option) => {
+                        const isActive = field.value === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => field.onChange(option.value)}
+                            className={cn(
+                              'flex-1 rounded-full px-4 py-2 text-sm font-semibold transition',
+                              isActive
+                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                            )}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </FormControl>
+                  <FormMessage />
                 </FormItem>
-            )}/>
-            {user?.enableOcr && watchTipo !== 'transferencia' && (<Button type="button" variant="outline" size="sm" onClick={() => setIsOcrDialogOpen(true)}><Camera className="mr-2 h-4 w-4"/>Digitalizar</Button>)}
+              )}
+            />
+          </div>
+          {user?.enableOcr && watchTipo !== 'transferencia' && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsOcrDialogOpen(true)}>
+              <Camera className="mr-2 h-4 w-4" />
+              Digitalizar
+            </Button>
+          )}
         </div>
         
-        <FormField control={form.control} name="descricao" render={({ field }) => (<FormItem><FormLabel className="flex items-center gap-2"><PencilLine className="h-4 w-4" />Título</FormLabel><FormControl>{user?.habilitarDescricaoInteligente && watchTipo !== 'transferencia' ? (<DescricaoInteligente valor={field.value || ''} onChange={field.onChange} tipoTransacao={watchTipo} onSugestaoSelecionada={handleSuggestionSelected} valorTransacao={form.watch('valor')}/>) : (<Input placeholder={watchTipo === 'transferencia' ? "Ex: Dinheiro para emergências" : "Ex: Almoço no restaurante"} {...field}/>)}</FormControl><FormMessage/></FormItem>)}/>
+        <div className="scroll-mt-28" ref={registerFieldRef('descricao')}>
+          <FormField
+            control={form.control}
+            name="descricao"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="flex items-center gap-2">
+                  <PencilLine className="h-4 w-4" />
+                  Título
+                </FormLabel>
+                <FormControl>
+                  {user?.habilitarDescricaoInteligente && watchTipo !== 'transferencia' ? (
+                    <DescricaoInteligente
+                      valor={field.value || ''}
+                      onChange={field.onChange}
+                      tipoTransacao={watchTipo}
+                      onSugestaoSelecionada={handleSuggestionSelected}
+                      valorTransacao={form.watch('valor')}
+                    />
+                  ) : (
+                    <Input
+                      placeholder={
+                        watchTipo === 'transferencia'
+                          ? 'Ex: Dinheiro para emergências'
+                          : 'Ex: Almoço no restaurante'
+                      }
+                      {...field}
+                    />
+                  )}
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         
         <div className="flex w-full flex-col gap-4 sm:flex-row">
-            <FormField control={form.control} name="valor" render={({ field }) => (<FormItem className="w-full flex-1"><FormLabel className="flex items-center gap-2"><CircleDollarSign className="h-4 w-4" />Valor</FormLabel><FormControl><CurrencyInput value={field.value || 0} onValueChange={field.onChange} /></FormControl><FormMessage /></FormItem>)}/>
-            <FormField control={form.control} name="data" render={({ field }) => (<FormItem className="flex w-full flex-1 flex-col"><FormLabel className="flex items-center gap-2"><CalendarIcon className="h-4 w-4" />Data</FormLabel><Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}><PopoverTrigger asChild><FormControl><Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal h-10',!field.value && 'text-muted-foreground')}>{field.value ? (format(field.value, 'PPP', { locale: ptBR })) : (<span>Escolha uma data</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={(date) => {if (date) field.onChange(date); setIsCalendarOpen(false)}} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)}/>
+          <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('valor')}>
+            <FormField
+              control={form.control}
+              name="valor"
+              render={({ field }) => (
+                <FormItem className="w-full flex-1">
+                  <FormLabel className="flex items-center gap-2">
+                    <CircleDollarSign className="h-4 w-4" />
+                    Valor
+                  </FormLabel>
+                  <FormControl>
+                    <CurrencyInput value={field.value || 0} onValueChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+          <div className="flex w-full flex-1 flex-col scroll-mt-28" ref={registerFieldRef('data')}>
+            <FormField
+              control={form.control}
+              name="data"
+              render={({ field }) => (
+                <FormItem className="flex w-full flex-1 flex-col">
+                  <FormLabel className="flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4" />
+                    Data
+                  </FormLabel>
+                  <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={'outline'}
+                          className={cn('w-full pl-3 text-left font-normal h-10', !field.value && 'text-muted-foreground')}
+                        >
+                          {field.value ? (
+                            format(field.value, 'PPP', { locale: ptBR })
+                          ) : (
+                            <span>Escolha uma data</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={(date) => {
+                          if (date) field.onChange(date);
+                          setIsCalendarOpen(false);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
         </div>
 
         {watchTipo === 'transferencia' && (
-            <div className="flex w-full flex-col gap-4 sm:flex-row">
-                <FormField control={form.control} name="fromAccountId" render={({ field }) => (<FormItem className="w-full flex-1"><FormLabel className="flex items-center gap-2"><Landmark className="h-4 w-4" />Conta de Origem</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="De onde sairá o dinheiro?" /></SelectTrigger></FormControl><SelectContent>{accounts.filter(acc => acc.id !== form.watch('toAccountId')).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.nome}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)}/>
-                <FormField control={form.control} name="toAccountId" render={({ field }) => (<FormItem className="w-full flex-1"><FormLabel className="flex items-center gap-2"><Landmark className="h-4 w-4" />Conta de Destino</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Para onde vai o dinheiro?" /></SelectTrigger></FormControl><SelectContent>{accounts.filter(acc => acc.id !== form.watch('fromAccountId')).map(acc => (<SelectItem key={acc.id} value={acc.id}>{acc.nome}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)}/>
+          <div className="flex w-full flex-col gap-4 sm:flex-row">
+            <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('fromAccountId')}>
+              <FormField
+                control={form.control}
+                name="fromAccountId"
+                render={({ field }) => (
+                  <FormItem className="w-full flex-1">
+                    <FormLabel className="flex items-center gap-2">
+                      <Landmark className="h-4 w-4" />
+                      Conta de Origem
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="De onde sairá o dinheiro?" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts
+                          .filter((acc) => acc.id !== form.watch('toAccountId'))
+                          .map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id}>
+                              {acc.nome}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
+            <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('toAccountId')}>
+              <FormField
+                control={form.control}
+                name="toAccountId"
+                render={({ field }) => (
+                  <FormItem className="w-full flex-1">
+                    <FormLabel className="flex items-center gap-2">
+                      <Landmark className="h-4 w-4" />
+                      Conta de Destino
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Para onde vai o dinheiro?" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts
+                          .filter((acc) => acc.id !== form.watch('fromAccountId'))
+                          .map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id}>
+                              {acc.nome}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
         )}
         
         {watchTipo !== 'transferencia' && (
-            <>
-                <div className="flex w-full flex-col gap-4 sm:flex-row">
-                    <FormField control={form.control} name="metodoPagamento" render={({ field }) => (<FormItem className="w-full flex-1"><FormLabel className="flex items-center gap-2"><Wallet className="h-4 w-4" />Pagamento</FormLabel><Select onValueChange={field.onChange as (value: string) => void} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione o método" /></SelectTrigger></FormControl><SelectContent>{watchTipo === 'despesa' && <SelectItem value="credito">Cartão de Crédito</SelectItem>}<SelectItem value="debito">Débito</SelectItem><SelectItem value="pix">PIX</SelectItem><SelectItem value="dinheiro">Dinheiro</SelectItem></SelectContent></Select><FormMessage /></FormItem>)}/>
-                    {watchMetodo !== 'dinheiro' && (<FormField control={form.control} name="contaCartaoId" render={({ field }) => (<FormItem className="w-full flex-1"><FormLabel className="flex items-center gap-2"><Landmark className="h-4 w-4" />{watchMetodo === 'credito' ? 'Cartão' : 'Conta'}</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder={`Selecione`} /></SelectTrigger></FormControl><SelectContent>{paymentSources.map(source => (<SelectItem key={source.id} value={source.id}>{source.nome}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)}/>)}
-                </div>
-
-                <FormField control={form.control} name="pago" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><div className="space-y-0.5"><FormLabel>{field.value ? 'Operação Efetuada' : 'Operação Pendente'}</FormLabel></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl></FormItem>)}/>
-                
-                <Separator className="my-4"/>
-
-                <FormField control={form.control} name="entryType" render={({ field }) => (
-                    <FormItem className="space-y-3">
-                        <FormLabel className="flex items-center gap-2"><Shapes className="h-4 w-4" />Tipo de Lançamento</FormLabel>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            {ENTRY_TYPE_OPTIONS.map((option) => {
-                                const Icon = option.icon;
-                                const disabled = option.value === 'installment' && watchTipo !== 'despesa';
-                                const isActive = field.value === option.value;
-                                return (
-                                    <button
-                                        key={option.value}
-                                        type="button"
-                                        role="radio"
-                                        aria-checked={isActive}
-                                        disabled={disabled}
-                                        onClick={() => field.onChange(option.value)}
-                                        className={cn(
-                                            'rounded-md border-2 p-3 text-left text-sm transition',
-                                            isActive ? 'border-primary/60 bg-primary/5' : 'border-muted',
-                                            disabled && 'opacity-40 pointer-events-none'
-                                        )}
-                                    >
-                                        <div className="flex items-center gap-2 font-semibold">
-                                            <Icon className="h-4 w-4" />
-                                            {option.title}
-                                        </div>
-                                        <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <FormMessage />
+          <div className="space-y-4">
+            <div className="flex w-full flex-col gap-4 sm:flex-row">
+              <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('metodoPagamento')}>
+                <FormField
+                  control={form.control}
+                  name="metodoPagamento"
+                  render={({ field }) => (
+                    <FormItem className="w-full flex-1">
+                      <FormLabel className="flex items-center gap-2">
+                        <Wallet className="h-4 w-4" />
+                        Pagamento
+                      </FormLabel>
+                      <Select onValueChange={field.onChange as (value: string) => void} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione o método" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {watchTipo === 'despesa' && <SelectItem value="credito">Cartão de Crédito</SelectItem>}
+                          <SelectItem value="debito">Débito</SelectItem>
+                          <SelectItem value="pix">PIX</SelectItem>
+                          <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
                     </FormItem>
-                )}/>
-                
-                <AnimatePresence>
-                {watchEntryType === 'installment' && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                        <div className="space-y-4 rounded-lg border p-3 mt-2">
-                             <FormField control={form.control} name="totalInstallments" render={({ field }) => (<FormItem><FormLabel>Nº de Parcelas</FormLabel><Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value)}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{[...Array(47)].map((_, i) => (<SelectItem key={i + 2} value={String(i + 2)}>{i + 2}x</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>)}/>
-                             <FormField control={form.control} name="withInterest" render={({ field }) => (<FormItem className="flex items-center justify-between"><FormLabel>Incluir juros?</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl></FormItem>)}/>
-                             {form.watch('withInterest') && (<FormField control={form.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Taxa de Juros ao Mês (%)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="Ex: 1.99" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} /></FormControl><FormMessage /></FormItem>)}/>)}
-                        </div>
-                    </motion.div>
-                )}
-                </AnimatePresence>
+                  )}
+                />
+              </div>
+              {watchMetodo !== 'dinheiro' && (
+                <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('contaCartaoId')}>
+                  <FormField
+                    control={form.control}
+                    name="contaCartaoId"
+                    render={({ field }) => (
+                      <FormItem className="w-full flex-1">
+                        <FormLabel className="flex items-center gap-2">
+                          <Landmark className="h-4 w-4" />
+                          {watchMetodo === 'credito' ? 'Cartão' : 'Conta'}
+                        </FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder={`Selecione`} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {paymentSources.map((source) => (
+                              <SelectItem key={source.id} value={source.id}>
+                                {source.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
 
-                 <AnimatePresence>
-                {watchEntryType === 'recurring' && (
-                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                       <div className="space-y-4 rounded-lg border p-3 mt-2">
-                           <FormField control={form.control} name="recurrenceType" render={({ field }) => ( <FormItem><FormLabel>Frequência</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="NONE">Nenhuma</SelectItem><SelectItem value="WEEKLY">Semanal</SelectItem><SelectItem value="BIWEEKLY">Quinzenal</SelectItem><SelectItem value="MONTHLY">Mensal</SelectItem><SelectItem value="BIMONTHLY">Bimestral</SelectItem><SelectItem value="TRIMONTHLY">Trimestral</SelectItem><SelectItem value="SEMIANNUALLY">Semestral</SelectItem></SelectContent></Select><FormMessage /></FormItem>)}/>
-                       </div>
-                    </motion.div>
+            <OptionalSection
+              title="Status do pagamento"
+              description="Atualize quando a operação já foi concluída."
+              isOpen={optionalSections.status}
+              onToggle={() => toggleOptionalSection('status')}
+            >
+              <div className="scroll-mt-28" ref={registerFieldRef('pago')}>
+                <FormField
+                  control={form.control}
+                  name="pago"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel>{field.value ? 'Operação Efetuada' : 'Operação Pendente'}</FormLabel>
+                      </div>
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </OptionalSection>
+
+            <OptionalSection
+              title="Parcelas ou recorrência"
+              description="Use apenas se precisar parcelar ou repetir um lançamento."
+              isOpen={optionalSections.schedule}
+              onToggle={() => toggleOptionalSection('schedule')}
+            >
+              <div className="scroll-mt-28" ref={registerFieldRef('entryType')}>
+                <FormField
+                  control={form.control}
+                  name="entryType"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel className="flex items-center gap-2">
+                        <Shapes className="h-4 w-4" />
+                        Tipo de Lançamento
+                      </FormLabel>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        {ENTRY_TYPE_OPTIONS.map((option) => {
+                          const Icon = option.icon;
+                          const disabled = option.value === 'installment' && watchTipo !== 'despesa';
+                          const isActive = field.value === option.value;
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              role="radio"
+                              aria-checked={isActive}
+                              disabled={disabled}
+                              onClick={() => field.onChange(option.value)}
+                              className={cn(
+                                'rounded-md border-2 p-3 text-left text-sm transition',
+                                isActive ? 'border-primary/60 bg-primary/5' : 'border-muted',
+                                disabled && 'pointer-events-none opacity-40'
+                              )}
+                            >
+                              <div className="flex items-center gap-2 font-semibold">
+                                <Icon className="h-4 w-4" />
+                                {option.title}
+                              </div>
+                              <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <AnimatePresence>
+                {watchEntryType === 'installment' && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-2 space-y-4 rounded-lg border p-3">
+                      <div className="scroll-mt-28" ref={registerFieldRef('totalInstallments')}>
+                        <FormField
+                          control={form.control}
+                          name="totalInstallments"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nº de Parcelas</FormLabel>
+                              <Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value)}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {[...Array(47)].map((_, i) => (
+                                    <SelectItem key={i + 2} value={String(i + 2)}>
+                                      {i + 2}x
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <div className="scroll-mt-28" ref={registerFieldRef('withInterest')}>
+                        <FormField
+                          control={form.control}
+                          name="withInterest"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center justify-between">
+                              <FormLabel>Incluir juros?</FormLabel>
+                              <FormControl>
+                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      {form.watch('withInterest') && (
+                        <div className="scroll-mt-28" ref={registerFieldRef('interestRate')}>
+                          <FormField
+                            control={form.control}
+                            name="interestRate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Taxa de Juros ao Mês (%)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="Ex: 1.99"
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
                 )}
-                </AnimatePresence>
-                
-                 <Collapsible open={openCollapsible === 'details'} onOpenChange={() => setOpenCollapsible(prev => prev === 'details' ? null : 'details')}>
-                    <CollapsibleTrigger asChild>
-                        <Button variant="ghost" className="w-full justify-start gap-2"><ChevronDown className={cn("h-4 w-4 transition-transform", openCollapsible === 'details' && "rotate-180")}/> Detalhes Adicionais</Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent asChild>
-                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                            <div className="space-y-4 pt-2">
-                                <FormField control={form.control} name="categoryId" render={({ field }) => ( 
-                                    <FormItem>
-                                        <FormLabel>Categoria</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value}>
-                                            <FormControl>
-                                                <SelectTrigger><SelectValue placeholder="Selecione a categoria" /></SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                {filteredCategories.map(cat => (
-                                                    <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {favoriteCategorySuggestions.length > 0 && (
-                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                <span className="w-full text-[11px] uppercase tracking-wide text-muted-foreground">
-                                                    Sugestões
-                                                </span>
-                                                {favoriteCategorySuggestions.map((cat) => (
-                                                    <Button
-                                                        key={cat.id}
-                                                        type="button"
-                                                        size="xs"
-                                                        variant={field.value === cat.id ? 'default' : 'outline'}
-                                                        onClick={(event) => {
-                                                            event.preventDefault();
-                                                            field.onChange(cat.id);
-                                                        }}
-                                                    >
-                                                        {cat.label}
-                                                    </Button>
-                                                ))}
-                                            </div>
-                                        )}
-                                        <FormMessage />
-                                    </FormItem>
-                                )}/>
-                                <FormField control={form.control} name="tags" render={({ field }) => (<FormItem><FormLabel>Tags</FormLabel><FormControl><TagInput allTags={userTags} selectedTags={field.value || []} onChange={(newTags) => field.onChange(newTags)} onTagsUpdate={setUserTags}/></FormControl><FormMessage /></FormItem>)}/>
-                                <FormField control={form.control} name="attachmentUrl" render={({ field }) => (<FormItem><FormLabel>Comprovante</FormLabel><FormControl>{field.value ? (<AttachmentPreviewer objectName={field.value} onRemove={() => form.setValue('attachmentUrl', null)}/>) : (<FileUpload onValueChange={(objectName) => field.onChange(objectName)}/>)}</FormControl><FormMessage /></FormItem>)}/>
-                                <FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Observações</FormLabel><FormControl><Textarea placeholder="Detalhes adicionais..." {...field}/></FormControl><FormMessage /></FormItem>)}/>
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {watchEntryType === 'recurring' && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="mt-2 space-y-4 rounded-lg border p-3">
+                      <div className="scroll-mt-28" ref={registerFieldRef('recurrenceType')}>
+                        <FormField
+                          control={form.control}
+                          name="recurrenceType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Frequência</FormLabel>
+                              <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="NONE">Nenhuma</SelectItem>
+                                  <SelectItem value="WEEKLY">Semanal</SelectItem>
+                                  <SelectItem value="BIWEEKLY">Quinzenal</SelectItem>
+                                  <SelectItem value="MONTHLY">Mensal</SelectItem>
+                                  <SelectItem value="BIMONTHLY">Bimestral</SelectItem>
+                                  <SelectItem value="TRIMONTHLY">Trimestral</SelectItem>
+                                  <SelectItem value="SEMIANNUALLY">Semestral</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </OptionalSection>
+
+            <OptionalSection
+              title="Detalhes adicionais"
+              description="Categoria, tags, anexos e observações."
+              isOpen={optionalSections.extras}
+              onToggle={() => toggleOptionalSection('extras')}
+            >
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="scroll-mt-28" ref={registerFieldRef('categoryId')}>
+                    <FormField
+                      control={form.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Categoria</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione a categoria" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {filteredCategories.map((cat) => (
+                                <SelectItem key={cat.id} value={cat.id}>
+                                  {cat.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {favoriteCategorySuggestions.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <span className="w-full text-[11px] uppercase tracking-wide text-muted-foreground">
+                                Sugestões
+                              </span>
+                              {favoriteCategorySuggestions.map((cat) => (
+                                <Button
+                                  key={cat.id}
+                                  type="button"
+                                  size="xs"
+                                  variant={field.value === cat.id ? 'default' : 'outline'}
+                                  onClick={(event) => {
+                                    event.preventDefault();
+                                    field.onChange(cat.id);
+                                  }}
+                                >
+                                  {cat.label}
+                                </Button>
+                              ))}
                             </div>
-                        </motion.div>
-                    </CollapsibleContent>
-                </Collapsible>
-            </>
+                          )}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="scroll-mt-28" ref={registerFieldRef('tags')}>
+                    <FormField
+                      control={form.control}
+                      name="tags"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tags</FormLabel>
+                          <FormControl>
+                            <TagInput
+                              allTags={userTags}
+                              selectedTags={field.value || []}
+                              onChange={(newTags) => field.onChange(newTags)}
+                              onTagsUpdate={setUserTags}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="scroll-mt-28" ref={registerFieldRef('attachmentUrl')}>
+                    <FormField
+                      control={form.control}
+                      name="attachmentUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Comprovante</FormLabel>
+                          <FormControl>
+                            {field.value ? (
+                              <AttachmentPreviewer objectName={field.value} onRemove={() => form.setValue('attachmentUrl', null)} />
+                            ) : (
+                              <FileUpload onValueChange={(objectName) => field.onChange(objectName)} />
+                            )}
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="scroll-mt-28 md:col-span-2" ref={registerFieldRef('notes')}>
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Observações</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="Detalhes adicionais..." {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+            </OptionalSection>
+          </div>
         )}
 
         <div className="flex flex-col-reverse sm:flex-row sm:justify-end pt-6 gap-2">

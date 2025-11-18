@@ -322,6 +322,86 @@ export type FamilySummary = {
     totalMembers: number;
 };
 
+export type CellBudget = {
+    id: string;
+    cellId: string;
+    categoryId?: string | null;
+    label?: string | null;
+    type: 'CELL' | 'HYBRID' | 'PERSONAL';
+    splitConfig?: Record<string, unknown> | null;
+    fundId?: string | null;
+    limit: number;
+    effectiveFrom?: string | null;
+    effectiveTo?: string | null;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type CellFundContribution = {
+    id: string;
+    fundId: string;
+    userId: string;
+    amount: number;
+    source?: string | null;
+    fromBudgetId?: string | null;
+    metadata?: Record<string, unknown> | null;
+    createdAt: string;
+};
+
+export type CellFund = {
+    id: string;
+    cellId: string;
+    name: string;
+    targetAmount: number;
+    currentAmount: number;
+    usagePolicy?: Record<string, unknown> | null;
+    status: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
+    goalDeadline?: string | null;
+    contributions: CellFundContribution[];
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type CellSplitRule = {
+    id: string;
+    cellId: string;
+    name: string;
+    trigger: 'RECURRING_BILL' | 'ADHOC' | 'USAGE_BASED';
+    method: 'EQUAL' | 'WEIGHTED' | 'CONSUMPTION' | 'PAYER_REIMBURSED';
+    weightsConfig?: Record<string, unknown> | null;
+    consumptionMetric?: string | null;
+    autoReimburse: boolean;
+    active: boolean;
+    metadata?: Record<string, unknown> | null;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type CellDecision = {
+    id: string;
+    cellId: string;
+    title: string;
+    description?: string | null;
+    payload: Record<string, unknown>;
+    createdAt: string;
+};
+
+export type CellTimelineEvent = {
+    id: string;
+    cellId: string;
+    actorId?: string | null;
+    type: string;
+    title?: string | null;
+    description?: string | null;
+    payload?: Record<string, unknown> | null;
+    createdAt: string;
+};
+
+export type CellEquilibriumEntry = {
+    userId: string;
+    balance: number;
+};
+
 export type FinancialOverview = {
     monthSummary: {
         received: number;

@@ -32,7 +32,11 @@
     "BudgetType": ["MONTHLY", "WEEKLY", "CUSTOM"],
     "LedgerDirection": ["DEBIT", "CREDIT"],
     "RecurringBillStatus": ["ACTIVE", "PAUSED", "CANCELLED"],
-    "BillPaymentStatus": ["PENDING", "PAID", "SKIPPED", "FAILED"]
+    "BillPaymentStatus": ["PENDING", "PAID", "SKIPPED", "FAILED"],
+    "CellBudgetType": ["CELL", "HYBRID", "PERSONAL"],
+    "CellFundStatus": ["ACTIVE", "PAUSED", "COMPLETED"],
+    "CellSplitTrigger": ["RECURRING_BILL", "ADHOC", "USAGE_BASED"],
+    "CellSplitMethod": ["EQUAL", "WEIGHTED", "CONSUMPTION", "PAYER_REIMBURSED"]
   },
   "models": {
     "User": {
@@ -93,6 +97,7 @@
         "transactions": { "type": "Transaction", "isList": true },
         "unlockedAchievements": { "type": "UnlockedAchievement", "isList": true },
         "notifications": { "type": "Notification", "isList": true },
+        "cellEvents": { "type": "CellEvent", "isList": true, "relation": { "name": "UserCellEvents" } },
         "budgets": { "type": "Budget", "isList": true },
         "goals": { "type": "Goal", "isList": true },
         "automations": { "type": "Automation", "isList": true },
@@ -111,7 +116,8 @@
         "attachments": { "type": "Attachment", "isList": true },
         "devices": { "type": "UserDevice", "isList": true },
         "securityEvents": { "type": "SecurityEvent", "isList": true },
-        "favoriteCategoryLinks": { "type": "UserFavoriteCategory", "isList": true }
+        "favoriteCategoryLinks": { "type": "UserFavoriteCategory", "isList": true },
+        "cellFundContributions": { "type": "CellFundContribution", "isList": true }
       }
     },
     "Clan": {
@@ -134,9 +140,14 @@
         "members": { "type": "ClanMember", "isList": true, "relation": { "name": "ClanToMembers" } },
         "invites": { "type": "ClanInvite", "isList": true },
         "goals": { "type": "Goal", "isList": true },
-        "sharedExpenses": { "type": "SharedExpense", "isList": true }
+        "sharedExpenses": { "type": "SharedExpense", "isList": true },
+        "events": { "type": "CellEvent", "isList": true, "relation": { "name": "ClanCellEvents" } },
+        "cellBudgets": { "type": "CellBudget", "isList": true },
+        "cellFunds": { "type": "CellFund", "isList": true },
+        "cellSplitRules": { "type": "CellSplitRule", "isList": true },
+        "cellEquilibriumSnapshots": { "type": "CellEquilibriumSnapshot", "isList": true }
       },
-      "map": "clans"
+      "map": "family_cells"
     },
     "ClanMember": {
       "fields": {
@@ -144,13 +155,22 @@
         "clanId": { "type": "String" },
         "role": { "type": "ClanRole", "attributes": ["@default(MEMBER)"] },
         "joinedAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+        ,
+        "permissions": {
+          "type": "Json",
+          "attributes": [
+            "@default(\"{}\")",
+            "@map(\"permissions_json\")"
+          ],
+          "comment": "Permissões granulares (manageMembers, manageBudgets, recordTransactions, moveFunds, viewPersonalBudget, manageFunds, vote, approveSplits)"
+        }
       },
       "relations": {
         "user": { "type": "User", "relation": { "name": "UserToClan", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
         "clan": { "type": "Clan", "relation": { "name": "ClanToMembers", "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } }
       },
       "indices": [{ "fields": ["userId", "clanId"], "isId": true }],
-      "map": "clan_members"
+      "map": "cell_members"
     },
     "ClanInvite": {
       "fields": {
@@ -167,7 +187,7 @@
         "invitedUser": { "type": "User", "relation": { "name": "UserInvites", "fields": ["invitedUserId"], "references": ["id"], "onDelete": "Cascade" } }
       },
       "indices": [{ "fields": ["clanId", "invitedUserId"], "unique": true }],
-      "map": "clan_invites"
+      "map": "cell_invites"
     },
     "SharedExpense": {
       "fields": {
@@ -185,7 +205,8 @@
         "creator": { "type": "User", "relation": { "name": "ExpenseCreator", "fields": ["creatorId"], "references": ["id"], "onDelete": "NoAction" } },
         "category": { "type": "Category", "relation": { "name": "Category_SharedExpense", "fields": ["categoryId"], "references": ["id"], "onDelete": "NoAction" } },
         "participants": { "type": "SharedExpenseParticipant", "isList": true, "relation": { "name": "SharedExpense_Participants" } }
-      }
+      },
+      "map": "cell_expenses"
     },
     "SharedExpenseParticipant": {
       "fields": {
@@ -200,7 +221,152 @@
         "user": { "type": "User", "relation": { "name": "User_SharedExpenseParticipants", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
         "transaction": { "type": "Transaction", "relation": { "name": "GeneratedTransactionForParticipant", "fields": ["createdTransactionId"], "references": ["id"] } }
       },
-      "indices": [{ "fields": ["sharedExpenseId", "userId"], "unique": true }]
+      "indices": [{ "fields": ["sharedExpenseId", "userId"], "unique": true }],
+      "map": "cell_expense_splits"
+    },
+    "CellBudget": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "cellId": { "type": "String" },
+        "categoryId": { "type": "String", "optional": true },
+        "label": { "type": "String", "optional": true },
+        "type": { "type": "CellBudgetType", "attributes": ["@default(CELL)"] },
+        "splitConfig": { "type": "Json", "optional": true },
+        "fundId": { "type": "String", "optional": true },
+        "limit": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "effectiveFrom": { "type": "DateTime", "optional": true },
+        "effectiveTo": { "type": "DateTime", "optional": true },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
+      },
+      "relations": {
+        "cell": { "type": "Clan", "relation": { "fields": ["cellId"], "references": ["id"], "onDelete": "Cascade" } },
+        "category": { "type": "Category", "optional": true, "relation": { "fields": ["categoryId"], "references": ["id"], "onDelete": "SetNull" } },
+        "fund": { "type": "CellFund", "optional": true, "relation": { "name": "CellFundToBudgets", "fields": ["fundId"], "references": ["id"], "onDelete": "SetNull" } },
+        "fundContributions": { "type": "CellFundContribution", "isList": true, "relation": { "name": "BudgetToContribution" } }
+      },
+      "indices": [
+        { "fields": ["cellId"] },
+        { "fields": ["cellId", "type"] }
+      ],
+      "map": "cell_budgets"
+    },
+    "CellFund": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "cellId": { "type": "String" },
+        "name": { "type": "String" },
+        "targetAmount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "currentAmount": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
+        "usagePolicy": { "type": "Json", "optional": true },
+        "status": { "type": "CellFundStatus", "attributes": ["@default(ACTIVE)"] },
+        "goalDeadline": { "type": "DateTime", "optional": true },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
+      },
+      "relations": {
+        "cell": { "type": "Clan", "relation": { "fields": ["cellId"], "references": ["id"], "onDelete": "Cascade" } },
+        "contributions": { "type": "CellFundContribution", "isList": true },
+        "budgets": { "type": "CellBudget", "isList": true, "relation": { "name": "CellFundToBudgets" } }
+      },
+      "indices": [{ "fields": ["cellId"] }],
+      "map": "cell_funds"
+    },
+    "CellFundContribution": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "fundId": { "type": "String" },
+        "userId": { "type": "String" },
+        "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "source": { "type": "String", "optional": true },
+        "fromBudgetId": { "type": "String", "optional": true },
+        "metadata": { "type": "Json", "optional": true },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "fund": { "type": "CellFund", "relation": { "fields": ["fundId"], "references": ["id"], "onDelete": "Cascade" } },
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "fromBudget": { "type": "CellBudget", "optional": true, "relation": { "name": "BudgetToContribution", "fields": ["fromBudgetId"], "references": ["id"], "onDelete": "SetNull" } }
+      },
+      "indices": [{ "fields": ["fundId", "createdAt"] }],
+      "map": "cell_fund_contributions"
+    },
+    "CellSplitRule": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "cellId": { "type": "String" },
+        "name": { "type": "String" },
+        "trigger": { "type": "CellSplitTrigger", "attributes": ["@default(ADHOC)"] },
+        "method": { "type": "CellSplitMethod", "attributes": ["@default(EQUAL)"] },
+        "weightsConfig": { "type": "Json", "optional": true },
+        "consumptionMetric": { "type": "String", "optional": true },
+        "autoReimburse": { "type": "Boolean", "attributes": ["@default(false)"] },
+        "active": { "type": "Boolean", "attributes": ["@default(true)"] },
+        "metadata": { "type": "Json", "optional": true },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
+      },
+      "relations": {
+        "cell": { "type": "Clan", "relation": { "fields": ["cellId"], "references": ["id"], "onDelete": "Cascade" } }
+      },
+      "indices": [{ "fields": ["cellId", "active"] }],
+      "map": "cell_split_rules"
+    },
+    "CellEquilibriumSnapshot": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "cellId": { "type": "String" },
+        "referenceMonth": { "type": "String" },
+        "summary": { "type": "Json" },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "cell": { "type": "Clan", "relation": { "fields": ["cellId"], "references": ["id"], "onDelete": "Cascade" } }
+      },
+      "indices": [{ "fields": ["cellId", "referenceMonth"], "unique": true }],
+      "map": "cell_equilibrium_snapshots"
+    },
+    "CellEvent": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "cellId": { "type": "String" },
+        "actorId": { "type": "String", "optional": true },
+        "type": { "type": "String" },
+        "title": { "type": "String", "optional": true },
+        "description": { "type": "String", "optional": true },
+        "payload": { "type": "Json", "optional": true },
+        "entityId": { "type": "String", "optional": true },
+        "entityType": { "type": "String", "optional": true },
+        "visibility": { "type": "String", "attributes": ["@default(\"CELL\")"] },
+        "sourceAuditLogId": { "type": "String", "optional": true, "attributes": ["@unique"] },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "cell": {
+          "type": "Clan",
+          "relation": {
+            "name": "ClanCellEvents",
+            "fields": ["cellId"],
+            "references": ["id"],
+            "onDelete": "Cascade"
+          }
+        },
+        "actor": {
+          "type": "User",
+          "optional": true,
+          "relation": {
+            "name": "UserCellEvents",
+            "fields": ["actorId"],
+            "references": ["id"],
+            "onDelete": "SetNull"
+          }
+        }
+      },
+      "indices": [
+        { "fields": ["cellId", "createdAt"] },
+        { "fields": ["entityId", "entityType"] }
+      ],
+      "map": "cell_events"
     },
     "LegacyRuin": {
       "fields": {
@@ -566,8 +732,9 @@
             "transactions": { "type": "Transaction", "isList": true, "relation": { "name": "Transaction_category" } },
             "budgets": { "type": "Budget", "isList": true, "relation": { "name": "Budget_category" } },
             "categorizationRules": { "type": "CategorizationRule", "isList": true, "relation": { "name": "CategorizationRule_category" } },
-            "sharedExpenses": { "type": "SharedExpense", "isList": true, "relation": { "name": "Category_SharedExpense" } },
-            "recurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_category" } },
+        "sharedExpenses": { "type": "SharedExpense", "isList": true, "relation": { "name": "Category_SharedExpense" } },
+        "recurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_category" } },
+        "cellBudgets": { "type": "CellBudget", "isList": true },
             "parentCategory": { "type": "Category", "optional": true, "relation": { "name": "CategoryHierarchy", "fields": ["parentCategoryId"], "references": ["id"], "onDelete": "NoAction", "onUpdate": "NoAction" } },
             "subcategories": { "type": "Category", "isList": true, "relation": { "name": "CategoryHierarchy" } },
             "favoriteUsers": { "type": "UserFavoriteCategory", "isList": true },

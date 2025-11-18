@@ -4,6 +4,7 @@ import config from './src/config/config.js';
 import { PrismaClient } from '@prisma/client';
 import { redisClient } from './src/config/redis.js';
 import minioClient from './src/config/minioClient.js';
+import { scheduleDefaultCellJobs } from './src/queues/cellJobsQueue.js';
 
 const prisma = new PrismaClient();
 
@@ -22,6 +23,9 @@ const startServer = async () => {
             throw new Error('Ping para o Redis não retornou "PONG"');
         }
         console.log('✅ [OK] Conectado ao Redis com sucesso.');
+        await scheduleDefaultCellJobs().catch((err) => {
+            console.error('⚠️  Não foi possível agendar os jobs de células:', err);
+        });
 
         // 3. Testa MinIO e garante bucket
         console.log('Validando conexão com o MinIO...');

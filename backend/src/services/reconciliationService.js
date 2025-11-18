@@ -7,7 +7,17 @@ import pkg from 'string-similarity-js';
 import minioClient from '../config/minioClient.js';
 import config from '../config/config.js';
 
-const { findBestMatch: findBestStringMatch } = pkg;
+const findBestStringMatch =
+  pkg?.findBestMatch ||
+  ((source, target) => {
+    const baseScore =
+      typeof pkg?.getStringSimilarity === 'function'
+        ? pkg.getStringSimilarity(source, target)
+        : source === target
+          ? 1
+          : 0;
+    return { bestMatch: { rating: baseScore } };
+  });
 
 
 const prisma = new PrismaClient();

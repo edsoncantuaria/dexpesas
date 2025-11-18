@@ -109,9 +109,9 @@ const baseServiceItems: ServiceItem[] = [
         iconBgClass: 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400'
     },
     {
-        href: '/dashboard/clans',
-        title: 'Modo Família',
-        description: 'Gerencie finanças em conjunto',
+        href: '/dashboard/cells',
+        title: 'Células Financeiras',
+        description: 'Gerencie budgets híbridos e rateios inteligentes',
         Icon: Users,
         iconBgClass: 'bg-gray-100 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400'
     },

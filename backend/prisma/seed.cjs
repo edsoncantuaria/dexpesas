@@ -7,8 +7,13 @@ const prisma = new PrismaClient();
 async function main() {
   console.log(`Iniciando o seeding do banco de dados...`);
 
+  // Remove categorias globais anteriores (userId null) para evitar duplicidades.
+  await prisma.category.deleteMany({
+    where: { userId: null },
+  });
+
   // Cria as categorias padrão.
-  // Usar createMany com skipDuplicates é idempotente e seguro.
+  // Usar createMany com skipDuplicates reforça a idempotência caso existam registros remanescentes.
   await prisma.category.createMany({
     data: defaultCategories,
     skipDuplicates: true,

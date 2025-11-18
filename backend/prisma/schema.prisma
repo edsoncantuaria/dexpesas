@@ -213,6 +213,31 @@ enum BillPaymentStatus {
   FAILED
 }
 
+enum CellBudgetType {
+  CELL
+  HYBRID
+  PERSONAL
+}
+
+enum CellFundStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum CellSplitTrigger {
+  RECURRING_BILL
+  ADHOC
+  USAGE_BASED
+}
+
+enum CellSplitMethod {
+  EQUAL
+  WEIGHTED
+  CONSUMPTION
+  PAYER_REIMBURSED
+}
+
 model User {
   id                   String @id @default(cuid())
   name                 String
@@ -270,6 +295,7 @@ model User {
   transactions         Transaction[]
   unlockedAchievements UnlockedAchievement[]
   notifications        Notification[]
+  cellEvents           CellEvent[] @relation("UserCellEvents")
   budgets              Budget[]
   goals                Goal[]
   automations          Automation[]
@@ -289,6 +315,7 @@ model User {
   devices              UserDevice[]
   securityEvents       SecurityEvent[]
   favoriteCategoryLinks UserFavoriteCategory[]
+  cellFundContributions CellFundContribution[]
 
 }
 
@@ -313,8 +340,13 @@ model Clan {
   invites              ClanInvite[]
   goals                Goal[]
   sharedExpenses       SharedExpense[]
+  events               CellEvent[] @relation("ClanCellEvents")
+  cellBudgets          CellBudget[]
+  cellFunds            CellFund[]
+  cellSplitRules       CellSplitRule[]
+  cellEquilibriumSnapshots CellEquilibriumSnapshot[]
 
-  @@map("clans")
+  @@map("family_cells")
 }
 
 model ClanMember {
@@ -322,13 +354,15 @@ model ClanMember {
   clanId               String
   role                 ClanRole @default(MEMBER)
   joinedAt             DateTime @default(now())
+  /// Permissões granulares (manageMembers, manageBudgets, recordTransactions, moveFunds, viewPersonalBudget, manageFunds, vote, approveSplits)
+  permissions          Json @default("{}") @map("permissions_json")
 
   // --- Relações ---
   user                 User @relation("UserToClan", fields: [userId], references: [id], onDelete: Cascade)
   clan                 Clan @relation("ClanToMembers", fields: [clanId], references: [id], onDelete: Cascade)
 
   @@id([userId, clanId])
-  @@map("clan_members")
+  @@map("cell_members")
 }
 
 model ClanInvite {
@@ -345,7 +379,7 @@ model ClanInvite {
   invitedUser          User @relation("UserInvites", fields: [invitedUserId], references: [id], onDelete: Cascade)
 
   @@unique([clanId, invitedUserId])
-  @@map("clan_invites")
+  @@map("cell_invites")
 }
 
 model SharedExpense {
@@ -364,6 +398,7 @@ model SharedExpense {
   category             Category @relation("Category_SharedExpense", fields: [categoryId], references: [id], onDelete: NoAction)
   participants         SharedExpenseParticipant[] @relation("SharedExpense_Participants")
 
+  @@map("cell_expenses")
 }
 
 model SharedExpenseParticipant {
@@ -379,6 +414,130 @@ model SharedExpenseParticipant {
   transaction          Transaction @relation("GeneratedTransactionForParticipant", fields: [createdTransactionId], references: [id])
 
   @@unique([sharedExpenseId, userId])
+  @@map("cell_expense_splits")
+}
+
+model CellBudget {
+  id                   String @id @default(cuid())
+  cellId               String
+  categoryId           String?
+  label                String?
+  type                 CellBudgetType @default(CELL)
+  splitConfig          Json?
+  fundId               String?
+  limit                Decimal @db.Decimal(18, 4)
+  effectiveFrom        DateTime?
+  effectiveTo          DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // --- Relações ---
+  cell                 Clan @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  category             Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  fund                 CellFund? @relation("CellFundToBudgets", fields: [fundId], references: [id], onDelete: SetNull)
+  fundContributions    CellFundContribution[] @relation("BudgetToContribution")
+
+  @@index([cellId])
+  @@index([cellId, type])
+  @@map("cell_budgets")
+}
+
+model CellFund {
+  id                   String @id @default(cuid())
+  cellId               String
+  name                 String
+  targetAmount         Decimal @db.Decimal(18, 4)
+  currentAmount        Decimal @default(0) @db.Decimal(18, 4)
+  usagePolicy          Json?
+  status               CellFundStatus @default(ACTIVE)
+  goalDeadline         DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // --- Relações ---
+  cell                 Clan @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  contributions        CellFundContribution[]
+  budgets              CellBudget[] @relation("CellFundToBudgets")
+
+  @@index([cellId])
+  @@map("cell_funds")
+}
+
+model CellFundContribution {
+  id                   String @id @default(cuid())
+  fundId               String
+  userId               String
+  amount               Decimal @db.Decimal(18, 4)
+  source               String?
+  fromBudgetId         String?
+  metadata             Json?
+  createdAt            DateTime @default(now())
+
+  // --- Relações ---
+  fund                 CellFund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromBudget           CellBudget? @relation("BudgetToContribution", fields: [fromBudgetId], references: [id], onDelete: SetNull)
+
+  @@index([fundId, createdAt])
+  @@map("cell_fund_contributions")
+}
+
+model CellSplitRule {
+  id                   String @id @default(cuid())
+  cellId               String
+  name                 String
+  trigger              CellSplitTrigger @default(ADHOC)
+  method               CellSplitMethod @default(EQUAL)
+  weightsConfig        Json?
+  consumptionMetric    String?
+  autoReimburse        Boolean @default(false)
+  active               Boolean @default(true)
+  metadata             Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // --- Relações ---
+  cell                 Clan @relation(fields: [cellId], references: [id], onDelete: Cascade)
+
+  @@index([cellId, active])
+  @@map("cell_split_rules")
+}
+
+model CellEquilibriumSnapshot {
+  id                   String @id @default(cuid())
+  cellId               String
+  referenceMonth       String
+  summary              Json
+  createdAt            DateTime @default(now())
+
+  // --- Relações ---
+  cell                 Clan @relation(fields: [cellId], references: [id], onDelete: Cascade)
+
+  @@unique([cellId, referenceMonth])
+  @@map("cell_equilibrium_snapshots")
+}
+
+model CellEvent {
+  id                   String @id @default(cuid())
+  cellId               String
+  actorId              String?
+  type                 String
+  title                String?
+  description          String?
+  payload              Json?
+  entityId             String?
+  entityType           String?
+  visibility           String @default("CELL")
+  sourceAuditLogId     String? @unique
+  createdAt            DateTime @default(now())
+
+  // --- Relações ---
+  cell                 Clan @relation("ClanCellEvents", fields: [cellId], references: [id], onDelete: Cascade)
+  actor                User? @relation("UserCellEvents", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([cellId, createdAt])
+  @@index([entityId, entityType])
+  @@map("cell_events")
 }
 
 model LegacyRuin {
@@ -741,6 +900,7 @@ model Category {
   categorizationRules  CategorizationRule[] @relation("CategorizationRule_category")
   sharedExpenses       SharedExpense[] @relation("Category_SharedExpense")
   recurringBills       RecurringBill[] @relation("RecurringBill_category")
+  cellBudgets          CellBudget[]
   parentCategory       Category? @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subcategories        Category[] @relation("CategoryHierarchy")
   favoriteUsers        UserFavoriteCategory[]

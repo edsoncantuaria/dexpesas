@@ -1,0 +1,55 @@
+// backend/src/routes/cellRoutes.js
+import express from 'express';
+import authMiddleware from '../middlewares/authMiddleware.js';
+import cellController from '../controllers/cellController.js';
+import validate from '../middlewares/validate.js';
+import {
+  cellSchema,
+  cellBudgetSchema,
+  cellFundSchema,
+  cellFundContributionSchema,
+  cellSplitRuleSchema,
+  cellDecisionSchema,
+  cellVoteSchema,
+  splitEngineSchema,
+  cellInviteSchema,
+  cellAcceptInviteSchema,
+} from '../validators/cellSchema.js';
+
+const router = express.Router();
+
+router.use(authMiddleware);
+
+router.get('/', cellController.listCells);
+router.post('/', validate(cellSchema), cellController.createCell);
+router.get('/:cellId', cellController.getCellDetails);
+
+router.get('/:cellId/budgets', cellController.listBudgets);
+router.post('/:cellId/budgets', validate(cellBudgetSchema), cellController.createBudget);
+router.patch('/budgets/:budgetId', validate(cellBudgetSchema.partial()), cellController.updateBudget);
+router.delete('/budgets/:budgetId', cellController.deleteBudget);
+
+router.get('/:cellId/funds', cellController.listFunds);
+router.post('/:cellId/funds', validate(cellFundSchema), cellController.createFund);
+router.post('/funds/:fundId/contributions', validate(cellFundContributionSchema), cellController.contributeToFund);
+
+router.get('/:cellId/split-rules', cellController.listSplitRules);
+router.post('/:cellId/split-rules', validate(cellSplitRuleSchema), cellController.createSplitRule);
+router.post('/:cellId/split-engine', validate(splitEngineSchema), cellController.runSplitEngine);
+
+router.get('/:cellId/decisions', cellController.listDecisions);
+router.post('/:cellId/decisions', validate(cellDecisionSchema), cellController.createDecision);
+router.post('/:cellId/decisions/:decisionId/vote', validate(cellVoteSchema), cellController.voteDecision);
+
+router.get('/:cellId/timeline', cellController.listTimeline);
+
+router.get('/:cellId/equilibrium', cellController.getEquilibrium);
+
+router.get('/:cellId/alerts', cellController.listAlerts);
+
+router.post('/:cellId/invite', validate(cellInviteSchema), cellController.inviteMember);
+router.get('/invites/pending', cellController.listPendingInvites);
+router.post('/invites/:inviteId/accept', validate(cellAcceptInviteSchema), cellController.acceptInvite);
+router.post('/invites/:inviteId/decline', cellController.declineInvite);
+
+export default router;

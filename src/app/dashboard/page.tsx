@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
-import type { User, GamificationProfile, Account, Card as CardType, Goal, Budget, Achievement, UnlockedAchievement, AuditLog, Boss, Clan, Transaction } from '@/lib/definitions';
+import type { User, GamificationProfile, Account, Card as CardType, Goal, Budget, Achievement, UnlockedAchievement, AuditLog, Boss, Clan, Transaction, CellBudget, CellFund } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { LoadingScreen } from '@/components/ui/loading-screen';
@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useClassicModeNotice } from '@/hooks/use-classic-mode-notice';
+import { CellSummaryCard } from '@/components/dashboard/overview/cell-summary-card';
 
 const cardComponents: { [key: string]: React.ComponentType<any> } = {
     account_book: AccountBookCard,
@@ -34,6 +35,8 @@ function DashboardPageContent() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [clan, setClan] = useState<Clan | null>(null);
+  const [cellBudgets, setCellBudgets] = useState<CellBudget[]>([]);
+  const [cellFunds, setCellFunds] = useState<CellFund[]>([]);
   const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievement[]>([]);
   const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
   const [timelineLogs, setTimelineLogs] = useState<AuditLog[]>([]);
@@ -137,14 +140,24 @@ function DashboardPageContent() {
 
         if (currentUser?.clanId) {
           try {
-            const clanRes = await api.get(`/familia/${currentUser.clanId}`);
-            setClan(clanRes.data);
+            const [cellRes, budgetsRes, fundsRes] = await Promise.all([
+              api.get(`/cells/${currentUser.clanId}`),
+              api.get(`/cells/${currentUser.clanId}/budgets`),
+              api.get(`/cells/${currentUser.clanId}/funds`),
+            ]);
+            setClan(cellRes.data);
+            setCellBudgets(budgetsRes.data);
+            setCellFunds(fundsRes.data);
           } catch (clanError) {
-            console.warn('Não foi possível buscar os dados da família. O usuário pode ter saído.', clanError);
+            console.warn('Não foi possível buscar os dados da célula. O usuário pode ter saído.', clanError);
             setClan(null);
+            setCellBudgets([]);
+            setCellFunds([]);
           }
         } else {
           setClan(null);
+          setCellBudgets([]);
+          setCellFunds([]);
         }
       } catch (error) {
         console.warn('Erro ao carregar dados de gamificação', error);
@@ -263,6 +276,9 @@ function DashboardPageContent() {
           allAchievements={allAchievements}
           unlockedAchievements={unlockedAchievements}
         />
+      )}
+      {clan && (
+        <CellSummaryCard cell={clan} funds={cellFunds} budgets={cellBudgets} />
       )}
       {isGamificationEnabled && !profile && (
         <div className="rounded-lg border border-dashed bg-muted/30 p-6 text-sm text-muted-foreground">

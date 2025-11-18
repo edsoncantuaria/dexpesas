@@ -83,7 +83,7 @@ export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchi
                 <div className="flex items-baseline gap-2">
                     <h1 className="text-2xl font-bold font-headline">{user.name}</h1>
                     {clan && (
-                        <Link href="/dashboard/clans" className="text-sm italic text-muted-foreground hover:underline flex items-center gap-1">
+                        <Link href="/dashboard/cells" className="text-sm italic text-muted-foreground hover:underline flex items-center gap-1">
                             <Users className="h-3 w-3"/>{clan.name}
                         </Link>
                     )}
