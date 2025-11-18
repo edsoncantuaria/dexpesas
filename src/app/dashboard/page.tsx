@@ -138,18 +138,23 @@ function DashboardPageContent() {
           });
         }
 
-        if (currentUser?.clanId) {
+        const resolvedCellId =
+          currentUser?.clanId ||
+          currentUser?.clanMembership?.clanId ||
+          currentUser?.clanMemberships?.[0]?.clanId;
+
+        if (resolvedCellId) {
           try {
             const [cellRes, budgetsRes, fundsRes] = await Promise.all([
-              api.get(`/cells/${currentUser.clanId}`),
-              api.get(`/cells/${currentUser.clanId}/budgets`),
-              api.get(`/cells/${currentUser.clanId}/funds`),
+              api.get(`/cells/${resolvedCellId}`),
+              api.get(`/cells/${resolvedCellId}/budgets`),
+              api.get(`/cells/${resolvedCellId}/funds`),
             ]);
             setClan(cellRes.data);
             setCellBudgets(budgetsRes.data);
             setCellFunds(fundsRes.data);
           } catch (clanError) {
-            console.warn('Não foi possível buscar os dados da célula. O usuário pode ter saído.', clanError);
+            console.warn('Não foi possível buscar os dados da família. O usuário pode ter saído.', clanError);
             setClan(null);
             setCellBudgets([]);
             setCellFunds([]);

@@ -133,7 +133,7 @@ const CACHE_KEYS = {
 
 class DataController {
     async getAllCategories(req, res, next) {
-        const cacheKey = CACHE_KEYS.CATEGORIES;
+        const cacheKey = `${CACHE_KEYS.CATEGORIES}:global`;
         try {
             // 1. Tenta buscar do cache primeiro
             const cachedCategories = await CacheService.get(cacheKey);
@@ -143,9 +143,9 @@ class DataController {
 
             // 2. Se não estiver no cache, busca no banco
             const categories = await prisma.category.findMany({
-                orderBy: {
-                    label: 'asc',
-                }
+                where: { userId: null },
+                select: { id: true, nome: true, label: true, icon: true, type: true, parentCategoryId: true },
+                orderBy: { label: 'asc' },
             });
             
             // 3. Salva no cache por 1 hora (3600 segundos)

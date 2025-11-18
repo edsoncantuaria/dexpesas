@@ -36,7 +36,9 @@
     "CellBudgetType": ["CELL", "HYBRID", "PERSONAL"],
     "CellFundStatus": ["ACTIVE", "PAUSED", "COMPLETED"],
     "CellSplitTrigger": ["RECURRING_BILL", "ADHOC", "USAGE_BASED"],
-    "CellSplitMethod": ["EQUAL", "WEIGHTED", "CONSUMPTION", "PAYER_REIMBURSED"]
+    "CellSplitMethod": ["EQUAL", "WEIGHTED", "CONSUMPTION", "PAYER_REIMBURSED"],
+    "CellBudgetRecurrence": ["MONTHLY", "WEEKLY", "BIWEEKLY", "CUSTOM"],
+    "CellSharedAccountVisibility": ["MEMBERS", "ADMINS", "CUSTOM"]
   },
   "models": {
     "User": {
@@ -145,7 +147,8 @@
         "cellBudgets": { "type": "CellBudget", "isList": true },
         "cellFunds": { "type": "CellFund", "isList": true },
         "cellSplitRules": { "type": "CellSplitRule", "isList": true },
-        "cellEquilibriumSnapshots": { "type": "CellEquilibriumSnapshot", "isList": true }
+        "cellEquilibriumSnapshots": { "type": "CellEquilibriumSnapshot", "isList": true },
+        "sharedAccounts": { "type": "CellSharedAccount", "isList": true, "relation": { "name": "ClanSharedAccounts" } }
       },
       "map": "family_cells"
     },
@@ -198,7 +201,8 @@
         "totalAmount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
         "splitMethod": { "type": "SplitMethod" },
         "categoryId": { "type": "String" },
-        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "splitAppliedAt": { "type": "DateTime", "optional": true }
       },
       "relations": {
         "clan": { "type": "Clan", "relation": { "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
@@ -231,19 +235,23 @@
         "categoryId": { "type": "String", "optional": true },
         "label": { "type": "String", "optional": true },
         "type": { "type": "CellBudgetType", "attributes": ["@default(CELL)"] },
+        "recurrenceType": { "type": "CellBudgetRecurrence", "attributes": ["@default(MONTHLY)"] },
+        "recurrenceDays": { "type": "Int", "optional": true },
         "splitConfig": { "type": "Json", "optional": true },
         "fundId": { "type": "String", "optional": true },
         "limit": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
         "effectiveFrom": { "type": "DateTime", "optional": true },
         "effectiveTo": { "type": "DateTime", "optional": true },
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
-        "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
+        "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] },
+        "lastSyncedAt": { "type": "DateTime", "optional": true }
       },
       "relations": {
         "cell": { "type": "Clan", "relation": { "fields": ["cellId"], "references": ["id"], "onDelete": "Cascade" } },
         "category": { "type": "Category", "optional": true, "relation": { "fields": ["categoryId"], "references": ["id"], "onDelete": "SetNull" } },
         "fund": { "type": "CellFund", "optional": true, "relation": { "name": "CellFundToBudgets", "fields": ["fundId"], "references": ["id"], "onDelete": "SetNull" } },
-        "fundContributions": { "type": "CellFundContribution", "isList": true, "relation": { "name": "BudgetToContribution" } }
+        "fundContributions": { "type": "CellFundContribution", "isList": true, "relation": { "name": "BudgetToContribution" } },
+        "personalMirrors": { "type": "Budget", "isList": true, "relation": { "name": "BudgetToCellBudget" } }
       },
       "indices": [
         { "fields": ["cellId"] },
@@ -290,6 +298,28 @@
       },
       "indices": [{ "fields": ["fundId", "createdAt"] }],
       "map": "cell_fund_contributions"
+    },
+    "CellSharedAccount": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "cellId": { "type": "String" },
+        "accountId": { "type": "String" },
+        "visibility": { "type": "CellSharedAccountVisibility", "attributes": ["@default(MEMBERS)"] },
+        "allowedRoles": { "type": "Json", "attributes": ["@default(\"[]\")"] },
+        "metadata": { "type": "Json", "optional": true },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
+      },
+      "relations": {
+        "cell": { "type": "Clan", "relation": { "name": "ClanSharedAccounts", "fields": ["cellId"], "references": ["id"], "onDelete": "Cascade" } },
+        "account": { "type": "Account", "relation": { "name": "AccountSharedCells", "fields": ["accountId"], "references": ["id"], "onDelete": "Cascade" } }
+      },
+      "indices": [
+        { "fields": ["cellId"] },
+        { "fields": ["accountId"] },
+        { "fields": ["cellId", "accountId"], "unique": true }
+      ],
+      "map": "cell_shared_accounts"
     },
     "CellSplitRule": {
       "fields": {
@@ -470,11 +500,12 @@
             "reconciliations": { "type": "Reconciliation", "isList": true },
             "goals": { "type": "Goal", "isList": true },
             "cardsForPayment": { "type": "Card", "isList": true, "relation": { "name": "Card_paymentAccount" } },
-            "ledgerEntries": { "type": "LedgerEntry", "isList": true },
-            "recurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_BillAccount" } },
-            "autoPayRecurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_AutoPayAccount" } },
-            "budgetAccounts": { "type": "Budget", "isList": true, "relation": { "name": "Budget_account" } }
-        }
+        "ledgerEntries": { "type": "LedgerEntry", "isList": true },
+        "recurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_BillAccount" } },
+        "autoPayRecurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_AutoPayAccount" } },
+        "budgetAccounts": { "type": "Budget", "isList": true, "relation": { "name": "Budget_account" } },
+        "sharedCells": { "type": "CellSharedAccount", "isList": true, "relation": { "name": "AccountSharedCells" } }
+      }
     },
     "Card": {
         "fields": {
@@ -758,15 +789,17 @@
         "includeTransfers": { "type": "Boolean", "attributes": ["@default(false)"] },
         "userId": { "type": "String" },
         "categoryId": { "type": "String" },
-        "accountId": { "type": "String", "optional": true }
+        "accountId": { "type": "String", "optional": true },
+        "cellBudgetId": { "type": "String", "optional": true }
       },
       "relations": {
         "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
         "category": { "type": "Category", "relation": { "name": "Budget_category", "fields": ["categoryId"], "references": ["id"], "onDelete": "Cascade" } },
-        "account": { "type": "Account", "optional": true, "relation": { "name": "Budget_account", "fields": ["accountId"], "references": ["id"], "onDelete": "SetNull" } }
+        "account": { "type": "Account", "optional": true, "relation": { "name": "Budget_account", "fields": ["accountId"], "references": ["id"], "onDelete": "SetNull" } },
+        "cellBudget": { "type": "CellBudget", "optional": true, "relation": { "name": "BudgetToCellBudget", "fields": ["cellBudgetId"], "references": ["id"], "onDelete": "Cascade" } }
       },
       "indices": [
-        { "fields": ["userId", "categoryId", "accountId", "type", "month", "startDate", "endDate"], "unique": true },
+        { "fields": ["userId", "categoryId", "type", "month", "startDate", "endDate", "cellBudgetId"], "unique": true },
         { "fields": ["userId", "startDate", "endDate"] },
         { "fields": ["userId", "month"] }
       ]

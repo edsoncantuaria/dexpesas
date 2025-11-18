@@ -1,7 +1,5 @@
 // backend/src/services/splitEngineService.js
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prismaClient.js';
 
 class SplitEngineService {
   static async listRules(cellId) {
@@ -90,12 +88,12 @@ class SplitEngineService {
         });
 
     if (!rule) {
-      throw new Error('Nenhuma regra de rateio encontrada para a célula.');
+      throw new Error('Nenhuma regra de rateio encontrada para a família.');
     }
 
     const members = expense.clan.members;
     if (!members.length) {
-      throw new Error('Não há membros na célula para aplicar o rateio.');
+      throw new Error('Não há membros na família para aplicar o rateio.');
     }
 
     const splits = this.distributeAmount(
@@ -111,17 +109,28 @@ class SplitEngineService {
       });
 
       for (const split of splits) {
+        const participantEntry = expense.participants.find(
+          (p) => p.userId === split.userId,
+        );
+        if (!participantEntry?.createdTransactionId) {
+          throw new Error(
+            'Despesa compartilhada não possui transação de origem para todos os participantes.',
+          );
+        }
         await tx.sharedExpenseParticipant.create({
           data: {
             sharedExpenseId: expense.id,
             userId: split.userId,
             amountOwed: split.amount,
-            createdTransactionId: expense.participants.find(
-              (p) => p.userId === split.userId,
-            )?.createdTransactionId || null,
+            createdTransactionId: participantEntry.createdTransactionId,
           },
         });
       }
+
+      await tx.sharedExpense.update({
+        where: { id: expense.id },
+        data: { splitAppliedAt: new Date() },
+      });
     });
 
     return splits;

@@ -1,8 +1,8 @@
 // backend/src/services/cellJobsService.js
-import { PrismaClient } from '@prisma/client';
-import { subHours } from 'date-fns';
-
-const prisma = new PrismaClient();
+import { subHours, format, addMonths, parseISO } from 'date-fns';
+import CellBudgetSyncService from './cellBudgetSyncService.js';
+import SplitEngineService from './splitEngineService.js';
+import prisma from '../config/prismaClient.js';
 const eventListeners = [];
 
 export function onCellJobEvent(listener) {
@@ -34,13 +34,17 @@ function emit(job) {
 
 class CellJobsService {
   static async runSplitEngine({ cellId = null, trigger = 'SCHEDULED' } = {}) {
-    const where = cellId ? { id: cellId } : {};
-    const cells = await prisma.clan.findMany({
-      where,
-      select: { id: true, name: true },
+    const pendingExpenses = await prisma.sharedExpense.findMany({
+      where: {
+        splitAppliedAt: null,
+        ...(cellId ? { clanId: cellId } : {}),
+        participants: { some: {} },
+      },
+      select: { id: true, clanId: true },
+      orderBy: { createdAt: 'asc' },
     });
 
-    if (!cells.length) {
+    if (!pendingExpenses.length) {
       emit({
         type: 'CELL_JOB_RUN',
         job: 'SplitEngine',
@@ -48,36 +52,53 @@ class CellJobsService {
         filter: cellId || 'ALL',
         processedCells: 0,
         evaluatedExpenses: 0,
+        appliedExpenses: 0,
+        failedExpenses: 0,
       });
-      return { processedCells: 0, evaluatedExpenses: 0 };
+      return {
+        processedCells: 0,
+        evaluatedExpenses: 0,
+        appliedExpenses: 0,
+        failedExpenses: 0,
+      };
     }
 
-    const expenseTotals = await prisma.sharedExpense.groupBy({
-      by: ['clanId'],
-      _count: { _all: true },
-      where: cellId ? { clanId: cellId } : {},
-    });
+    let appliedExpenses = 0;
+    let failedExpenses = 0;
 
-    const totalsMap = new Map(
-      expenseTotals.map((item) => [item.clanId, item._count._all]),
-    );
+    for (const expense of pendingExpenses) {
+      try {
+        await SplitEngineService.applyRuleToExpense(expense.id);
+        appliedExpenses += 1;
+      } catch (error) {
+        failedExpenses += 1;
+        console.error('[CELL_SPLIT_JOB_ERROR]', {
+          expenseId: expense.id,
+          cellId: expense.clanId,
+          message: error.message,
+        });
+      }
+    }
 
-    const evaluatedExpenses = cells.reduce(
-      (acc, cell) => acc + (totalsMap.get(cell.id) || 0),
-      0,
-    );
+    const processedCells = new Set(
+      pendingExpenses.map((item) => item.clanId),
+    ).size;
 
     emit({
       type: 'CELL_JOB_RUN',
       job: 'SplitEngine',
       trigger,
-      processedCells: cells.length,
-      evaluatedExpenses,
+      processedCells,
+      evaluatedExpenses: pendingExpenses.length,
+      appliedExpenses,
+      failedExpenses,
     });
 
     return {
-      processedCells: cells.length,
-      evaluatedExpenses,
+      processedCells,
+      evaluatedExpenses: pendingExpenses.length,
+      appliedExpenses,
+      failedExpenses,
     };
   }
 
@@ -148,6 +169,75 @@ class CellJobsService {
     });
 
     return grouped;
+  }
+
+  static async runBudgetMirrorRollup({
+    month = format(new Date(), 'yyyy-MM'),
+    includeNextMonth = true,
+    trigger = 'SCHEDULED',
+  } = {}) {
+    const budgets = await prisma.cellBudget.findMany({
+      select: {
+        id: true,
+        effectiveFrom: true,
+        effectiveTo: true,
+        cellId: true,
+      },
+    });
+
+    const baseDate = parseISO(`${month}-01`);
+    const monthsToProcess = [month];
+    if (includeNextMonth) {
+      monthsToProcess.push(format(addMonths(baseDate, 1), 'yyyy-MM'));
+    }
+
+    const processedByMonth = {};
+
+    for (const targetMonth of monthsToProcess) {
+      const { start, end } = CellBudgetSyncService.getMonthRange(targetMonth);
+      let processed = 0;
+      for (const budget of budgets) {
+        const from = budget.effectiveFrom ? new Date(budget.effectiveFrom) : null;
+        const to = budget.effectiveTo ? new Date(budget.effectiveTo) : null;
+        const isActive = (!from || from <= end) && (!to || to >= start);
+        if (!isActive) continue;
+        await CellBudgetSyncService.removeMirrors(budget.id, targetMonth);
+        await CellBudgetSyncService.syncBudget(budget.id, targetMonth);
+        processed += 1;
+      }
+      processedByMonth[targetMonth] = processed;
+    }
+
+    emit({
+      type: 'CELL_JOB_RUN',
+      job: 'BudgetMirrorRollup',
+      trigger,
+      months: processedByMonth,
+    });
+
+    return { months: processedByMonth };
+  }
+
+  static async runFullBudgetResync({ trigger = 'SCHEDULED' } = {}) {
+    const grouped = await prisma.cellBudget.groupBy({
+      by: ['cellId'],
+      _count: { _all: true },
+    });
+
+    let processed = 0;
+    for (const entry of grouped) {
+      await CellBudgetSyncService.resyncCellBudgets(entry.cellId);
+      processed += 1;
+    }
+
+    emit({
+      type: 'CELL_JOB_RUN',
+      job: 'FamilyBudgetResync',
+      trigger,
+      processedFamilies: processed,
+    });
+
+    return { processedFamilies: processed };
   }
 }
 

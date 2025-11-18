@@ -8,6 +8,7 @@ import {
   cellBudgetSchema,
   cellFundSchema,
   cellFundContributionSchema,
+  cellSharedAccountSchema,
   cellSplitRuleSchema,
   cellDecisionSchema,
   cellVoteSchema,
@@ -23,6 +24,7 @@ router.use(authMiddleware);
 router.get('/', cellController.listCells);
 router.post('/', validate(cellSchema), cellController.createCell);
 router.get('/:cellId', cellController.getCellDetails);
+router.patch('/:cellId', validate(cellSchema.partial()), cellController.updateCell);
 
 router.get('/:cellId/budgets', cellController.listBudgets);
 router.post('/:cellId/budgets', validate(cellBudgetSchema), cellController.createBudget);
@@ -32,6 +34,11 @@ router.delete('/budgets/:budgetId', cellController.deleteBudget);
 router.get('/:cellId/funds', cellController.listFunds);
 router.post('/:cellId/funds', validate(cellFundSchema), cellController.createFund);
 router.post('/funds/:fundId/contributions', validate(cellFundContributionSchema), cellController.contributeToFund);
+router.delete('/funds/:fundId', cellController.deleteFund);
+
+router.get('/:cellId/shared-accounts', cellController.listSharedAccounts);
+router.post('/:cellId/shared-accounts', validate(cellSharedAccountSchema), cellController.linkSharedAccount);
+router.delete('/:cellId/shared-accounts/:sharedAccountId', cellController.unlinkSharedAccount);
 
 router.get('/:cellId/split-rules', cellController.listSplitRules);
 router.post('/:cellId/split-rules', validate(cellSplitRuleSchema), cellController.createSplitRule);
@@ -51,5 +58,7 @@ router.post('/:cellId/invite', validate(cellInviteSchema), cellController.invite
 router.get('/invites/pending', cellController.listPendingInvites);
 router.post('/invites/:inviteId/accept', validate(cellAcceptInviteSchema), cellController.acceptInvite);
 router.post('/invites/:inviteId/decline', cellController.declineInvite);
+router.post('/:cellId/leave', cellController.leaveCell);
+router.delete('/:cellId', cellController.deleteCell);
 
 export default router;

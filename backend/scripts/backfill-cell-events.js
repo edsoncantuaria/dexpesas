@@ -14,10 +14,10 @@ const CELL_RELEVANT_ENTITIES = new Set([
 
 const ACTION_TYPE_MAP = {
   CLAN: {
-    CREATE_CLAN: { type: 'CELL_CREATED', title: 'Célula criada' },
+    CREATE_CLAN: { type: 'CELL_CREATED', title: 'Família criada' },
     UPDATE_CLAN: { type: 'CELL_UPDATED', title: 'Configurações atualizadas' },
-    DELETE_CLAN: { type: 'CELL_DELETED', title: 'Célula removida' },
-    default: { type: 'CELL_EVENT', title: 'Atualização da célula' },
+    DELETE_CLAN: { type: 'CELL_DELETED', title: 'Família removida' },
+    default: { type: 'CELL_EVENT', title: 'Atualização da família' },
   },
   CLAN_MEMBER: {
     ADD_MEMBER: { type: 'MEMBER_JOINED', title: 'Novo membro adicionado' },

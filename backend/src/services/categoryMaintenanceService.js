@@ -3,6 +3,7 @@ import prisma from '../config/prismaClient.js';
 import { defaultCategories } from '../config/seedData.js';
 
 const allowedCategoryNames = new Set(defaultCategories.map((cat) => cat.nome));
+const canonicalCategoryIds = new Set(defaultCategories.map((cat) => cat.id));
 
 async function reassignCategoryReferences(tx, fromCategoryId, toCategoryId) {
   const [transactionResult, budgetResult, ruleResult] = await Promise.all([
@@ -36,6 +37,7 @@ export async function resetCategoriesData(prismaClient = prisma) {
     };
 
     const existingCategories = await tx.category.findMany({
+      where: { userId: null },
       select: { id: true, nome: true, type: true },
     });
 
@@ -47,28 +49,13 @@ export async function resetCategoriesData(prismaClient = prisma) {
       return acc;
     }, {});
 
-    for (const nome of Object.keys(categoriesByNome)) {
-      const entries = categoriesByNome[nome];
-      if (entries.length <= 1) continue;
+    const ensureCanonicalCategory = async (defaultCategory) => {
+      const entries = categoriesByNome[defaultCategory.nome] || [];
+      const existingCanonical = entries.find((entry) => entry.id === defaultCategory.id);
 
-      const canonical = entries[0];
-      for (const duplicate of entries.slice(1)) {
-        operations.reassigned += await reassignCategoryReferences(
-          tx,
-          duplicate.id,
-          canonical.id
-        );
-        await tx.category.delete({ where: { id: duplicate.id } });
-        operations.duplicatesRemoved += 1;
-      }
-      categoriesByNome[nome] = [canonical];
-    }
-
-    for (const defaultCategory of defaultCategories) {
-      const existingEntry = categoriesByNome[defaultCategory.nome]?.[0];
-      if (existingEntry) {
+      if (existingCanonical) {
         await tx.category.update({
-          where: { id: existingEntry.id },
+          where: { id: existingCanonical.id },
           data: {
             label: defaultCategory.label,
             icon: defaultCategory.icon,
@@ -76,22 +63,77 @@ export async function resetCategoriesData(prismaClient = prisma) {
           },
         });
         operations.updated += 1;
-      } else {
+
+        const duplicates = entries.filter((entry) => entry.id !== defaultCategory.id);
+        for (const duplicate of duplicates) {
+          operations.reassigned += await reassignCategoryReferences(
+            tx,
+            duplicate.id,
+            existingCanonical.id
+          );
+          await tx.category.delete({ where: { id: duplicate.id } });
+          operations.duplicatesRemoved += 1;
+        }
+
+        categoriesByNome[defaultCategory.nome] = [existingCanonical];
+        return existingCanonical;
+      }
+
+      if (entries.length > 0) {
+        const [firstDuplicate, ...rest] = entries;
         const created = await tx.category.create({
           data: {
+            id: defaultCategory.id,
             nome: defaultCategory.nome,
             label: defaultCategory.label,
             icon: defaultCategory.icon,
             type: defaultCategory.type,
           },
         });
-        categoriesByNome[defaultCategory.nome] = [created];
         operations.created += 1;
+        operations.reassigned += await reassignCategoryReferences(
+          tx,
+          firstDuplicate.id,
+          created.id
+        );
+        await tx.category.delete({ where: { id: firstDuplicate.id } });
+        operations.duplicatesRemoved += 1;
+
+        for (const duplicate of rest) {
+          operations.reassigned += await reassignCategoryReferences(
+            tx,
+            duplicate.id,
+            created.id
+          );
+          await tx.category.delete({ where: { id: duplicate.id } });
+          operations.duplicatesRemoved += 1;
+        }
+
+        categoriesByNome[defaultCategory.nome] = [created];
+        return created;
       }
+
+      const created = await tx.category.create({
+        data: {
+          id: defaultCategory.id,
+          nome: defaultCategory.nome,
+          label: defaultCategory.label,
+          icon: defaultCategory.icon,
+          type: defaultCategory.type,
+        },
+      });
+      operations.created += 1;
+      categoriesByNome[defaultCategory.nome] = [created];
+      return created;
+    };
+
+    const canonicalRecords = {};
+    for (const defaultCategory of defaultCategories) {
+      canonicalRecords[defaultCategory.nome] = await ensureCanonicalCategory(defaultCategory);
     }
 
-    const fallbackDespesa = categoriesByNome['Outros']?.[0];
-    const fallbackReceita = categoriesByNome['OutrasReceitas']?.[0];
+    const fallbackDespesa = canonicalRecords['Outros'];
+    const fallbackReceita = canonicalRecords['OutrasReceitas'];
 
     if (!fallbackDespesa || !fallbackReceita) {
       throw new Error('Categorias de fallback (Outros/OutrasReceitas) não encontradas.');
@@ -99,14 +141,14 @@ export async function resetCategoriesData(prismaClient = prisma) {
 
     const extraCategories = await tx.category.findMany({
       where: {
-        NOT: {
-          nome: { in: Array.from(allowedCategoryNames) },
-        },
+        userId: null,
+        id: { notIn: Array.from(canonicalCategoryIds) },
       },
-      select: { id: true, type: true },
+      select: { id: true, type: true, nome: true },
     });
 
     for (const extra of extraCategories) {
+      if (canonicalCategoryIds.has(extra.id)) continue;
       const fallbackId =
         extra.type === 'receita' ? fallbackReceita.id : fallbackDespesa.id;
       operations.reassigned += await reassignCategoryReferences(

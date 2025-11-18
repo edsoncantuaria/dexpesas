@@ -41,13 +41,17 @@ class CellJobsWorker {
         return CellJobsService.runEquilibriumSnapshot(payload);
       case 'cell-alerts':
         return CellJobsService.runCellAlerts(payload);
+      case 'budget-mirror-rollup':
+        return CellJobsService.runBudgetMirrorRollup(payload);
+      case 'family-budget-resync':
+        return CellJobsService.runFullBudgetResync(payload);
       default:
         throw new Error(`Tipo de job desconhecido: ${job.name}`);
     }
   }
 
   run() {
-    console.log(`🧩 Worker de Células (${QUEUE_NAME}) iniciado.`);
+    console.log(`🧩 Worker de Famílias (${QUEUE_NAME}) iniciado.`);
   }
 
   async close() {

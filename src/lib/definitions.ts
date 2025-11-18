@@ -228,11 +228,15 @@ export type Budget = {
     id: string;
     userId: string;
     categoryId: string;
+    cellBudgetId?: string | null;
     month: string;
     limit: number;
     originalLimit: number;
     rolloverAmount: number;
     spent: number;
+    personalSpent?: number;
+    sharedSpent?: number;
+    cellSyncedAt?: string | null;
     rollover: boolean;
     category?: Category; // Opcional, vindo do include
 };
@@ -326,8 +330,11 @@ export type CellBudget = {
     id: string;
     cellId: string;
     categoryId?: string | null;
+    category?: Category | null;
     label?: string | null;
     type: 'CELL' | 'HYBRID' | 'PERSONAL';
+    recurrenceType?: 'MONTHLY' | 'WEEKLY' | 'BIWEEKLY' | 'CUSTOM';
+    recurrenceDays?: number | null;
     splitConfig?: Record<string, unknown> | null;
     fundId?: string | null;
     limit: number;
@@ -335,6 +342,7 @@ export type CellBudget = {
     effectiveTo?: string | null;
     createdAt: string;
     updatedAt: string;
+    aggregatedSpent?: number;
 };
 
 export type CellFundContribution = {
@@ -360,6 +368,18 @@ export type CellFund = {
     contributions: CellFundContribution[];
     createdAt: string;
     updatedAt: string;
+};
+
+export type CellSharedAccount = {
+    id: string;
+    cellId: string;
+    accountId: string;
+    visibility: 'MEMBERS' | 'ADMINS' | 'CUSTOM';
+    allowedRoles: Array<'LEADER' | 'ADMIN' | 'MEMBER'>;
+    metadata?: Record<string, unknown> | null;
+    createdAt: string;
+    updatedAt: string;
+    account?: Account | null;
 };
 
 export type CellSplitRule = {
@@ -582,6 +602,12 @@ export type Clan = {
     leader: Partial<User> & { level: number };
     _count: { members: number };
     leaderId: string;
+    members?: Array<{
+      userId: string;
+      role: 'LEADER' | 'ADMIN' | 'MEMBER';
+      permissions?: Record<string, boolean> | null;
+      user?: Pick<User, 'id' | 'name' | 'avatarUrl' | 'level'> | null;
+    }>;
 }
 
 export type ClanInvite = {

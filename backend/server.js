@@ -24,7 +24,7 @@ const startServer = async () => {
         }
         console.log('✅ [OK] Conectado ao Redis com sucesso.');
         await scheduleDefaultCellJobs().catch((err) => {
-            console.error('⚠️  Não foi possível agendar os jobs de células:', err);
+            console.error('⚠️  Não foi possível agendar os jobs das famílias:', err);
         });
 
         // 3. Testa MinIO e garante bucket

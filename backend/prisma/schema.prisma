@@ -238,6 +238,19 @@ enum CellSplitMethod {
   PAYER_REIMBURSED
 }
 
+enum CellBudgetRecurrence {
+  MONTHLY
+  WEEKLY
+  BIWEEKLY
+  CUSTOM
+}
+
+enum CellSharedAccountVisibility {
+  MEMBERS
+  ADMINS
+  CUSTOM
+}
+
 model User {
   id                   String @id @default(cuid())
   name                 String
@@ -345,6 +358,7 @@ model Clan {
   cellFunds            CellFund[]
   cellSplitRules       CellSplitRule[]
   cellEquilibriumSnapshots CellEquilibriumSnapshot[]
+  sharedAccounts       CellSharedAccount[] @relation("ClanSharedAccounts")
 
   @@map("family_cells")
 }
@@ -391,6 +405,7 @@ model SharedExpense {
   splitMethod          SplitMethod
   categoryId           String
   createdAt            DateTime @default(now())
+  splitAppliedAt       DateTime?
 
   // --- Relações ---
   clan                 Clan @relation(fields: [clanId], references: [id], onDelete: Cascade)
@@ -423,6 +438,8 @@ model CellBudget {
   categoryId           String?
   label                String?
   type                 CellBudgetType @default(CELL)
+  recurrenceType       CellBudgetRecurrence @default(MONTHLY)
+  recurrenceDays       Int?
   splitConfig          Json?
   fundId               String?
   limit                Decimal @db.Decimal(18, 4)
@@ -430,12 +447,14 @@ model CellBudget {
   effectiveTo          DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+  lastSyncedAt         DateTime?
 
   // --- Relações ---
   cell                 Clan @relation(fields: [cellId], references: [id], onDelete: Cascade)
   category             Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   fund                 CellFund? @relation("CellFundToBudgets", fields: [fundId], references: [id], onDelete: SetNull)
   fundContributions    CellFundContribution[] @relation("BudgetToContribution")
+  personalMirrors      Budget[] @relation("BudgetToCellBudget")
 
   @@index([cellId])
   @@index([cellId, type])
@@ -480,6 +499,26 @@ model CellFundContribution {
 
   @@index([fundId, createdAt])
   @@map("cell_fund_contributions")
+}
+
+model CellSharedAccount {
+  id                   String @id @default(cuid())
+  cellId               String
+  accountId            String
+  visibility           CellSharedAccountVisibility @default(MEMBERS)
+  allowedRoles         Json @default("[]")
+  metadata             Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // --- Relações ---
+  cell                 Clan @relation("ClanSharedAccounts", fields: [cellId], references: [id], onDelete: Cascade)
+  account              Account @relation("AccountSharedCells", fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([cellId])
+  @@index([accountId])
+  @@unique([cellId, accountId])
+  @@map("cell_shared_accounts")
 }
 
 model CellSplitRule {
@@ -646,6 +685,7 @@ model Account {
   recurringBills       RecurringBill[] @relation("RecurringBill_BillAccount")
   autoPayRecurringBills RecurringBill[] @relation("RecurringBill_AutoPayAccount")
   budgetAccounts       Budget[] @relation("Budget_account")
+  sharedCells          CellSharedAccount[] @relation("AccountSharedCells")
 
 }
 
@@ -923,13 +963,15 @@ model Budget {
   userId               String
   categoryId           String
   accountId            String?
+  cellBudgetId         String?
 
   // --- Relações ---
   user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
   category             Category @relation("Budget_category", fields: [categoryId], references: [id], onDelete: Cascade)
   account              Account? @relation("Budget_account", fields: [accountId], references: [id], onDelete: SetNull)
+  cellBudget           CellBudget? @relation("BudgetToCellBudget", fields: [cellBudgetId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, categoryId, accountId, type, month, startDate, endDate])
+  @@unique([userId, categoryId, type, month, startDate, endDate, cellBudgetId])
   @@index([userId, startDate, endDate])
   @@index([userId, month])
 }

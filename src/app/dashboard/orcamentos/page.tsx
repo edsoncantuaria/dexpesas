@@ -1,7 +1,8 @@
 // src/app/dashboard/orcamentos/page.tsx
 'use client';
 
-import { PiggyBank, PlusCircle, Target } from "lucide-react";
+import Link from "next/link";
+import { PiggyBank, PlusCircle, Target, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -14,7 +15,7 @@ import { BudgetList } from "@/components/dashboard/orcamentos/budget-list";
 import { format } from "date-fns";
 import { ptBR } from 'date-fns/locale';
 import { BudgetSummaryCard } from "@/components/dashboard/orcamentos/budget-summary-card";
-
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 export default function OrcamentosPage() {
     const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -26,6 +27,7 @@ export default function OrcamentosPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [viewFilter, setViewFilter] = useState<'all' | 'personal' | 'family'>('all');
     const { toast } = useToast();
 
     const fetchBudgets = useCallback(async () => {
@@ -110,7 +112,7 @@ export default function OrcamentosPage() {
                 await fetchBudgets();
                 toast({
                     title: 'Orçamento excluído!',
-                    description: `O orçamento para "${budgetToDelete.category?.nome}" foi removido.`,
+                    description: `O orçamento para "${budgetToDelete.category?.label || budgetToDelete.category?.nome}" foi removido.`,
                     variant: 'destructive'
                 });
             } catch (error) {
@@ -127,11 +129,26 @@ export default function OrcamentosPage() {
         return categories.filter(c => !budgetedIds.has(c.id));
     }, [categories, budgets]);
     
+    const personalBudgets = useMemo(() => budgets.filter((budget) => !budget.cellBudgetId), [budgets]);
+    const familyBudgets = useMemo(() => budgets.filter((budget) => Boolean(budget.cellBudgetId)), [budgets]);
+
     const summary = useMemo(() => {
-        const totalBudgeted = budgets.reduce((acc, b) => acc + Number(b.limit), 0);
-        const totalSpent = budgets.reduce((acc, b) => acc + Number(b.spent), 0);
+        const totalBudgeted = personalBudgets.reduce((acc, b) => acc + Number(b.limit), 0);
+        const totalSpent = personalBudgets.reduce((acc, b) => acc + Number(b.spent), 0);
         return { totalBudgeted, totalSpent };
-    }, [budgets]);
+    }, [personalBudgets]);
+
+    const familyTotals = useMemo(() => {
+        const totalBudgeted = familyBudgets.reduce((acc, b) => acc + Number(b.limit), 0);
+        const totalSpent = familyBudgets.reduce((acc, b) => acc + Number(b.spent || 0), 0);
+        return { totalBudgeted, totalSpent };
+    }, [familyBudgets]);
+
+    const filteredBudgets = useMemo(() => {
+        if (viewFilter === 'personal') return personalBudgets;
+        if (viewFilter === 'family') return familyBudgets;
+        return budgets;
+    }, [viewFilter, budgets, personalBudgets, familyBudgets]);
 
     if (isLoading) {
         return <LoadingScreen />;
@@ -173,6 +190,23 @@ export default function OrcamentosPage() {
                     </DialogContent>
                 </Dialog>
             </div>
+
+            <div className="flex flex-wrap gap-2">
+                {[
+                    { key: 'all', label: 'Todos' },
+                    { key: 'personal', label: 'Pessoais' },
+                    { key: 'family', label: 'Modo Família' },
+                ].map((option) => (
+                    <Button
+                        key={option.key}
+                        variant={viewFilter === option.key ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setViewFilter(option.key as typeof viewFilter)}
+                    >
+                        {option.label}
+                    </Button>
+                ))}
+            </div>
             
             <BudgetSummaryCard 
                 selectedMonth={selectedDate}
@@ -181,8 +215,55 @@ export default function OrcamentosPage() {
                 totalSpent={summary.totalSpent}
             />
 
+            <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Orçamentos pessoais</CardTitle>
+                        <CardDescription>Valores sob seu controle direto.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between">
+                            <span>Total de categorias</span>
+                            <span className="font-semibold">{personalBudgets.length}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span>Limite combinado</span>
+                            <span className="font-semibold">{summary.totalBudgeted.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <CardTitle>Modo Família</CardTitle>
+                            <CardDescription>Reflete o que foi configurado na família.</CardDescription>
+                        </div>
+                        <Button variant="outline" asChild>
+                            <Link href="/dashboard/cells">
+                                <Users className="h-4 w-4 mr-2" />
+                                Abrir painel
+                            </Link>
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between">
+                            <span>Orçamentos sincronizados</span>
+                            <span className="font-semibold">{familyBudgets.length}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span>Limite combinado</span>
+                            <span className="font-semibold">{familyTotals.totalBudgeted.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <span>Gasto compartilhado</span>
+                            <span className="font-semibold">{familyTotals.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
             <BudgetList
-                budgets={budgets}
+                budgets={filteredBudgets}
                 onEdit={handleOpenForm}
                 onDelete={handleDeleteBudget}
             />

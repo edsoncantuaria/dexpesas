@@ -46,6 +46,22 @@ export async function scheduleDefaultCellJobs() {
         repeat: { every: 15 * 60 * 1000 }, // a cada 15 minutos
       },
     },
+    {
+      name: 'budget-mirror-rollup',
+      data: { trigger: 'SCHEDULED' },
+      options: {
+        jobId: 'cell_budget_mirror_monthly',
+        repeat: { pattern: '0 5 1 * *', tz: DEFAULT_TIMEZONE },
+      },
+    },
+    {
+      name: 'family-budget-resync',
+      data: { trigger: 'SCHEDULED' },
+      options: {
+        jobId: 'cell_budget_resync_daily',
+        repeat: { pattern: '30 3 * * *', tz: DEFAULT_TIMEZONE },
+      },
+    },
   ];
 
   await Promise.all(
@@ -63,3 +79,6 @@ export const enqueueEquilibriumSnapshotJob = (data = {}) =>
 
 export const enqueueCellAlertJob = (data = {}) =>
   cellJobsQueue.add('cell-alerts', data);
+
+export const enqueueBudgetMirrorJob = (data = {}) =>
+  cellJobsQueue.add('budget-mirror-rollup', data);

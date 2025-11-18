@@ -6,9 +6,9 @@ import { resetCategoriesData } from '../src/services/categoryMaintenanceService.
 import { defaultCategories } from '../src/config/seedData.js';
 
 const cloneDefaultCategories = () =>
-  defaultCategories.map((cat, index) => ({
-    id: `cat-${index}`,
+  defaultCategories.map((cat) => ({
     ...cat,
+    userId: null,
   }));
 
 const allowedNames = new Set(defaultCategories.map((cat) => cat.nome));
@@ -64,13 +64,22 @@ function buildMockPrisma(initialCategories) {
     },
     category: {
       findMany: async (params = {}) => {
-        if (params.where?.NOT) {
-          const filtered = state.categories.filter(
-            (cat) => !allowedNames.has(cat.nome)
-          );
-          return filtered.map((cat) => projectFields(cat, params.select));
+        const { where } = params;
+        let filtered = state.categories;
+
+        if (where?.userId === null) {
+          filtered = filtered.filter((cat) => cat.userId === null);
         }
-        return state.categories.map((cat) => projectFields(cat, params.select));
+        if (where?.id?.notIn) {
+          const blocked = new Set(where.id.notIn);
+          filtered = filtered.filter((cat) => !blocked.has(cat.id));
+        }
+        if (where?.NOT?.nome?.in) {
+          const blockedNames = new Set(where.NOT.nome.in);
+          filtered = filtered.filter((cat) => !blockedNames.has(cat.nome));
+        }
+
+        return filtered.map((cat) => projectFields(cat, params.select));
       },
       update: async ({ where, data }) => {
         const category = state.categories.find((cat) => cat.id === where.id);
@@ -80,7 +89,7 @@ function buildMockPrisma(initialCategories) {
       },
       create: async ({ data }) => {
         const newCategory = {
-          id: `created-${state.created.length + 1}`,
+          id: data.id || `created-${state.created.length + 1}`,
           ...data,
         };
         state.categories.push(newCategory);
@@ -108,7 +117,7 @@ function buildMockPrisma(initialCategories) {
 test('resetCategoriesData merges duplicates, updates defaults and removes extras', async () => {
   const initial = cloneDefaultCategories();
   const duplicate = { ...initial[0], id: 'dup-1' };
-  const extra = { id: 'extra-1', nome: 'CustomCategoria', type: 'despesa', label: 'Custom', icon: 'Star' };
+  const extra = { id: 'extra-1', nome: 'CustomCategoria', type: 'despesa', label: 'Custom', icon: 'Star', userId: null };
   const { state, client } = buildMockPrisma([...initial, duplicate, extra]);
 
   const summary = await resetCategoriesData(client);
@@ -134,6 +143,7 @@ test('resetCategoriesData reassigns receita extras to OutrasReceitas fallback', 
     type: 'receita',
     label: 'Bônus',
     icon: 'Star',
+    userId: null,
   };
   const { state, client } = buildMockPrisma([...initial, extraReceita]);
 

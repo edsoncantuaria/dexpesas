@@ -1,10 +1,19 @@
 // backend/src/controllers/budgetController.js
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { startOfMonth, endOfMonth, parseISO, subMonths } from 'date-fns';
 import GamificationService from '../services/gamificationService.js';
 import AuditService from '../services/auditService.js';
 
 const prisma = new PrismaClient();
+
+async function cleanupOrphanBudgets(userId) {
+    await prisma.$executeRaw`
+      DELETE B
+      FROM Budget AS B
+      LEFT JOIN Category AS C ON B.categoryId = C.id
+      WHERE C.id IS NULL AND B.userId = ${userId}
+    `;
+}
 
 class BudgetController {
     /**
@@ -31,6 +40,7 @@ class BudgetController {
 
 
         try {
+            await cleanupOrphanBudgets(userId);
             const budgets = await prisma.budget.findMany({
                 where: { userId, month },
                 include: {
@@ -40,6 +50,40 @@ class BudgetController {
             
             const categoryIds = budgets.map(b => b.categoryId);
             if (categoryIds.length === 0) return res.json([]);
+            
+            const mirroredBudgetIds = budgets.filter((budget) => budget.cellBudgetId).map((budget) => budget.cellBudgetId);
+            const cellBudgetsMeta = mirroredBudgetIds.length
+                ? await prisma.cellBudget.findMany({
+                      where: { id: { in: mirroredBudgetIds } },
+                      select: { id: true, cellId: true, categoryId: true, lastSyncedAt: true, updatedAt: true },
+                  })
+                : [];
+            const cellBudgetsMap = new Map(cellBudgetsMeta.map((meta) => [meta.id, meta]));
+
+            let sharedSpentMap = new Map();
+            if (cellBudgetsMeta.length) {
+                const cellIds = [...new Set(cellBudgetsMeta.map((meta) => meta.cellId))];
+                const cellCategoryIds = [
+                    ...new Set(cellBudgetsMeta.map((meta) => meta.categoryId).filter(Boolean)),
+                ];
+                if (cellIds.length && cellCategoryIds.length) {
+                    const sharedExpenses = await prisma.sharedExpense.groupBy({
+                        by: ['clanId', 'categoryId'],
+                        where: {
+                            clanId: { in: cellIds },
+                            categoryId: { in: cellCategoryIds },
+                            createdAt: { gte: startDate, lte: endDate },
+                        },
+                        _sum: { totalAmount: true },
+                    });
+                    sharedSpentMap = new Map(
+                        sharedExpenses.map((entry) => [
+                            `${entry.clanId}:${entry.categoryId}`,
+                            Number(entry._sum.totalAmount || 0),
+                        ]),
+                    );
+                }
+            }
             
             // Busca dados atuais e do mês anterior em paralelo para eficiência
             const [currentExpenses, previousBudgets, previousExpenses] = await Promise.all([
@@ -76,12 +120,30 @@ class BudgetController {
                     adjustedLimit += rolloverAmount;
                 }
 
+                const personalSpent = Number(currentSpentMap.get(budget.categoryId) || 0);
+                let sharedSpent = 0;
+                let syncedAt = null;
+                if (budget.cellBudgetId && cellBudgetsMap.has(budget.cellBudgetId)) {
+                    const cellMeta = cellBudgetsMap.get(budget.cellBudgetId);
+                    const key = cellMeta?.categoryId ? `${cellMeta.cellId}:${cellMeta.categoryId}` : null;
+                    if (key) {
+                        sharedSpent = sharedSpentMap.get(key) || 0;
+                    }
+                    const timestamp = cellMeta?.lastSyncedAt || cellMeta?.updatedAt || null;
+                    syncedAt = timestamp ? timestamp.toISOString() : null;
+                }
+
+                const finalSpent = budget.cellBudgetId ? sharedSpent : personalSpent;
+
                 return {
                     ...budget,
                     limit: adjustedLimit, // O limite final ajustado
                     originalLimit: parseFloat(budget.limit), // O limite original definido pelo usuário
                     rolloverAmount: rolloverAmount, // O valor que veio do mês anterior
-                    spent: currentSpentMap.get(budget.categoryId) || 0,
+                    spent: finalSpent,
+                    personalSpent,
+                    sharedSpent,
+                    cellSyncedAt: syncedAt,
                 };
             });
 

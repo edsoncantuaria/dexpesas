@@ -1,8 +1,6 @@
 // backend/src/services/equilibriumService.js
-import { PrismaClient } from '@prisma/client';
 import { format } from 'date-fns';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prismaClient.js';
 
 class EquilibriumService {
   static buildReferenceMonth(date = new Date()) {

@@ -10,6 +10,8 @@ import AuditService from '../services/auditService.js';
 
 import prisma from '../config/prismaClient.js';
 import { applyCellPermissions } from '../middlewares/cellPermissions.js';
+import CellBudgetSyncService from '../services/cellBudgetSyncService.js';
+import CellSharedAccountService from '../services/cellSharedAccountService.js';
 
 const normalizeValue = (value) => {
   if (value === null || value === undefined) return value;
@@ -33,6 +35,14 @@ const normalizeValue = (value) => {
 const serialize = (payload) => normalizeValue(payload);
 
 class CellController {
+  async syncCellBudgets(cellId) {
+    try {
+      await CellBudgetSyncService.resyncCellBudgets(cellId);
+    } catch (error) {
+      console.error('[CELL_SYNC] Falha ao sincronizar orçamentos da família', cellId, error);
+    }
+  }
+
   async listCells(req, res, next) {
     const userId = req.user.id;
     try {
@@ -71,7 +81,7 @@ class CellController {
         },
       });
       if (!cell) {
-        return res.status(404).json({ message: 'Célula não encontrada.' });
+        return res.status(404).json({ message: 'Família não encontrada.' });
       }
       res.json(serialize(cell));
     } catch (error) {
@@ -88,7 +98,7 @@ class CellController {
       });
       if (existingMembership) {
         return res.status(400).json({
-          message: 'Você já participa de uma célula. Deixe a atual antes de criar outra.',
+          message: 'Você já participa de uma família. Deixe a atual antes de criar outra.',
         });
       }
       const newCell = await prisma.$transaction(async (tx) => {
@@ -120,8 +130,46 @@ class CellController {
       res.status(201).json(serialize(newCell));
     } catch (error) {
       if (error.code === 'P2002') {
-        return res.status(409).json({ message: 'Já existe uma célula com este nome.' });
+        return res.status(409).json({ message: 'Já existe uma família com este nome.' });
       }
+      next(error);
+    }
+  }
+
+  async updateCell(req, res, next) {
+    const { cellId } = req.params;
+    const userId = req.user.id;
+    try {
+      const membership = await applyCellPermissions(userId, cellId, { manageMembers: true });
+      if (membership.role !== 'LEADER') {
+        return res.status(403).json({ message: 'Somente o líder pode editar as informações da família.' });
+      }
+
+      const data = {
+        name: req.body.name,
+        description: req.body.description,
+        iconUrl: req.body.iconUrl,
+      };
+
+      const filteredData = Object.fromEntries(
+        Object.entries(data).filter(([, value]) => value !== undefined)
+      );
+
+      const updated = await prisma.clan.update({
+        where: { id: cellId },
+        data: filteredData,
+      });
+
+      await AuditService.log({
+        userId,
+        action: 'CELL_UPDATED',
+        entity: 'CELL',
+        entityId: cellId,
+        details: filteredData,
+      });
+
+      res.json(serialize(updated));
+    } catch (error) {
       next(error);
     }
   }
@@ -130,7 +178,8 @@ class CellController {
     const { cellId } = req.params;
     try {
       await applyCellPermissions(req.user.id, cellId, { manageBudgets: true });
-      const budgets = await CellBudgetService.listBudgets(cellId);
+      const month = req.query.month || null;
+      const budgets = await CellBudgetService.listBudgets(cellId, month);
       res.json(serialize(budgets));
     } catch (error) {
       next(error);
@@ -151,6 +200,9 @@ class CellController {
       });
       res.status(201).json(serialize(budget));
     } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
       next(error);
     }
   }
@@ -169,6 +221,9 @@ class CellController {
       });
       res.json(serialize(budget));
     } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
       next(error);
     }
   }
@@ -236,6 +291,41 @@ class CellController {
     }
   }
 
+  async deleteFund(req, res, next) {
+    const { fundId } = req.params;
+    try {
+      const fund = await prisma.cellFund.findUnique({
+        where: { id: fundId },
+      });
+      if (!fund) {
+        return res.status(404).json({ message: 'Fundo não encontrado.' });
+      }
+
+      await applyCellPermissions(req.user.id, fund.cellId, { manageFunds: true });
+
+      if (Number(fund.currentAmount || 0) > 0) {
+        return res.status(400).json({
+          message: 'Só é possível excluir caixinhas zeradas.',
+        });
+      }
+
+      await prisma.cellFund.delete({
+        where: { id: fundId },
+      });
+
+      await AuditService.log({
+        userId: req.user.id,
+        action: 'CELL_FUND_DELETED',
+        entity: 'CELL_FUND',
+        entityId: fundId,
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async contributeToFund(req, res, next) {
     const { fundId } = req.params;
     const userId = req.user.id;
@@ -272,6 +362,89 @@ class CellController {
     }
   }
 
+  async listSharedAccounts(req, res, next) {
+    const { cellId } = req.params;
+    try {
+      await applyCellPermissions(req.user.id, cellId, {});
+      const sharedAccounts = await CellSharedAccountService.list(cellId);
+      res.json(serialize(sharedAccounts));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async linkSharedAccount(req, res, next) {
+    const { cellId } = req.params;
+    try {
+      await applyCellPermissions(req.user.id, cellId, { manageSharedAccounts: true });
+      const record = await CellSharedAccountService.link(cellId, req.body);
+
+      await TimelineService.appendEvent({
+        cellId,
+        actorId: req.user.id,
+        type: 'CELL_SHARED_ACCOUNT_LINKED',
+        title: 'Conta compartilhada vinculada',
+        description: `A conta ${record.account?.nome || record.accountId} agora está visível para a família.`,
+        payload: {
+          sharedAccountId: record.id,
+          accountId: record.accountId,
+          visibility: record.visibility,
+        },
+      });
+
+      await AuditService.log({
+        userId: req.user.id,
+        action: 'CELL_SHARED_ACCOUNT_LINKED',
+        entity: 'CELL',
+        entityId: cellId,
+        details: {
+          sharedAccountId: record.id,
+          accountId: record.accountId,
+          visibility: record.visibility,
+        },
+      });
+
+      res.status(201).json(serialize(record));
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+      next(error);
+    }
+  }
+
+  async unlinkSharedAccount(req, res, next) {
+    const { cellId, sharedAccountId } = req.params;
+    try {
+      await applyCellPermissions(req.user.id, cellId, { manageSharedAccounts: true });
+      const removed = await CellSharedAccountService.unlink(cellId, sharedAccountId);
+
+      await TimelineService.appendEvent({
+        cellId,
+        actorId: req.user.id,
+        type: 'CELL_SHARED_ACCOUNT_UNLINKED',
+        title: 'Conta compartilhada removida',
+        description: `A conta ${removed.account?.nome || removed.accountId} foi desvinculada da família.`,
+        payload: { sharedAccountId },
+      });
+
+      await AuditService.log({
+        userId: req.user.id,
+        action: 'CELL_SHARED_ACCOUNT_UNLINKED',
+        entity: 'CELL',
+        entityId: cellId,
+        details: { sharedAccountId },
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+      next(error);
+    }
+  }
+
   async runSplitEngine(req, res, next) {
     const { cellId } = req.params;
     try {
@@ -282,7 +455,7 @@ class CellController {
         where: { id: expenseId },
       });
       if (!expense || expense.clanId !== cellId) {
-        return res.status(404).json({ message: 'Despesa não encontrada para esta célula.' });
+        return res.status(404).json({ message: 'Despesa não encontrada para esta família.' });
       }
       const result = await SplitEngineService.applyRuleToExpense(
         expenseId,
@@ -464,7 +637,7 @@ class CellController {
         where: { userId_clanId: { userId: invitedUserId, clanId: cellId } },
       });
       if (existingMember) {
-        return res.status(400).json({ message: 'Usuário já participa da célula.' });
+        return res.status(400).json({ message: 'Usuário já participa da família.' });
       }
       const invite = await prisma.clanInvite.create({
         data: {
@@ -516,6 +689,7 @@ class CellController {
     const userId = req.user.id;
     const { sharePersonalBudget = false, shareAccounts = false, shareDebtSummary = false } = req.body || {};
     try {
+      let clanId = null;
       await prisma.$transaction(async (tx) => {
         const invite = await tx.clanInvite.findFirst({
           where: { id: inviteId, invitedUserId: userId, status: 'PENDING' },
@@ -526,8 +700,9 @@ class CellController {
         if (!invite) {
           throw { statusCode: 404, message: 'Convite inválido ou expirado.' };
         }
+         clanId = invite.clanId;
         if (invite.clan._count.members >= invite.clan.maxMembers) {
-          throw { statusCode: 400, message: 'Célula lotada.' };
+          throw { statusCode: 400, message: 'Família lotada.' };
         }
         await tx.clanMember.create({
           data: {
@@ -553,7 +728,10 @@ class CellController {
         entityId: inviteId,
         details: { sharePersonalBudget, shareAccounts, shareDebtSummary },
       });
-      res.json({ message: 'Bem-vindo à célula!' });
+      if (clanId) {
+        await this.syncCellBudgets(clanId);
+      }
+      res.json({ message: 'Bem-vindo à família!' });
     } catch (error) {
       if (error.statusCode) {
         return res.status(error.statusCode).json({ message: error.message });
@@ -580,6 +758,104 @@ class CellController {
         entityId: inviteId,
       });
       res.json({ message: 'Convite recusado.' });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteCell(req, res, next) {
+    const { cellId } = req.params;
+    const userId = req.user.id;
+    try {
+      const membership = await applyCellPermissions(userId, cellId, { manageMembers: true });
+      if (membership.role !== 'LEADER') {
+        return res.status(403).json({ message: 'Somente o líder da família pode excluí-la.' });
+      }
+
+      const memberCount = await prisma.clanMember.count({
+        where: { clanId: cellId },
+      });
+
+      if (memberCount > 1) {
+        return res.status(400).json({
+          message: 'Não é possível excluir a família enquanto houver outros membros. Peça para todos saírem antes.',
+        });
+      }
+
+      const budgets = await prisma.cellBudget.findMany({
+        where: { cellId },
+        select: { id: true },
+      });
+
+      await Promise.all(
+        budgets.map((budget) => CellBudgetSyncService.removeMirrors(budget.id)),
+      );
+
+      await prisma.clan.delete({
+        where: { id: cellId },
+      });
+
+      await AuditService.log({
+        userId,
+        action: 'CELL_DELETED',
+        entity: 'CELL',
+        entityId: cellId,
+      });
+
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async leaveCell(req, res, next) {
+    const { cellId } = req.params;
+    const userId = req.user.id;
+    try {
+      const membership = await prisma.clanMember.findUnique({
+        where: {
+          userId_clanId: {
+            userId,
+            clanId: cellId,
+          },
+        },
+      });
+
+      if (!membership) {
+        return res.status(404).json({ message: 'Você não participa desta família.' });
+      }
+
+      if (membership.role === 'LEADER') {
+        const otherMembers = await prisma.clanMember.count({
+          where: {
+            clanId: cellId,
+            NOT: { userId },
+          },
+        });
+        if (otherMembers > 0) {
+          return res.status(400).json({
+            message: 'Como líder, você precisa transferir a liderança ou excluir a família antes de sair.',
+          });
+        }
+        return res.status(400).json({
+          message: 'Use a opção de excluír a família quando você for o último membro.',
+        });
+      }
+
+      await prisma.clanMember.delete({
+        where: { id: membership.id },
+      });
+
+      await AuditService.log({
+        userId,
+        action: 'CELL_MEMBER_LEFT',
+        entity: 'CELL',
+        entityId: cellId,
+        details: { memberId: membership.id },
+      });
+
+      await this.syncCellBudgets(cellId);
+      res.json({ message: 'Você saiu da família.' });
     } catch (error) {
       next(error);
     }

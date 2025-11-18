@@ -10,6 +10,7 @@ const DEFAULT_FLAGS = {
   manageFunds: false,
   vote: true,
   approveSplits: false,
+  manageSharedAccounts: false,
   viewEquilibrium: true,
   viewAlerts: true,
 };
@@ -70,7 +71,7 @@ async function resolveMembership(userId, cellId, context = {}) {
 export async function applyCellPermissions(userId, cellId, requiredFlags = {}, context = {}) {
   const membership = await resolveMembership(userId, cellId, context);
   if (!membership) {
-    const error = new Error('Acesso negado: usuário não pertence à célula.');
+    const error = new Error('Acesso negado: usuário não pertence à família.');
     error.statusCode = 403;
     throw error;
   }

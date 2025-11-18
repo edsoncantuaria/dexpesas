@@ -54,7 +54,7 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
                             return (
                                 <div key={budget.id} className="space-y-2">
                                     <div className="flex justify-between items-baseline">
-                                        <p className="font-semibold">{budget.category?.nome}</p>
+                                        <p className="font-semibold">{budget.category?.label || budget.category?.nome}</p>
                                         <p className="text-sm text-muted-foreground">
                                            {spent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / {limit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                         </p>

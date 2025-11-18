@@ -110,8 +110,8 @@ const baseServiceItems: ServiceItem[] = [
     },
     {
         href: '/dashboard/cells',
-        title: 'Células Financeiras',
-        description: 'Gerencie budgets híbridos e rateios inteligentes',
+        title: 'Modo Família',
+        description: 'Gerencie orçamentos híbridos e rateios inteligentes',
         Icon: Users,
         iconBgClass: 'bg-gray-100 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400'
     },

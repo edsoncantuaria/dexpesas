@@ -1,8 +1,8 @@
-# Células Financeiras — Redesign do Módulo de Família
+# Famílias Financeiras — Redesign do Módulo de Família
 
 ## Visão
 
-Vamos substituir o módulo atual de “famílias”/`clans` por **Células Financeiras**: workspaces leves onde cada grupo escolhe como colaborar, controlar seus orçamentos e registrar interações compartilhadas. O objetivo é unir simplicidade (KISS) com flexibilidade de configurações para casais, famílias, repúblicas, projetos pontuais e parceiros informais.
+Vamos substituir o módulo atual de “famílias”/`clans` por **Famílias Financeiras**: workspaces leves onde cada grupo escolhe como colaborar, controlar seus orçamentos e registrar interações compartilhadas. O objetivo é unir simplicidade (KISS) com flexibilidade de configurações para casais, famílias, repúblicas, projetos pontuais e parceiros informais.
 
 ## Objetivos
 
@@ -14,7 +14,7 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
 
 ## Fora de Escopo (por enquanto)
 
-- Integrações externas automáticas (Open Finance) dentro da célula.
+- Integrações externas automáticas (Open Finance) dentro da família.
 - Apps móveis ou widgets dedicados (reutilizaremos o app web responsivo).
 - Automação de PIX/billing real (apenas sugerimos quanto cada membro deve pagar).
 
@@ -23,11 +23,11 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
 | Nome             | Descrição |
 | ---------------- | --------- |
 | **FamilyCell**   | Workspace compartilhado criado por um Owner. Sucede `Clan` e centraliza todas as configurações.
-| **Member**       | Usuário dentro da célula com um _Role_ padrão e permissões customizadas.
+| **Member**       | Usuário dentro da família com um _Role_ padrão e permissões customizadas.
 | **Role**         | Perfis pré-definidos (`OWNER`, `MANAGER`, `CONTRIBUTOR`, `VIEWER`).
 | **Fund/Caixinha**| Subconta com objetivo, meta e regras. Recebe contribuições automáticas ou pontuais.
-| **Shared Account** | Conta bancária ou cartão marcado como coletivo dentro da célula.
-| **Hybrid Budget** | Orçamento que combina parte pessoal e parte da célula (ex.: 50/50, porcentagens customizadas ou linkado a um fundo).
+| **Shared Account** | Conta bancária ou cartão marcado como coletivo dentro da família.
+| **Hybrid Budget** | Orçamento que combina parte pessoal e parte da família (ex.: 50/50, porcentagens customizadas ou linkado a um fundo).
 | **Split Rule**   | Regra de rateio automático aplicada a despesas recorrentes ou pontuais.
 | **Equilibrium**  | Motor que calcula quem deve para quem e sugere reembolsos automáticos (tipo Splitwise nativo).
 
@@ -35,7 +35,7 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
 
 ### Camadas
 
-- **Frontend (Next App)**: novas telas `/cells` para criação, visão geral, timeline, fundos, rateios e relatórios. O dashboard continua mostrando um card "Célula em Destaque" com atalhos.
+- **Frontend (Next App)**: novas telas `/cells` para criação, visão geral, timeline, fundos, rateios e relatórios. O dashboard continua mostrando um card "Família em Destaque" com atalhos.
 - **Backend API**: renomeia rotas `/familia` para `/cells` (rotas antigas permanecem por um tempo via proxy) e adiciona serviços específicos (`CellBudgetService`, `SplitEngine`, `EquilibriumService`, `DecisionService`).
 - **Persistência**: novas tabelas específicas para fundos, rateios e votos. O schema atual de `clans`, `shared_expenses` e `clan_members` será migrado sem perder histórico.
 - **Workers**: jobs para rateios periódicos, alertas de meta, cálculo de equilíbrio e expiração de convites.
@@ -82,7 +82,7 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
 
 ### Sistema De Roles E Permissões
 
-| Role        | Pode criar célula? | Gerencia membros? | Cria orçamentos/contas? | Adiciona transações? | Move fundos? | Vota? |
+| Role        | Pode criar família? | Gerencia membros? | Cria orçamentos/contas? | Adiciona transações? | Move fundos? | Vota? |
 | ----------- | ------------------ | ------------------ | ----------------------- | --------------------- | ------------ | ----- |
 | **Owner**        | Sim | Sim (e transferir ownership) | Sim | Sim | Sim | Sempre |
 | **Manager**      | Não | Convida/remove (exceto Owners) | Sim | Sim | Sim | Sim |
@@ -116,7 +116,7 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
   - **CASAL**: apenas 2 membros, rateios default 50/50, Equilibrium automático.
   - **FAMILIA**: roles completos, fundos como “Casa”, “Viagem”.
   - **REPUBLICA**: consumo por pessoas/dias, votações obrigatórias para despesas > X.
-  - **PROJETO/VIAGEM**: célula com data de encerramento, fundos temporários e modo convidado.
+  - **PROJETO/VIAGEM**: família com data de encerramento, fundos temporários e modo convidado.
   - **NEGOCIO_INFORMAL**: maior foco em contas compartilhadas e fluxo de aprovação.
 - Usuário pode customizar qualquer preset após criação.
 
@@ -128,13 +128,13 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
 
 ### Alertas Inteligentes
 
-- Novos tipos de alerta atrelados a célula: `CELL_BUDGET_RISK`, `FUND_TARGET_NEAR`, `MEMBER_DELINQUENT`, `EQUILIBRIUM_OFF`.
+- Novos tipos de alerta atrelados a família: `CELL_BUDGET_RISK`, `FUND_TARGET_NEAR`, `MEMBER_DELINQUENT`, `EQUILIBRIUM_OFF`.
 - Alertas aparecem no dashboard e podem virar notificações push/email.
 
 ### Relatórios Pessoal vs Família
 
 - Novo painel `/dashboard/reports/hybrid` que exibe comparativos:
-  - `Gastos pessoais x gastos para célula` (por período).
+  - `Gastos pessoais x gastos para família` (por período).
   - `Quanto paguei pelos outros` (usa dados do Equilibrium).
   - `Contribuição mensal por fundo`.
 - Estes relatórios reutilizam os data loaders existentes com filtros `cell_id`.
@@ -143,7 +143,7 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
 
 1. **Renomear tabelas** (`clans` → `family_cells`, `clan_members` → `cell_members`, etc.) via migrações Prisma.
 2. **Backfill**: povoar `permissions_json` com defaults baseados em role atual. Sinalizar que todos os membros existentes participam do Equilibrium.
-3. **Shared accounts**: permitir que contas já existentes sejam vinculadas a uma célula (bridge table `cell_shared_accounts`).
+3. **Shared accounts**: permitir que contas já existentes sejam vinculadas a uma família (bridge table `cell_shared_accounts`).
 4. **Histórico**: `shared_expenses` vira `cell_expenses` (nova coluna `split_rule_id` e `allocation_json`).
 5. **Auditoria**: migrar logs antigos para `cell_events` (script que transforma `audit_logs` relevantes em eventos).
 
@@ -189,7 +189,7 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
 
 ### Endpoints Principais (prefixo `/cells`)
 
-- `POST /cells` – cria célula (modo + presets).
+- `POST /cells` – cria família (modo + presets).
 - `GET /cells/:cellId` – visão geral com budgets, fundos, timeline resumida.
 - `PATCH /cells/:cellId/settings` – altera governance/policies.
 - `POST /cells/:cellId/invite` / `POST /cells/invites/:token/accept` – fluxo de convite.
@@ -216,13 +216,13 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
 
 ## UX/Telas
 
-1. **Dashboard**: card “Célula Financeira” substitui `FamilySummaryCard`. Mostra saldo compartilhado, atalhos para aprovar despesas, status do Equilibrium e link rápido para fundos.
-2. **Listagem `/dashboard/cells`**: cards com status (modo, nº de membros, alertas). CTA para criar nova célula.
-3. **Visão da Célula** (tabs):
+1. **Dashboard**: card “Família Financeira” substitui `FamilySummaryCard`. Mostra saldo compartilhado, atalhos para aprovar despesas, status do Equilibrium e link rápido para fundos.
+2. **Listagem `/dashboard/cells`**: cards com status (modo, nº de membros, alertas). CTA para criar nova família.
+3. **Visão da Família** (tabs):
    - **Home**: saldo, fundos, alertas, timeline resumida.
    - **Transações & Rateios**: lista despesas, regras, botão “Nova divisão (3 passos)”.
    - **Membros & Permissões**: matriz de roles, checkboxes para visibilidade.
-   - **Relatórios**: gráficos comparando pessoal vs célula.
+   - **Relatórios**: gráficos comparando pessoal vs família.
 4. **Wizard de Convite**: Owner define role, permissões extras e quais dados pessoais quer expor.
 5. **Timeline**: feed com filtros. Entrada do tipo “Edson pagou R$ 120 no mercado e rateou entre 3 membros” inclui chips para cada membro, botão “ver rateio”.
 6. **Equilíbrio**: lista “Você deve / Você tem a receber”. Botões “Registrar Pix” e “Gerar lembrete”.
@@ -250,7 +250,7 @@ Vamos substituir o módulo atual de “famílias”/`clans` por **Células Finan
 4. Planejar testes automatizados (unitários para motores de rateio/equilíbrio e E2E para convites + votações).
 5. Atualizar backlog do time com épicos por fase (backend, frontend, migração de dados, observabilidade).
 
-Este documento servirá como blueprint para implementação incremental das Células Financeiras. Ajuste conforme decisões futuras do time de produto e engenharia.
+Este documento servirá como blueprint para implementação incremental das Famílias Financeiras. Ajuste conforme decisões futuras do time de produto e engenharia.
 
 ## Feature Flags Planejadas
 
@@ -258,12 +258,12 @@ Este documento servirá como blueprint para implementação incremental das Cél
 | ---- | -------- | ----------- | ----------- |
 | `newCellExperience` | Habilitar novas páginas `/dashboard/cells` e substituir `FamilySummaryCard` no dashboard | Beta interno → grupo de early adopters → 100% | Feature principal; mantém fallback para UI antiga (`/dashboard/clans`). |
 | `cellApiV2` | Direcionar o frontend para rotas `/cells` ao invés de `/familia` | Time interno primeiro; clientes com baixo risco | Permite monitorar novos endpoints antes do rollout completo. |
-| `equilibriumEngine` | Ativar cálculo automático e tela de equilíbrio | Somente células opt-in (Owner ativa) na fase inicial | Requer monitoramento extra de débitos pendentes; fallback manual (Splitwise externo). |
+| `equilibriumEngine` | Ativar cálculo automático e tela de equilíbrio | Somente famílias opt-in (Owner ativa) na fase inicial | Requer monitoramento extra de débitos pendentes; fallback manual (Splitwise externo). |
 | `decisionWorkflow` | Habilitar votações em 3 cliques e decisões obrigatórias | Owners selecionados / modos REPÚBLICA & NEGOCIO_INFORMAL primeiro | Depende do `cellEvents` estável. |
 | `fundsV2` | Nova UX de fundos/caixinhas com metas e regras | Beta curto com casais/famílias | Depende de `cell_funds` e `cell_fund_contributions`. |
 | `splitWizard` | Wizard de rateio automático em 3 passos | Quando `SplitEngine` estiver validado | Gera métricas `% de despesas rateadas automaticamente`. |
 | `timelineFeed` | Timeline unificada com `cell_events` | Após migração dos audit logs | Necessário para alertas/contexto antes de habilitar votações. |
-| `alertsCell` | Novos alertas inteligentes relacionados à célula | Paralelo à flag `timelineFeed` | Evita ruído em usuários que ainda não têm célula migrada. |
+| `alertsCell` | Novos alertas inteligentes relacionados à família | Paralelo à flag `timelineFeed` | Evita ruído em usuários que ainda não têm família migrada. |
 
 ## Checklist de Implementação
 
@@ -277,7 +277,7 @@ Este documento servirá como blueprint para implementação incremental das Cél
 - **CELL-BE** – Backend/Core Services  
   - Subtarefas: renomear tabelas e migrar dados, criar `SplitEngine`, `EquilibriumService`, `DecisionService`, expor rotas `/cells`, adicionar observabilidade e logs.
 - **CELL-FE** – Frontend/Experiência  
-  - Subtarefas: criar navegação `/dashboard/cells`, card “Célula Financeira”, tabs Home/Transações/Membros/Relatórios, wizard de convite, UX de orçamentos híbridos/fundos/rateio/timeline/equilibrium.
+  - Subtarefas: criar navegação `/dashboard/cells`, card “Família Financeira”, tabs Home/Transações/Membros/Relatórios, wizard de convite, UX de orçamentos híbridos/fundos/rateio/timeline/equilibrium.
 - **CELL-MIG** – Migração & Compatibilidade  
   - Subtarefas: scripts de backfill (`permissions_json`), proxy `/familia`, verificação pós-migração (saldo/ranking), rollback plan.
 - **CELL-QA** – Testes & Qualidade  
@@ -308,7 +308,7 @@ Cada épico inclui dependências explícitas (ex.: CELL-FE depende de CELL-BE/CE
 >
 > Jobs/Queues: configurado um pipeline em BullMQ (Redis) com os seguintes workers (ver `backend/src/queues/cellJobsQueue.js` e workers correspondentes):
 > - `SplitEngineJob` (cron diária + disparos manuais): aplica `cell_split_rules` pendentes, gera `cell_expense_splits` e agenda cobranças/reembolsos.
-> - `EquilibriumSnapshotJob` (cron semanal e trigger pós-split): consolida débitos/créditos por célula e grava `cell_equilibrium_snapshots`, disparando alertas caso valores fiquem em aberto por > X dias.
+> - `EquilibriumSnapshotJob` (cron semanal e trigger pós-split): consolida débitos/créditos por família e grava `cell_equilibrium_snapshots`, disparando alertas caso valores fiquem em aberto por > X dias.
 > - `CellAlertJob` (cron a cada 15min + webhooks): avalia `cell_budgets`, `cell_funds` e `cell_events` recentes para gerar notificações (`CELL_BUDGET_RISK`, `FUND_TARGET_NEAR`, `MEMBER_DELINQUENT`, etc.).
 > Cada job emite eventos estruturados para observabilidade (`CELL_JOB_RUN`, `CELL_JOB_ERROR`) e usa telemetry para reportar sucesso/falha, ajudando a monitorar o rollout.
 >
@@ -319,7 +319,7 @@ Cada épico inclui dependências explícitas (ex.: CELL-FE depende de CELL-BE/CE
 > - `SplitEngineService`: aplica regras (`cell_split_rules`) em despesas compartilhadas e gera splits.
 > - `EquilibriumService`: consolida saldos entre membros e persiste `cell_equilibrium_snapshots`.
 > - `DecisionService`: registra/atualiza decisões via `cell_events` e gerencia votos.
-> - `TimelineService`: helper para registrar/consultar eventos das Células.
+> - `TimelineService`: helper para registrar/consultar eventos das Famílias.
 > - `CellAlertService`: avalia budgets/fundos para gerar alertas (`CELL_BUDGET_RISK`, `FUND_TARGET_NEAR`).
 >
 > Permissões granulares: middleware `applyCellPermissions` valida `permissions_json`/role antes de acessar budgets, fundos, rateios, decisões, timeline, equilíbrio e alertas (flags como `manageBudgets`, `moveFunds`, `vote`, `viewEquilibrium` etc.).
@@ -335,8 +335,8 @@ Cada épico inclui dependências explícitas (ex.: CELL-FE depende de CELL-BE/CE
 - [x] Adicionar eventos estruturados (`CELL_EVENT`, `DECISION_CREATED`, etc.) para observabilidade.
 
 ### Frontend/UX
-- [x] Criar navegação `/dashboard/cells` e card “Célula Financeira” substituindo `FamilySummaryCard`.
-- [x] Implementar visão da célula (tabs Home, Transações & Rateios, Membros, Relatórios).
+- [x] Criar navegação `/dashboard/cells` e card “Família Financeira” substituindo `FamilySummaryCard`.
+- [x] Implementar visão da família (tabs Home, Transações & Rateios, Membros, Relatórios).
 - [x] Construir wizard de convite com permissões e visibilidade personalizadas.
 - [x] Construir fluxo de criação/edição de orçamentos híbridos com seletor Pessoal/Cell/Rateio/Fundo.
 - [x] Implementar gestão de fundos (criação, aportes, regras de uso, metas).
@@ -352,7 +352,7 @@ Cada épico inclui dependências explícitas (ex.: CELL-FE depende de CELL-BE/CE
 
 Notas:
 - Convites agora exigem o ID do convidado e armazenam o consentimento solicitado; o convidado aceita/recusa informando quais dados pessoais compartilhar (budget pessoal, contas, dívidas).
-- Middleware `applyCellPermissions` + validações nos controllers garantem ownership e limites (inputs positivos, despesa pertence à célula). O fluxo de criação de célula impede múltipla participação.
+- Middleware `applyCellPermissions` + validações nos controllers garantem ownership e limites (inputs positivos, despesa pertence à família). O fluxo de criação de família impede múltipla participação.
 - Ações críticas (criar/editar budgets, fundos, rateios, decisões, convites e contribuições) disparam `AuditService.log` e eventos em `TimelineService`.
 
 ### Alertas & Observabilidade
@@ -366,6 +366,6 @@ Notas:
 - [ ] Planejar beta interno (flag) e monitorar feedback/telemetria antes do rollout completo.
 
 ### Rollout & Comunicação
-- [ ] Preparar plano de comunicação para usuários (release notes, tooltips explicando Células).
+- [ ] Preparar plano de comunicação para usuários (release notes, tooltips explicando Famílias).
 - [ ] Monitorar KPIs pós-lançamento (% despesas rateadas, fundos ativos, equilíbrio liquidado).
 - [ ] Programar janela para desativar rotas/componentes legados (`Clan*`) após validação.

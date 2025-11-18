@@ -4,13 +4,15 @@ import { z } from 'zod';
 export const cellSchema = z.object({
   name: z.string().min(2).max(100),
   description: z.string().max(255).optional(),
-  iconUrl: z.string().url().optional(),
+  iconUrl: z.string().max(255).optional().nullable(),
 });
 
 export const cellBudgetSchema = z.object({
   categoryId: z.string().optional().nullable(),
   label: z.string().max(100).optional().nullable(),
   type: z.enum(['CELL', 'HYBRID', 'PERSONAL']).optional(),
+  recurrenceType: z.enum(['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'CUSTOM']).optional(),
+  recurrenceDays: z.number().min(1).max(90).optional().nullable(),
   splitConfig: z.any().optional(),
   fundId: z.string().optional().nullable(),
   limit: z.number().positive(),
@@ -32,6 +34,23 @@ export const cellFundContributionSchema = z.object({
   fromBudgetId: z.string().optional().nullable(),
   metadata: z.any().optional(),
 });
+
+export const cellSharedAccountSchema = z
+  .object({
+    accountId: z.string().min(1),
+    visibility: z.enum(['MEMBERS', 'ADMINS', 'CUSTOM']).optional(),
+    allowedRoles: z.array(z.enum(['LEADER', 'ADMIN', 'MEMBER'])).optional(),
+    metadata: z.any().optional(),
+  })
+  .refine(
+    (data) =>
+      data.visibility !== 'CUSTOM' ||
+      (Array.isArray(data.allowedRoles) && data.allowedRoles.length > 0),
+    {
+      message: 'Defina os perfis autorizados ao usar visibilidade customizada.',
+      path: ['allowedRoles'],
+    },
+  );
 
 export const cellSplitRuleSchema = z.object({
   name: z.string().min(2),

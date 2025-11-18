@@ -28,7 +28,17 @@ CREATE TABLE `User` (
     `monthlyIncomeRange` VARCHAR(191) NULL,
     `investmentProfile` VARCHAR(191) NULL,
     `mainFinancialGoal` VARCHAR(191) NULL,
+    `fixedMonthlyIncome` DECIMAL(18, 2) NULL,
+    `phoneNumber` VARCHAR(191) NULL,
+    `phoneVerified` BOOLEAN NOT NULL DEFAULT false,
+    `twoFactorEnabled` BOOLEAN NOT NULL DEFAULT false,
+    `twoFactorSecret` VARCHAR(191) NULL,
+    `favoriteCategories` JSON NULL,
+    `dashboardPreferences` JSON NULL,
+    `hideFamilyMode` BOOLEAN NOT NULL DEFAULT false,
+    `lastSecurityNotificationAt` DATETIME(3) NULL,
     `pushSubscription` TEXT NULL,
+    `gamificationMode` ENUM('FULL', 'LITE', 'OFF') NOT NULL DEFAULT 'FULL',
     `level` INTEGER NOT NULL DEFAULT 1,
     `xp` INTEGER NOT NULL DEFAULT 0,
     `heroClass` VARCHAR(191) NULL,
@@ -41,7 +51,7 @@ CREATE TABLE `User` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `clans` (
+CREATE TABLE `family_cells` (
     `id` VARCHAR(191) NOT NULL,
     `name` VARCHAR(191) NOT NULL,
     `description` VARCHAR(191) NULL,
@@ -55,24 +65,24 @@ CREATE TABLE `clans` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `clans_name_key`(`name`),
-    UNIQUE INDEX `clans_leaderId_key`(`leaderId`),
+    UNIQUE INDEX `family_cells_name_key`(`name`),
+    UNIQUE INDEX `family_cells_leaderId_key`(`leaderId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `clan_members` (
+CREATE TABLE `cell_members` (
     `userId` VARCHAR(191) NOT NULL,
     `clanId` VARCHAR(191) NOT NULL,
     `role` ENUM('LEADER', 'ADMIN', 'MEMBER') NOT NULL DEFAULT 'MEMBER',
     `joinedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `permissions_json` JSON NOT NULL,
 
-    UNIQUE INDEX `clan_members_userId_key`(`userId`),
     PRIMARY KEY (`userId`, `clanId`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `clan_invites` (
+CREATE TABLE `cell_invites` (
     `id` VARCHAR(191) NOT NULL,
     `clanId` VARCHAR(191) NOT NULL,
     `invitedUserId` VARCHAR(191) NOT NULL,
@@ -81,12 +91,12 @@ CREATE TABLE `clan_invites` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `expiresAt` DATETIME(3) NOT NULL,
 
-    UNIQUE INDEX `clan_invites_clanId_invitedUserId_key`(`clanId`, `invitedUserId`),
+    UNIQUE INDEX `cell_invites_clanId_invitedUserId_key`(`clanId`, `invitedUserId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `SharedExpense` (
+CREATE TABLE `cell_expenses` (
     `id` VARCHAR(191) NOT NULL,
     `clanId` VARCHAR(191) NOT NULL,
     `creatorId` VARCHAR(191) NOT NULL,
@@ -100,15 +110,121 @@ CREATE TABLE `SharedExpense` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
-CREATE TABLE `SharedExpenseParticipant` (
+CREATE TABLE `cell_expense_splits` (
     `id` VARCHAR(191) NOT NULL,
     `sharedExpenseId` VARCHAR(191) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
     `amountOwed` DECIMAL(18, 4) NOT NULL,
     `createdTransactionId` VARCHAR(191) NOT NULL,
 
-    UNIQUE INDEX `SharedExpenseParticipant_createdTransactionId_key`(`createdTransactionId`),
-    UNIQUE INDEX `SharedExpenseParticipant_sharedExpenseId_userId_key`(`sharedExpenseId`, `userId`),
+    UNIQUE INDEX `cell_expense_splits_createdTransactionId_key`(`createdTransactionId`),
+    UNIQUE INDEX `cell_expense_splits_sharedExpenseId_userId_key`(`sharedExpenseId`, `userId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `cell_budgets` (
+    `id` VARCHAR(191) NOT NULL,
+    `cellId` VARCHAR(191) NOT NULL,
+    `categoryId` VARCHAR(191) NULL,
+    `label` VARCHAR(191) NULL,
+    `type` ENUM('CELL', 'HYBRID', 'PERSONAL') NOT NULL DEFAULT 'CELL',
+    `recurrenceType` ENUM('MONTHLY', 'WEEKLY', 'BIWEEKLY', 'CUSTOM') NOT NULL DEFAULT 'MONTHLY',
+    `recurrenceDays` INTEGER NULL,
+    `splitConfig` JSON NULL,
+    `fundId` VARCHAR(191) NULL,
+    `limit` DECIMAL(18, 4) NOT NULL,
+    `effectiveFrom` DATETIME(3) NULL,
+    `effectiveTo` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `cell_budgets_cellId_idx`(`cellId`),
+    INDEX `cell_budgets_cellId_type_idx`(`cellId`, `type`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `cell_funds` (
+    `id` VARCHAR(191) NOT NULL,
+    `cellId` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `targetAmount` DECIMAL(18, 4) NOT NULL,
+    `currentAmount` DECIMAL(18, 4) NOT NULL DEFAULT 0,
+    `usagePolicy` JSON NULL,
+    `status` ENUM('ACTIVE', 'PAUSED', 'COMPLETED') NOT NULL DEFAULT 'ACTIVE',
+    `goalDeadline` DATETIME(3) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `cell_funds_cellId_idx`(`cellId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `cell_fund_contributions` (
+    `id` VARCHAR(191) NOT NULL,
+    `fundId` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `amount` DECIMAL(18, 4) NOT NULL,
+    `source` VARCHAR(191) NULL,
+    `fromBudgetId` VARCHAR(191) NULL,
+    `metadata` JSON NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `cell_fund_contributions_fundId_createdAt_idx`(`fundId`, `createdAt`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `cell_split_rules` (
+    `id` VARCHAR(191) NOT NULL,
+    `cellId` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `trigger` ENUM('RECURRING_BILL', 'ADHOC', 'USAGE_BASED') NOT NULL DEFAULT 'ADHOC',
+    `method` ENUM('EQUAL', 'WEIGHTED', 'CONSUMPTION', 'PAYER_REIMBURSED') NOT NULL DEFAULT 'EQUAL',
+    `weightsConfig` JSON NULL,
+    `consumptionMetric` VARCHAR(191) NULL,
+    `autoReimburse` BOOLEAN NOT NULL DEFAULT false,
+    `active` BOOLEAN NOT NULL DEFAULT true,
+    `metadata` JSON NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `cell_split_rules_cellId_active_idx`(`cellId`, `active`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `cell_equilibrium_snapshots` (
+    `id` VARCHAR(191) NOT NULL,
+    `cellId` VARCHAR(191) NOT NULL,
+    `referenceMonth` VARCHAR(191) NOT NULL,
+    `summary` JSON NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    UNIQUE INDEX `cell_equilibrium_snapshots_cellId_referenceMonth_key`(`cellId`, `referenceMonth`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `cell_events` (
+    `id` VARCHAR(191) NOT NULL,
+    `cellId` VARCHAR(191) NOT NULL,
+    `actorId` VARCHAR(191) NULL,
+    `type` VARCHAR(191) NOT NULL,
+    `title` VARCHAR(191) NULL,
+    `description` VARCHAR(191) NULL,
+    `payload` JSON NULL,
+    `entityId` VARCHAR(191) NULL,
+    `entityType` VARCHAR(191) NULL,
+    `visibility` VARCHAR(191) NOT NULL DEFAULT 'CELL',
+    `sourceAuditLogId` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    UNIQUE INDEX `cell_events_sourceAuditLogId_key`(`sourceAuditLogId`),
+    INDEX `cell_events_cellId_createdAt_idx`(`cellId`, `createdAt`),
+    INDEX `cell_events_entityId_entityType_idx`(`entityId`, `entityType`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -430,10 +546,11 @@ CREATE TABLE `Budget` (
     `userId` VARCHAR(191) NOT NULL,
     `categoryId` VARCHAR(191) NOT NULL,
     `accountId` VARCHAR(191) NULL,
+    `cellBudgetId` VARCHAR(191) NULL,
 
     INDEX `Budget_userId_startDate_endDate_idx`(`userId`, `startDate`, `endDate`),
     INDEX `Budget_userId_month_idx`(`userId`, `month`),
-    UNIQUE INDEX `Budget_userId_categoryId_accountId_type_month_startDate_endD_key`(`userId`, `categoryId`, `accountId`, `type`, `month`, `startDate`, `endDate`),
+    UNIQUE INDEX `Budget_user_cat_type_month_cell_key`(`userId`, `categoryId`, `type`, `month`, `startDate`, `endDate`, `cellBudgetId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -494,7 +611,7 @@ CREATE TABLE `Notification` (
     `id` VARCHAR(191) NOT NULL,
     `title` VARCHAR(191) NOT NULL,
     `message` VARCHAR(191) NOT NULL,
-    `type` ENUM('TRANSACTION_CREATED', 'PAYMENT_DUE', 'LIMIT_ALERT', 'ACHIEVEMENT_UNLOCKED', 'BUDGET_ALERT', 'UPCOMING_PAYMENT', 'STREAK_AWARDED') NOT NULL,
+    `type` ENUM('TRANSACTION_CREATED', 'PAYMENT_DUE', 'LIMIT_ALERT', 'ACHIEVEMENT_UNLOCKED', 'BUDGET_ALERT', 'UPCOMING_PAYMENT', 'STREAK_AWARDED', 'SECURITY_ALERT', 'FAMILY_UPDATE') NOT NULL,
     `read` BOOLEAN NOT NULL DEFAULT false,
     `relatedId` VARCHAR(191) NULL,
     `actions` JSON NULL,
@@ -646,6 +763,46 @@ CREATE TABLE `Item` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     UNIQUE INDEX `Item_key_key`(`key`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `user_favorite_categories` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `categoryId` VARCHAR(191) NOT NULL,
+    `priority` INTEGER NOT NULL DEFAULT 0,
+
+    UNIQUE INDEX `user_favorite_categories_userId_categoryId_key`(`userId`, `categoryId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `user_devices` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `deviceId` VARCHAR(191) NOT NULL,
+    `deviceName` VARCHAR(191) NULL,
+    `platform` VARCHAR(191) NULL,
+    `ipAddress` VARCHAR(191) NULL,
+    `trusted` BOOLEAN NOT NULL DEFAULT false,
+    `lastLoginAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    UNIQUE INDEX `user_devices_userId_deviceId_key`(`userId`, `deviceId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `security_events` (
+    `id` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+    `type` ENUM('NEW_DEVICE', 'PASSWORD_RESET', 'TWO_FACTOR_CHALLENGE') NOT NULL,
+    `message` VARCHAR(191) NOT NULL,
+    `metadata` JSON NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `security_events_userId_idx`(`userId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

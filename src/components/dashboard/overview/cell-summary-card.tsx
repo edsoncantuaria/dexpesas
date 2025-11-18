@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Users, Activity, Wallet, ShieldCheck, Plus } from 'lucide-react';
+import { Users, Activity, ShieldCheck, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,8 +14,13 @@ type CellSummaryCardProps = {
   budgets: CellBudget[];
 };
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const safeNumber = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const formatCurrency = (value: unknown) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(safeNumber(value));
 
 export function CellSummaryCard({ cell, funds, budgets }: CellSummaryCardProps) {
   if (!cell) return null;
@@ -30,15 +35,15 @@ export function CellSummaryCard({ cell, funds, budgets }: CellSummaryCardProps) 
             <Users className="h-6 w-6" />
           </div>
           <div>
-            <CardTitle className="text-xl font-headline">Célula Financeira</CardTitle>
-            <p className="text-sm text-muted-foreground">Workspace compartilhado entre os membros</p>
+            <CardTitle className="text-xl font-headline">Modo Família</CardTitle>
+            <p className="text-sm text-muted-foreground">Espaço compartilhado para orçamentos e decisões</p>
           </div>
         </div>
         <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
           <Link href="/dashboard/cells" className="w-full">
             <Button className="w-full md:w-auto">
               <ShieldCheck className="h-4 w-4 mr-2" />
-              Abrir célula
+              Entrar no Modo Família
             </Button>
           </Link>
           <Link href="/dashboard/cells#convites" className="w-full">
@@ -52,7 +57,7 @@ export function CellSummaryCard({ cell, funds, budgets }: CellSummaryCardProps) 
       <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <div className="rounded-md border bg-muted/30 p-4 flex flex-col gap-2">
           <span className="text-xs text-muted-foreground uppercase tracking-wide">Saldo compartilhado</span>
-          <span className="text-2xl font-bold">{formatCurrency(Number(cell.balance || 0))}</span>
+          <span className="text-2xl font-bold">{formatCurrency(cell.balance)}</span>
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Activity className="h-3.5 w-3.5 text-primary" />
             {cell._count?.members || cell.members?.length || 0} membros ativos
@@ -77,7 +82,7 @@ export function CellSummaryCard({ cell, funds, budgets }: CellSummaryCardProps) 
               {topBudgets.map((budget) => (
                 <div key={budget.id} className="flex items-center justify-between text-sm">
                   <span>{budget.label || 'Orçamento'}</span>
-                  <span className="font-semibold">{formatCurrency(Number(budget.limit))}</span>
+                  <span className="font-semibold">{formatCurrency(budget.limit)}</span>
                 </div>
               ))}
             </div>
