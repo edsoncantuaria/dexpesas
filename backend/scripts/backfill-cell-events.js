@@ -1,6 +1,7 @@
 // backend/scripts/backfill-cell-events.js
 // Popula a tabela cell_events utilizando os registros existentes em audit_logs.
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 
 const prisma = new PrismaClient();
 

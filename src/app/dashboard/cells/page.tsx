@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import {
@@ -52,11 +52,13 @@ import type {
   CellBudget,
   CellFund,
   CellSharedAccount,
+  CellSharedExpense,
   CellSplitRule,
   CellTimelineEvent,
   CellEquilibriumEntry,
   Category,
   Account,
+  ClanRole,
 } from '@/lib/definitions';
 import {
   Plus,
@@ -70,10 +72,15 @@ import {
   LogOut,
   Trash2,
   Info,
+  ReceiptText,
+  CircleCheck,
+  Clock4,
 } from 'lucide-react';
+import { withdrawalRoleOptions } from './withdrawal-options';
 import { ClanIcon } from '@/components/dashboard/clans/clan-icon';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 
 type WizardInviteForm = {
   email: string;
@@ -86,19 +93,104 @@ type WizardInviteForm = {
   sharePersonalData: boolean;
 };
 
-type RateioForm = {
-  name: string;
-  trigger: CellSplitRule['trigger'];
-  method: CellSplitRule['method'];
-  autoReimburse: boolean;
-  description: string;
+type FundDepositChannel = 'CELL_ACCOUNT' | 'CUSTODIAN' | 'MANUAL';
+
+const depositChannelCopy: Record<FundDepositChannel, { label: string; helper: string }> = {
+  CELL_ACCOUNT: {
+    label: 'Conta compartilhada',
+    helper: 'Sai de uma conta vinculada ao workspace ou rateio interno.',
+  },
+  CUSTODIAN: {
+    label: 'Pago direto ao responsável',
+    helper: 'Membros transferem para quem guarda a caixinha e registram o aporte.',
+  },
+  MANUAL: {
+    label: 'Outro fluxo combinado',
+    helper: 'Use para acordos livres: PIX fixo, envelope etc.',
+  },
 };
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
-const toCurrency = (value: unknown) => {
-  const parsed = Number(value);
-  return currencyFormatter.format(Number.isFinite(parsed) ? parsed : 0);
+const parseDecimalDigits = (payload: any): number => {
+  const digitsSource = payload?.d || payload?.c;
+  if (!Array.isArray(digitsSource) || digitsSource.length === 0) {
+    return 0;
+  }
+  const digits = digitsSource.join('');
+  const exponent = typeof payload?.e === 'number' ? payload.e : Number(payload?.e ?? 0);
+  const sign = payload?.s === -1 ? '-' : '';
+  const intLength = exponent + 1;
+  if (intLength <= 0) {
+    const zeros = '0'.repeat(Math.abs(intLength));
+    return Number(`${sign}0.${zeros}${digits}`);
+  }
+  if (intLength >= digits.length) {
+    const zeros = '0'.repeat(intLength - digits.length);
+    return Number(`${sign}${digits}${zeros}`);
+  }
+  const intPart = digits.slice(0, intLength) || '0';
+  const fracPart = digits.slice(intLength) || '0';
+  return Number(`${sign}${intPart}.${fracPart}`);
 };
+const parseAmount = (value: unknown): number => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+  if (value && typeof value === 'object') {
+    if ('value' in (value as Record<string, unknown>)) {
+      return parseAmount((value as Record<string, unknown>).value);
+    }
+    if ('amount' in (value as Record<string, unknown>)) {
+      return parseAmount((value as Record<string, unknown>).amount);
+    }
+    if ('d' in (value as Record<string, unknown>) || 'c' in (value as Record<string, unknown>)) {
+      const parsed = parseDecimalDigits(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    const stringified = (value as Record<string, unknown>).toString?.();
+    if (stringified && stringified !== '[object Object]') {
+      return parseAmount(stringified);
+    }
+    return 0;
+  }
+  if (typeof value !== 'string') {
+    return 0;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return 0;
+  }
+  const sanitized = trimmed.replace(/[^\d.,-]/g, '');
+  if (!sanitized) {
+    return 0;
+  }
+  const commaIndex = sanitized.lastIndexOf(',');
+  const dotIndex = sanitized.lastIndexOf('.');
+  const dotCount = (sanitized.match(/\./g) || []).length;
+
+  if (commaIndex > dotIndex) {
+    const normalized =
+      dotIndex >= 0 ? sanitized.replace(/\./g, '').replace(',', '.') : sanitized.replace(',', '.');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  if (dotIndex > commaIndex && dotIndex !== -1) {
+    if (dotCount > 1 || sanitized.length - dotIndex - 1 === 3) {
+      const normalized = sanitized.replace(/\./g, '');
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    const normalized = sanitized.replace(/,/g, '');
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  const normalized = sanitized.replace(/,/g, '');
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+const toCurrency = (value: unknown) => currencyFormatter.format(parseAmount(value));
 
 export default function CellsDashboardPage() {
   const { user, isLoading: userLoading, fetchUser } = useUser();
@@ -107,6 +199,7 @@ export default function CellsDashboardPage() {
   const [budgets, setBudgets] = useState<CellBudget[]>([]);
   const [funds, setFunds] = useState<CellFund[]>([]);
   const [sharedAccounts, setSharedAccounts] = useState<CellSharedAccount[]>([]);
+  const [sharedExpenses, setSharedExpenses] = useState<CellSharedExpense[]>([]);
   const [splitRules, setSplitRules] = useState<CellSplitRule[]>([]);
   const [timeline, setTimeline] = useState<CellTimelineEvent[]>([]);
   const [equilibrium, setEquilibrium] = useState<CellEquilibriumEntry[]>([]);
@@ -128,6 +221,7 @@ export default function CellsDashboardPage() {
       setBudgets([]);
       setFunds([]);
       setSharedAccounts([]);
+      setSharedExpenses([]);
       setSplitRules([]);
       setTimeline([]);
       setEquilibrium([]);
@@ -147,6 +241,7 @@ export default function CellsDashboardPage() {
         timelineRes,
         equilibriumRes,
         alertsRes,
+        expensesRes,
       ] = await Promise.all([
         api.get(`/cells/${cellId}`),
         api.get(`/cells/${cellId}/budgets?month=${currentMonth}`),
@@ -156,6 +251,7 @@ export default function CellsDashboardPage() {
         api.get(`/cells/${cellId}/timeline`),
         api.get(`/cells/${cellId}/equilibrium`),
         api.get(`/cells/${cellId}/alerts`),
+        api.get(`/cells/${cellId}/expenses`),
       ]);
       setCell(cellRes.data);
       setBudgets(budgetsRes.data);
@@ -167,6 +263,7 @@ export default function CellsDashboardPage() {
         Array.isArray(equilibriumRes.data) ? equilibriumRes.data : []
       );
       setAlerts(alertsRes.data || []);
+      setSharedExpenses(expensesRes.data || []);
     } catch (error) {
       console.error('Erro ao carregar dados da família', error);
       toast({
@@ -189,6 +286,32 @@ export default function CellsDashboardPage() {
       setSharedAccounts(response.data || []);
     } catch (error) {
       console.error('Erro ao recarregar contas compartilhadas', error);
+    }
+  }, [cellId]);
+
+  const refreshEquilibriumSummary = useCallback(async () => {
+    if (!cellId) {
+      setEquilibrium([]);
+      return;
+    }
+    try {
+      const response = await api.get(`/cells/${cellId}/equilibrium`);
+      setEquilibrium(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Erro ao atualizar equilíbrio', error);
+    }
+  }, [cellId]);
+
+  const refreshSharedExpenses = useCallback(async () => {
+    if (!cellId) {
+      setSharedExpenses([]);
+      return;
+    }
+    try {
+      const response = await api.get(`/cells/${cellId}/expenses`);
+      setSharedExpenses(response.data || []);
+    } catch (error) {
+      console.error('Erro ao carregar despesas compartilhadas', error);
     }
   }, [cellId]);
 
@@ -225,13 +348,14 @@ export default function CellsDashboardPage() {
 
   if (!cellId || !cell) {
     return (
-      <div className="space-y-6">
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle>Você ainda não faz parte de uma Família Financeira</CardTitle>
-            <CardDescription>Crie um workspace colaborativo para compartilhar orçamentos, fundos e decisões com sua família ou grupo.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-4">
+      <>
+        <div className="space-y-6">
+          <Card className="border-dashed">
+            <CardHeader>
+              <CardTitle>Você ainda não faz parte de uma Família Financeira</CardTitle>
+              <CardDescription>Crie um workspace colaborativo para compartilhar orçamentos, fundos e decisões com sua família ou grupo.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-4">
             <Dialog open={isCreateCellOpen} onOpenChange={setIsCreateCellOpen}>
               <DialogTrigger asChild>
                 <Button className="w-full sm:w-auto">
@@ -240,13 +364,14 @@ export default function CellsDashboardPage() {
                 </Button>
               </DialogTrigger>
               <CreateCellDialog onSubmit={handleCreateCell} />
-            </Dialog>
-            <Link href="/dashboard">
-              <Button variant="outline">Voltar ao dashboard</Button>
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+              </Dialog>
+              <Link href="/dashboard">
+                <Button variant="outline">Voltar ao dashboard</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </>
     );
   }
 
@@ -344,21 +469,28 @@ export default function CellsDashboardPage() {
             budgets={budgets}
             funds={funds}
             sharedAccounts={sharedAccounts}
+            sharedExpenses={sharedExpenses}
             alerts={alerts}
             members={cell.members || []}
             canManageSharedAccounts={canManageSharedAccounts}
             cellId={cellId}
             onCreateBudget={fetchCellData}
             onRefreshSharedAccounts={refreshSharedAccounts}
+            onRefreshSharedExpenses={refreshSharedExpenses}
+            currentUserId={user?.id}
+            isLeader={isLeader}
           />
           <TimelineFeed events={timeline} />
         </TabsContent>
 
         <TabsContent value="rateios" className="space-y-6">
-          <SplitRulesPanel
+          <SharedExpensesPanel
             cellId={cellId}
-            splitRules={splitRules}
-            onUpdated={fetchCellData}
+            expenses={sharedExpenses}
+            members={cell.members || []}
+            currentUserId={user?.id}
+            isLeader={isLeader}
+            onRefresh={refreshSharedExpenses}
           />
         </TabsContent>
 
@@ -372,6 +504,8 @@ export default function CellsDashboardPage() {
             entries={equilibrium}
             currentUserId={user?.id}
             cellId={cellId}
+            members={cell.members || []}
+            onRefresh={refreshEquilibriumSummary}
           />
         </TabsContent>
 
@@ -644,12 +778,26 @@ function HomeTab({
   onRefreshSharedAccounts: () => Promise<void>;
 }) {
   const { toast } = useToast();
-  const totalBudgetLimit = budgets.reduce((sum, budget) => sum + Number(budget.limit || 0), 0);
+  const totalBudgetLimit = budgets.reduce((sum, budget) => sum + parseAmount(budget.limit), 0);
   const sharedBudgets = budgets.filter((budget) => budget.type === 'CELL');
   const hybridOrPersonal = budgets.filter((budget) => budget.type !== 'CELL');
-  const totalFundsAmount = funds.reduce((sum, fund) => sum + Number(fund.currentAmount || 0), 0);
-  const totalFundsTargets = funds.reduce((sum, fund) => sum + Number(fund.targetAmount || 0), 0);
+  const totalFundsAmount = funds.reduce((sum, fund) => sum + parseAmount(fund.currentAmount), 0);
+  const totalFundsTargets = funds.reduce((sum, fund) => sum + parseAmount(fund.targetAmount), 0);
   const activeFunds = funds.filter((fund) => fund.status === 'ACTIVE').length;
+  const [historyFundId, setHistoryFundId] = useState<string | null>(null);
+  const [activeFundAction, setActiveFundAction] = useState<{ fund: CellFund | null; mode: 'DEPOSIT' | 'WITHDRAW' | null }>({
+    fund: null,
+    mode: null,
+  });
+
+  const budgetsOverLimit = budgets.filter((budget) => parseAmount(budget.aggregatedSpent) > parseAmount(budget.limit)).length;
+  const budgetsNearLimit = budgets.filter((budget) => {
+    const limit = parseAmount(budget.limit);
+    if (limit <= 0) return false;
+    const spent = parseAmount(budget.aggregatedSpent);
+    const percent = (spent / limit) * 100;
+    return percent >= 80 && percent < 100;
+  }).length;
   const [isBudgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [isFundDialogOpen, setFundDialogOpen] = useState(false);
 
@@ -682,6 +830,7 @@ function HomeTab({
   };
 
   return (
+    <>
     <div className="space-y-6">
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
@@ -707,9 +856,9 @@ function HomeTab({
           </Dialog>
           </CardHeader>
           <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-md border bg-muted/40 p-3">
-              <p className="text-xs text-muted-foreground uppercase">Orçamentos ativos</p>
+              <p className="text-xs text-muted-foreground uppercase">Orçamentos</p>
               <p className="text-2xl font-semibold">{budgets.length}</p>
             </div>
             <div className="rounded-md border bg-muted/40 p-3">
@@ -722,7 +871,25 @@ function HomeTab({
               <p className="text-xs text-muted-foreground uppercase">Limite combinado</p>
               <p className="text-2xl font-semibold">{toCurrency(totalBudgetLimit)}</p>
             </div>
+            <div className="rounded-md border bg-muted/40 p-3">
+              <p className="text-xs text-muted-foreground uppercase">Caixas ativos</p>
+              <p className="text-2xl font-semibold">{activeFunds}</p>
+            </div>
           </div>
+          {(budgetsOverLimit > 0 || budgetsNearLimit > 0) && (
+            <div className="flex flex-wrap gap-2 text-xs">
+              {budgetsOverLimit > 0 && (
+                <Badge variant="destructive" className="rounded-full">
+                  {budgetsOverLimit} estourado{budgetsOverLimit > 1 ? 's' : ''}
+                </Badge>
+              )}
+              {budgetsNearLimit > 0 && (
+                <Badge variant="secondary" className="rounded-full text-amber-900 bg-amber-100 border-amber-200">
+                  {budgetsNearLimit} perto do limite
+                </Badge>
+              )}
+            </div>
+          )}
           {budgets.length === 0 && <p className="text-sm text-muted-foreground">Nenhum orçamento criado ainda.</p>}
           {budgets.map((budget) => {
             const typeCopy =
@@ -740,9 +907,30 @@ function HomeTab({
                 .join(' • ')}`;
             }
             const categoryLabel = budget.category?.label || budget.category?.nome || 'Categoria não definida';
-            const spent = Number(budget.aggregatedSpent || 0);
-            const limit = Number(budget.limit || 0);
-            const percent = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+            const spent = parseAmount(budget.aggregatedSpent);
+            const limit = parseAmount(budget.limit);
+            const rawPercent = limit > 0 ? (spent / limit) * 100 : 0;
+            const percent = limit > 0 ? Math.min(100, Math.max(rawPercent, 0)) : 0;
+            const healthStatus = rawPercent >= 100
+              ? {
+                  label: 'Estourou',
+                  description: 'Reforce o limite ou trave gastos.',
+                  indicatorClass: 'bg-destructive',
+                  textClass: 'text-destructive',
+                }
+              : rawPercent >= 80
+              ? {
+                  label: 'Atenção',
+                  description: 'Ajuste rateios ou combine reforços.',
+                  indicatorClass: 'bg-amber-500',
+                  textClass: 'text-amber-600',
+                }
+              : {
+                  label: 'Saudável',
+                  description: 'Consumo dentro do previsto.',
+                  indicatorClass: 'bg-emerald-500',
+                  textClass: 'text-emerald-600',
+                };
             const recurrenceDescription =
               budget.recurrenceType && budget.recurrenceType !== 'MONTHLY'
                 ? `Recorrência ${budget.recurrenceType === 'WEEKLY'
@@ -752,7 +940,7 @@ function HomeTab({
                     : `custom (${budget.recurrenceDays || '?'} dias)`}`
                 : null;
             return (
-              <div key={budget.id} className="relative rounded-md border p-3 space-y-2">
+              <div key={budget.id} className="relative rounded-xl border bg-card p-4 space-y-3">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
@@ -779,37 +967,25 @@ function HomeTab({
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-semibold">{budget.label || 'Orçamento sem nome'}</p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                        {categoryLabel}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground">{typeCopy}</p>
-                    </div>
+                <div className="flex flex-wrap items-start justify-between gap-4 text-sm">
+                  <div className="space-y-1">
+                    <p className="font-semibold leading-tight">{budget.label || 'Orçamento sem nome'}</p>
+                    <p className="text-xs text-muted-foreground">{categoryLabel}</p>
                   </div>
-                  <div className="flex flex-col items-end gap-1 text-right">
-                    <Badge variant={typeVariant as 'default' | 'secondary' | 'outline'} className="text-xs uppercase tracking-wide">
-                      {budget.type === 'CELL' ? 'Visível para todos' : budget.type === 'HYBRID' ? 'Híbrido' : 'Pessoal'}
+                  <div className="text-right">
+                    <Badge variant={typeVariant as 'default' | 'secondary' | 'outline'} className="text-[10px] uppercase">
+                      {budget.type === 'CELL' ? 'Compartilhado' : budget.type === 'HYBRID' ? 'Híbrido' : 'Pessoal'}
                     </Badge>
-                    <span className="text-sm font-semibold">{toCurrency(Number(budget.limit))}</span>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {toCurrency(spent)} / {toCurrency(limit)}
+                    </p>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">{splitCopy}</p>
-                  {recurrenceDescription && (
-                    <p className="text-xs text-muted-foreground">{recurrenceDescription}</p>
-                  )}
-                  <div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span>Gasto compartilhado</span>
-                      <span className={percent > 100 ? 'text-destructive' : 'text-muted-foreground'}>
-                        {toCurrency(spent)} / {toCurrency(limit)}
-                      </span>
-                    </div>
-                    <Progress value={percent} className="h-2 mt-1" />
-                  </div>
+                <Progress value={percent} className="h-2" indicatorClassName={healthStatus.indicatorClass} />
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className={`font-medium ${healthStatus.textClass}`}>{healthStatus.label}</span>
+                  <span>• {splitCopy}</span>
+                  {recurrenceDescription && <span>• {recurrenceDescription}</span>}
                 </div>
               </div>
             );
@@ -838,7 +1014,7 @@ function HomeTab({
           </Dialog>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-md border bg-muted/40 p-3">
               <p className="text-xs text-muted-foreground uppercase">Fundos ativos</p>
               <p className="text-2xl font-semibold">{activeFunds}</p>
@@ -854,10 +1030,10 @@ function HomeTab({
           </div>
           {funds.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma caixinha criada ainda.</p>}
           {funds.map((fund) => {
-            const hasTarget = Number(fund.targetAmount || 0) > 0;
-            const progress = hasTarget
-              ? Math.min(100, (Number(fund.currentAmount || 0) / Number(fund.targetAmount || 1)) * 100)
-              : 0;
+            const currentAmount = parseAmount(fund.currentAmount);
+            const targetAmount = parseAmount(fund.targetAmount);
+            const hasTarget = targetAmount > 0;
+            const progress = hasTarget ? Math.min(100, (currentAmount / targetAmount) * 100) : 0;
             const statusCopy =
               fund.status === 'ACTIVE'
                 ? 'Em construção'
@@ -866,9 +1042,18 @@ function HomeTab({
                 : 'Pausado';
             const statusVariant =
               fund.status === 'ACTIVE' ? 'secondary' : fund.status === 'COMPLETED' ? 'default' : 'outline';
+            const withdrawalRoles = (fund.withdrawalRoles?.length ? fund.withdrawalRoles : ['LEADER']) as ClanRole[];
+            const withdrawalText = withdrawalRoles.map((role) => withdrawalRoleOptions[role].label).join(', ');
+            const depositChannel = (fund.depositInstructions?.channel || 'CELL_ACCOUNT') as FundDepositChannel;
+            const depositChannelLabel = depositChannelCopy[depositChannel]?.label || depositChannelCopy.CELL_ACCOUNT.label;
+            const custodianName = fund.custodian?.name || 'Sem responsável vinculado';
+            const usageNotes =
+              fund.usagePolicy && typeof fund.usagePolicy === 'object'
+                ? (fund.usagePolicy as { notes?: string }).notes
+                : null;
 
             return (
-              <div key={fund.id} className="relative rounded-md border p-3 space-y-3">
+              <div key={fund.id} className="relative rounded-xl border bg-card p-4 space-y-3">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button
@@ -895,38 +1080,57 @@ function HomeTab({
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <p className="font-semibold">{fund.name}</p>
-                    <Badge variant={statusVariant as 'secondary' | 'default' | 'outline'} className="text-xs">
-                      {statusCopy}
-                    </Badge>
+                    <p className="font-semibold leading-tight">{fund.name}</p>
+                    <p className="text-xs text-muted-foreground">{custodianName}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{toCurrency(Number(fund.currentAmount || 0))}</p>
-                    <p className="text-xs text-muted-foreground">Meta {toCurrency(Number(fund.targetAmount || 0))}</p>
+                  <Badge variant={statusVariant as 'secondary' | 'default' | 'outline'} className="text-[10px] uppercase">
+                    {statusCopy}
+                  </Badge>
+                </div>
+                <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
+                  <span>{toCurrency(fund.currentAmount)}</span>
+                  <span>Meta {toCurrency(fund.targetAmount)}</span>
+                </div>
+                <Progress value={progress} className="h-2" />
+                <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                  <Badge variant="outline" className="rounded-full border-dashed">
+                    {depositChannelLabel}
+                  </Badge>
+                  <Badge variant="outline" className="rounded-full border-dashed">
+                    Saque: {withdrawalText}
+                  </Badge>
+                  {fund.mirrorToCustodian && <Badge variant="outline" className="rounded-full">Espelhado</Badge>}
+                  {fund.goal && <Badge variant="secondary" className="rounded-full border-dashed">Meta pessoal</Badge>}
+                </div>
+                {usageNotes && <p className="text-xs text-muted-foreground">{usageNotes}</p>}
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <Button size="sm" variant="outline" onClick={() => setActiveFundAction({ fund, mode: 'DEPOSIT' })}>
+                    Investir
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setActiveFundAction({ fund, mode: 'WITHDRAW' })}>
+                    Resgatar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={historyFundId === fund.id ? 'secondary' : 'ghost'}
+                    onClick={() => setHistoryFundId((current) => (current === fund.id ? null : fund.id))}
+                  >
+                    Histórico
+                  </Button>
+                </div>
+                {historyFundId === fund.id && (
+                  <div className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground space-y-1 max-h-48 overflow-y-auto">
+                    {fund.contributions.length === 0 && <p>Sem movimentos registrados.</p>}
+                    {fund.contributions.map((entry) => (
+                      <div key={entry.id} className="flex items-center justify-between gap-2">
+                        <span>{new Date(entry.createdAt).toLocaleDateString('pt-BR')}</span>
+                        <span className="font-semibold text-foreground">{toCurrency(entry.amount)}</span>
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <Progress
-                    value={progress}
-                    indicatorClassName={progress >= 80 ? 'bg-green-500' : undefined}
-                    className={!hasTarget ? 'opacity-50' : undefined}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {hasTarget ? `${progress.toFixed(0)}% concluído` : 'Defina uma meta para acompanhar o progresso'}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {fund.contributions.slice(0, 3).map((contribution) => (
-                    <Badge key={contribution.id} variant="secondary">
-                      {toCurrency(Number(contribution.amount))}
-                    </Badge>
-                  ))}
-                  {fund.contributions.length === 0 && (
-                    <span className="text-xs text-muted-foreground">Sem contribuições registradas</span>
-                  )}
-                </div>
+                )}
               </div>
             );
           })}
@@ -956,6 +1160,531 @@ function HomeTab({
         </CardContent>
       </Card>
     </div>
+    <FundContributionDialog
+      fund={activeFundAction.fund}
+      mode={activeFundAction.mode}
+      onClose={() => setActiveFundAction({ fund: null, mode: null })}
+      onSuccess={async () => {
+        await onCreateBudget();
+        setActiveFundAction({ fund: null, mode: null });
+      }}
+    />
+    </>
+  );
+}
+
+type SettlementTarget = {
+  expenseId: string;
+  participant: CellSharedExpenseParticipant;
+  description: string;
+};
+
+function SharedExpensesPanel({
+  cellId,
+  expenses,
+  members,
+  onRefresh,
+  currentUserId,
+  isLeader,
+}: {
+  cellId: string;
+  expenses: CellSharedExpense[];
+  members: Clan['members'];
+  onRefresh: () => Promise<void>;
+  currentUserId?: string;
+  isLeader: boolean;
+}) {
+  const { toast } = useToast();
+  const memberLookup = useMemo(() => {
+    const entries = members.map((member) => [member.userId, member.user?.name || 'Membro']);
+    return Object.fromEntries(entries);
+  }, [members]);
+  const [isDialogOpen, setDialogOpen] = useState(false);
+  const [settlementTarget, setSettlementTarget] = useState<SettlementTarget | null>(null);
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    try {
+      await api.delete(`/cells/${cellId}/expenses/${expenseId}`);
+      toast({ title: 'Despesa removida.' });
+      await onRefresh();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível excluir a despesa.',
+        description: error?.response?.data?.message || 'Tente novamente.',
+      });
+    }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle>Despesas compartilhadas</CardTitle>
+            <CardDescription>Registre contas da casa e acompanhe quem já pagou.</CardDescription>
+          </div>
+          <Button size="sm" className="w-full sm:w-auto" onClick={() => setDialogOpen(true)}>
+            <ReceiptText className="mr-2 h-4 w-4" />
+            Nova despesa
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {expenses.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma despesa compartilhada foi cadastrada ainda. Use o botão acima para lançar uma conta e dividir automaticamente entre os membros.
+            </p>
+          )}
+          {expenses.map((expense) => (
+            <div key={expense.id} className="rounded-xl border bg-card p-4 space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold leading-tight">{expense.description}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {toCurrency(expense.totalAmount)} • {expense.category?.nome || 'Sem categoria'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(expense.createdAt).toLocaleDateString('pt-BR')}
+                  </p>
+                </div>
+                {isLeader && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="ghost" size="icon" className="text-destructive" aria-label="Excluir despesa">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir despesa?</AlertDialogTitle>
+                        <AlertDialogDescription>Os lançamentos pendentes também serão removidos.</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDeleteExpense(expense.id)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Excluir
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+              </div>
+              <div className="space-y-2">
+                {expense.participants.map((participant) => {
+                  const isPaid = Boolean(participant.transaction?.pago);
+                  const canSettle = !isPaid && participant.userId === currentUserId;
+                  return (
+                    <div
+                      key={participant.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/40 p-2 text-sm"
+                    >
+                      <div>
+                        <p className="font-semibold">{memberLookup[participant.userId] || 'Membro'}</p>
+                        <p className="text-xs text-muted-foreground">{toCurrency(participant.amountOwed)}</p>
+                      </div>
+                      {isPaid ? (
+                        <Badge variant="outline" className="flex items-center gap-1 border-emerald-200 text-emerald-700">
+                          <CircleCheck className="h-3.5 w-3.5" />
+                          Pago
+                        </Badge>
+                      ) : canSettle ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            setSettlementTarget({
+                              expenseId: expense.id,
+                              participant,
+                              description: expense.description,
+                            })
+                          }
+                        >
+                          Registrar pagamento
+                        </Button>
+                      ) : (
+                        <Badge variant="secondary" className="flex items-center gap-1 text-amber-700 bg-amber-100">
+                          <Clock4 className="h-3.5 w-3.5" />
+                          Aguardando
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+      <NewSharedExpenseDialog
+        open={isDialogOpen}
+        onOpenChange={setDialogOpen}
+        cellId={cellId}
+        members={members}
+        onSuccess={async () => {
+          setDialogOpen(false);
+          await onRefresh();
+        }}
+      />
+      <SettleSharedExpenseDialog
+        target={settlementTarget}
+        cellId={cellId}
+        onClose={() => setSettlementTarget(null)}
+        onSuccess={async () => {
+          setSettlementTarget(null);
+          await onRefresh();
+        }}
+      />
+    </>
+  );
+}
+
+function NewSharedExpenseDialog({
+  open,
+  onOpenChange,
+  cellId,
+  members,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  cellId: string;
+  members: Clan['members'];
+  onSuccess: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mode, setMode] = useState<'EQUAL' | 'CUSTOM'>('EQUAL');
+  const [form, setForm] = useState({
+    description: '',
+    categoryId: '',
+    totalAmount: '',
+  });
+  const [splits, setSplits] = useState<Record<string, string>>({});
+  const [selectedMembers, setSelectedMembers] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    let active = true;
+    if (!open) return;
+    setIsLoadingCategories(true);
+    api
+      .get('/categories')
+      .then((response) => {
+        if (!active) return;
+        setCategories(response.data || []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setCategories([]);
+      })
+      .finally(() => {
+        if (active) {
+          setIsLoadingCategories(false);
+        }
+      });
+    const initialSplits: Record<string, string> = {};
+    const initialSelection: Record<string, boolean> = {};
+    (members || []).forEach((member) => {
+      initialSplits[member.userId] = '';
+      initialSelection[member.userId] = true;
+    });
+    setSplits(initialSplits);
+    setSelectedMembers(initialSelection);
+    setForm({ description: '', categoryId: '', totalAmount: '' });
+    setMode('EQUAL');
+    return () => {
+      active = false;
+    };
+  }, [open, members]);
+
+  useEffect(() => {
+    if (mode !== 'EQUAL') return;
+    const total = parseAmount(form.totalAmount);
+    const active = members.filter((member) => selectedMembers[member.userId]);
+    const perMember = active.length ? total / active.length : 0;
+    setSplits((prev) => {
+      const next: Record<string, string> = {};
+      members.forEach((member) => {
+        if (selectedMembers[member.userId]) {
+          next[member.userId] = perMember ? perMember.toFixed(2) : prev[member.userId] || '';
+        } else {
+          next[member.userId] = '';
+        }
+      });
+      return next;
+    });
+  }, [mode, form.totalAmount, members, selectedMembers]);
+
+  const totalAmount = parseAmount(form.totalAmount);
+  const activeMembers = members.filter((member) => selectedMembers[member.userId]);
+  const splitEntries = activeMembers
+    .map((member) => ({
+      memberId: member.userId,
+      amount: parseAmount(splits[member.userId]),
+    }))
+    .filter((entry) => entry.amount > 0);
+  const splitSum = splitEntries.reduce((acc, entry) => acc + entry.amount, 0);
+  const totalsMatch = Math.round(splitSum * 100) === Math.round(totalAmount * 100);
+
+  const handleSubmit = async () => {
+    if (!form.description.trim() || !form.categoryId || !totalAmount || !splitEntries.length || !totalsMatch) {
+      toast({ variant: 'destructive', title: 'Revise os campos da despesa antes de salvar.' });
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      await api.post(`/cells/${cellId}/expenses`, {
+        description: form.description,
+        categoryId: form.categoryId,
+        totalAmount,
+        splitMethod: mode === 'EQUAL' ? 'EQUAL' : 'AMOUNT',
+        splits: splitEntries,
+      });
+      toast({ title: 'Despesa compartilhada cadastrada!' });
+      await onSuccess();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível salvar a despesa.',
+        description: error?.response?.data?.message || 'Tente novamente.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Nova despesa compartilhada</DialogTitle>
+          <DialogDescription>Divida contas da casa e acompanhe quem já quitou cada parte.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Descrição</Label>
+              <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ex.: Conta de luz" />
+            </div>
+            <div>
+              <Label>Categoria</Label>
+              {isLoadingCategories ? (
+                <p className="text-xs text-muted-foreground">Carregando categorias...</p>
+              ) : (
+                <Select value={form.categoryId} onValueChange={(value) => setForm({ ...form, categoryId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.label || category.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label>Total</Label>
+              <Input
+                type="number"
+                min={0}
+                value={form.totalAmount}
+                onChange={(e) => setForm({ ...form, totalAmount: e.target.value })}
+                placeholder="0,00"
+              />
+            </div>
+            <div>
+              <Label>Divisão</Label>
+              <Select value={mode} onValueChange={(value: 'EQUAL' | 'CUSTOM') => setMode(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EQUAL">Igualitária</SelectItem>
+                  <SelectItem value="CUSTOM">Personalizada</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Participantes</span>
+              <span>
+                Soma: {toCurrency(splitSum)} {totalsMatch ? '' : '(ajuste necessário)'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {members.map((member) => (
+                <div key={member.userId} className="flex items-center justify-between gap-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={Boolean(selectedMembers[member.userId])}
+                      onCheckedChange={(checked) =>
+                        setSelectedMembers((prev) => ({
+                          ...prev,
+                          [member.userId]: Boolean(checked),
+                        }))
+                      }
+                    />
+                    <span>{member.user?.name || 'Membro'}</span>
+                  </div>
+                  <Input
+                    className="w-32"
+                    type="number"
+                    min={0}
+                    value={splits[member.userId] ?? ''}
+                    onChange={(e) =>
+                      setSplits((prev) => ({
+                        ...prev,
+                        [member.userId]: e.target.value,
+                      }))
+                    }
+                    disabled={mode === 'EQUAL' || !selectedMembers[member.userId]}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? 'Salvando...' : 'Cadastrar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SettleSharedExpenseDialog({
+  target,
+  cellId,
+  onClose,
+  onSuccess,
+}: {
+  target: SettlementTarget | null;
+  cellId: string;
+  onClose: () => void;
+  onSuccess: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!target) {
+      setAccounts([]);
+      setSelectedAccountId('');
+      return;
+    }
+    let active = true;
+    setIsLoadingAccounts(true);
+    api
+      .get('/accounts')
+      .then((response) => {
+        if (!active) return;
+        const list = response.data || [];
+        setAccounts(list);
+        setSelectedAccountId(list[0]?.id || '');
+      })
+      .catch(() => {
+        if (!active) return;
+        setAccounts([]);
+        setSelectedAccountId('');
+      })
+      .finally(() => {
+        if (active) {
+          setIsLoadingAccounts(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [target]);
+
+  if (!target) {
+    return null;
+  }
+
+  const handleSubmit = async () => {
+    if (!selectedAccountId) {
+      toast({ variant: 'destructive', title: 'Selecione a conta utilizada.' });
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      await api.post(`/cells/${cellId}/expenses/${target.expenseId}/settle`, {
+        participantId: target.participant.id,
+        accountId: selectedAccountId,
+      });
+      toast({ title: 'Pagamento registrado!' });
+      await onSuccess();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível registrar o pagamento.',
+        description: error?.response?.data?.message || 'Tente novamente.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const amount = toCurrency(target.participant.amountOwed);
+
+  return (
+    <Dialog open={Boolean(target)} onOpenChange={(open) => (!open ? onClose() : null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Registrar pagamento</DialogTitle>
+          <DialogDescription>{target.description}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Valor</Label>
+            <Input value={amount} disabled />
+          </div>
+          <div>
+            <Label>Conta utilizada</Label>
+            {isLoadingAccounts ? (
+              <p className="text-sm text-muted-foreground">Carregando contas...</p>
+            ) : accounts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Você ainda não cadastrou contas. Cadastre pelo menos uma conta pessoal para registrar o pagamento.
+              </p>
+            ) : (
+              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={handleSubmit} disabled={isSubmitting || accounts.length === 0}>
+            {isSubmitting ? 'Salvando...' : 'Confirmar pagamento'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1108,173 +1837,175 @@ function SharedAccountsCard({
     Boolean(selectedAccountId) && (visibility !== 'CUSTOM' || (visibility === 'CUSTOM' && allowedRoles.length > 0));
 
   return (
-    <Card className="md:col-span-2">
-      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-1">
-          <CardTitle>Contas compartilhadas</CardTitle>
-          <CardDescription>Mostre saldos relevantes para toda a família e controle quem pode vê-los.</CardDescription>
-        </div>
-        {canManageSharedAccounts && (
-          <Dialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) {
-                resetForm();
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="w-full sm:w-auto">
-                <Wallet className="h-4 w-4 mr-1" />
-                Vincular conta
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Compartilhar conta com a família</DialogTitle>
-                <DialogDescription>Selecione uma das suas contas e escolha quem poderá enxergar os detalhes.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Conta</Label>
-                  {isLoadingAccounts ? (
-                    <p className="text-sm text-muted-foreground">Carregando contas...</p>
-                  ) : shareableAccounts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                      Você já compartilhou todas as contas disponíveis. Cadastre uma nova conta pessoal para vinculá-la aqui.
-                    </p>
-                  ) : (
-                    <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+    <>
+      <Card className="md:col-span-2">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <CardTitle>Contas compartilhadas</CardTitle>
+            <CardDescription>Mostre saldos relevantes para toda a família e controle quem pode vê-los.</CardDescription>
+          </div>
+          {canManageSharedAccounts && (
+            <Dialog
+              open={isDialogOpen}
+              onOpenChange={(open) => {
+                setDialogOpen(open);
+                if (!open) {
+                  resetForm();
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" className="w-full sm:w-auto">
+                  <Wallet className="h-4 w-4 mr-1" />
+                  Vincular conta
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Compartilhar conta com a família</DialogTitle>
+                  <DialogDescription>Selecione uma das suas contas e escolha quem poderá enxergar os detalhes.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Conta</Label>
+                    {isLoadingAccounts ? (
+                      <p className="text-sm text-muted-foreground">Carregando contas...</p>
+                    ) : shareableAccounts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Você já compartilhou todas as contas disponíveis. Cadastre uma nova conta pessoal para vinculá-la aqui.
+                      </p>
+                    ) : (
+                      <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione uma conta" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {shareableAccounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id}>
+                              {account.nome} • {account.instituicao || 'Instituição'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Visibilidade</Label>
+                    <Select value={visibility} onValueChange={(value) => setVisibility(value as 'MEMBERS' | 'ADMINS' | 'CUSTOM')}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma conta" />
+                        <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {shareableAccounts.map((account) => (
-                          <SelectItem key={account.id} value={account.id}>
-                            {account.nome} • {account.instituicao || 'Instituição'}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="MEMBERS">Todos os membros</SelectItem>
+                        <SelectItem value="ADMINS">Apenas líderes/admins</SelectItem>
+                        <SelectItem value="CUSTOM">Permissões customizadas</SelectItem>
                       </SelectContent>
                     </Select>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label>Visibilidade</Label>
-                  <Select value={visibility} onValueChange={(value) => setVisibility(value as 'MEMBERS' | 'ADMINS' | 'CUSTOM')}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="MEMBERS">Todos os membros</SelectItem>
-                      <SelectItem value="ADMINS">Apenas líderes/admins</SelectItem>
-                      <SelectItem value="CUSTOM">Permissões customizadas</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {visibility === 'CUSTOM' && (
-                  <div className="rounded-md border p-3 space-y-3">
-                    <p className="text-xs text-muted-foreground">Escolha quais perfis podem visualizar a conta.</p>
-                    {(['LEADER', 'ADMIN', 'MEMBER'] as Array<'LEADER' | 'ADMIN' | 'MEMBER'>).map((role) => (
-                      <label key={role} className="flex items-center justify-between text-sm">
-                        <span>{roleLabels[role]}</span>
-                        <Switch
-                          checked={allowedRoles.includes(role)}
-                          onCheckedChange={(checked) => {
-                            setAllowedRoles((prev) =>
-                              checked ? [...prev, role] : prev.filter((item) => item !== role),
-                            );
-                          }}
-                        />
-                      </label>
-                    ))}
                   </div>
-                )}
-              </div>
-              <DialogFooter>
-                <Button
-                  onClick={handleLinkAccount}
-                  disabled={!isFormValid || isSubmitting || shareableAccounts.length === 0}
-                >
-                  {isSubmitting ? 'Compartilhando...' : 'Compartilhar conta'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {sharedAccounts.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma conta compartilhada ainda. Vincule uma conta bancária ou carteira para que os demais acompanhem o saldo coletivo.
-          </p>
-        )}
-        <div className="space-y-3">
-          {sharedAccounts.map((item) => {
-            const visibilityText = visibilityLabel(item.visibility);
-            const allowed = Array.isArray(item.allowedRoles) ? item.allowedRoles : [];
-            return (
-              <div key={item.id} className="rounded-md border p-3 space-y-2">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <p className="font-semibold">{item.account?.nome || 'Conta compartilhada'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.account?.instituicao ? `${item.account?.instituicao} • ` : ''}
-                      Titular: {renderOwnerName(item.account?.userId)}
-                    </p>
-                  </div>
-                  {canManageSharedAccounts && (
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive"
-                          aria-label="Remover conta compartilhada"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Remover conta da família?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Os demais membros deixarão de visualizar esta conta compartilhada.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleUnlink(item.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            disabled={removingId === item.id}
-                          >
-                            {removingId === item.id ? 'Removendo...' : 'Remover'}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="outline">{visibilityText}</Badge>
-                  {item.visibility === 'CUSTOM' && allowed.length > 0 && (
-                    <>
-                      <span>Perfis autorizados:</span>
-                      {allowed.map((role) => (
-                        <Badge key={`${item.id}-${role}`} variant="secondary">
-                          {roleLabels[role as 'LEADER' | 'ADMIN' | 'MEMBER'] || role}
-                        </Badge>
+                  {visibility === 'CUSTOM' && (
+                    <div className="rounded-md border p-3 space-y-3">
+                      <p className="text-xs text-muted-foreground">Escolha quais perfis podem visualizar a conta.</p>
+                      {(['LEADER', 'ADMIN', 'MEMBER'] as Array<'LEADER' | 'ADMIN' | 'MEMBER'>).map((role) => (
+                        <label key={role} className="flex items-center justify-between text-sm">
+                          <span>{roleLabels[role]}</span>
+                          <Switch
+                            checked={allowedRoles.includes(role)}
+                            onCheckedChange={(checked) => {
+                              setAllowedRoles((prev) =>
+                                checked ? [...prev, role] : prev.filter((item) => item !== role),
+                              );
+                            }}
+                          />
+                        </label>
                       ))}
-                    </>
+                    </div>
                   )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+                <DialogFooter>
+                  <Button
+                    onClick={handleLinkAccount}
+                    disabled={!isFormValid || isSubmitting || shareableAccounts.length === 0}
+                  >
+                    {isSubmitting ? 'Compartilhando...' : 'Compartilhar conta'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {sharedAccounts.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              Nenhuma conta compartilhada ainda. Vincule uma conta bancária ou carteira para que os demais acompanhem o saldo coletivo.
+            </p>
+          )}
+          <div className="space-y-3">
+            {sharedAccounts.map((item) => {
+              const visibilityText = visibilityLabel(item.visibility);
+              const allowed = Array.isArray(item.allowedRoles) ? item.allowedRoles : [];
+              return (
+                <div key={item.id} className="rounded-md border p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <p className="font-semibold">{item.account?.nome || 'Conta compartilhada'}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.account?.instituicao ? `${item.account?.instituicao} • ` : ''}
+                        Titular: {renderOwnerName(item.account?.userId)}
+                      </p>
+                    </div>
+                    {canManageSharedAccounts && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            aria-label="Remover conta compartilhada"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Remover conta da família?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Os demais membros deixarão de visualizar esta conta compartilhada.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleUnlink(item.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              disabled={removingId === item.id}
+                            >
+                              {removingId === item.id ? 'Removendo...' : 'Remover'}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline">{visibilityText}</Badge>
+                    {item.visibility === 'CUSTOM' && allowed.length > 0 && (
+                      <>
+                        <span>Perfis autorizados:</span>
+                        {allowed.map((role) => (
+                          <Badge key={`${item.id}-${role}`} variant="secondary">
+                            {roleLabels[role as 'LEADER' | 'ADMIN' | 'MEMBER'] || role}
+                          </Badge>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }
 
@@ -1292,6 +2023,7 @@ function BudgetDialog({ onSuccess, members }: { onSuccess: () => Promise<void>; 
   };
   const [form, setForm] = useState(initialFormState);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
   const { user } = useUser();
   const { toast } = useToast();
   const cellId =
@@ -1312,6 +2044,13 @@ function BudgetDialog({ onSuccess, members }: { onSuccess: () => Promise<void>; 
   };
   const [distribution, setDistribution] = useState<Record<string, number>>(buildDefaultDistribution);
   const hasMembers = Boolean(members?.length);
+  const parsedLimit = parseAmount(form.limit);
+  const labelIsValid = Boolean(form.label.trim());
+  const categoryIsValid = Boolean(form.categoryId);
+  const limitIsValid = Number.isFinite(parsedLimit) && parsedLimit > 0;
+  const customRecurrenceValue = Number(form.recurrenceDays);
+  const customRecurrenceValid =
+    form.recurrenceType !== 'CUSTOM' || (Number.isFinite(customRecurrenceValue) && customRecurrenceValue >= 1 && customRecurrenceValue <= 90);
 
   useEffect(() => {
     setDistribution((prev) => {
@@ -1334,7 +2073,7 @@ function BudgetDialog({ onSuccess, members }: { onSuccess: () => Promise<void>; 
         if (isMounted) {
           setCategories(response.data || []);
         }
-      } catch (error) {
+      } catch {
         if (isMounted) {
           toast({
             variant: 'destructive',
@@ -1357,26 +2096,22 @@ function BudgetDialog({ onSuccess, members }: { onSuccess: () => Promise<void>; 
 
   const splitModeEnabled = form.type !== 'PERSONAL';
   const totalDistribution = Object.values(distribution).reduce((acc, value) => acc + Number(value || 0), 0);
+  const distributionValid = !splitModeEnabled || form.splitMode !== 'PERCENTAGE' || totalDistribution === 100;
+
+  const errors = useMemo(() => ({
+    label: labelIsValid ? null : 'Dê um nome para o envelope.',
+    category: categoryIsValid ? null : 'Selecione a categoria que receberá o espelho.',
+    limit: limitIsValid ? null : 'Informe um limite maior que zero.',
+    recurrence: customRecurrenceValid ? null : 'Recorrência personalizada deve ficar entre 1 e 90 dias.',
+    distribution: distributionValid ? null : 'A soma das porcentagens precisa fechar 100%.',
+  }), [labelIsValid, categoryIsValid, limitIsValid, customRecurrenceValid, distributionValid]);
+
+  const formIsValid = Object.values(errors).every((value) => !value);
 
   const handleSubmit = async () => {
-    const parsedLimit = Number(form.limit);
-    if (!form.categoryId) {
-      toast({ variant: 'destructive', title: 'Selecione uma categoria para este orçamento.' });
-      return;
-    }
-    if (!Number.isFinite(parsedLimit) || parsedLimit <= 0) {
-      toast({ variant: 'destructive', title: 'Informe um limite válido.' });
-      return;
-    }
-    if (form.recurrenceType === 'CUSTOM') {
-      const recurrenceValue = Number(form.recurrenceDays);
-      if (!Number.isFinite(recurrenceValue) || recurrenceValue < 1 || recurrenceValue > 90) {
-        toast({ variant: 'destructive', title: 'Informe um intervalo válido (1 a 90 dias) para a recorrência personalizada.' });
-        return;
-      }
-    }
-    if (splitModeEnabled && form.splitMode === 'PERCENTAGE' && totalDistribution !== 100) {
-      toast({ variant: 'destructive', title: 'A soma das porcentagens precisa fechar 100%.' });
+    if (!formIsValid) {
+      setShowErrors(true);
+      toast({ variant: 'destructive', title: 'Revise os campos destacados antes de salvar.' });
       return;
     }
     try {
@@ -1409,150 +2144,146 @@ function BudgetDialog({ onSuccess, members }: { onSuccess: () => Promise<void>; 
       });
       toast({ title: 'Orçamento criado!' });
       setForm(initialFormState);
+      setShowErrors(false);
       setDistribution(buildDefaultDistribution());
       await onSuccess();
-    } catch (error) {
+    } catch {
       toast({ variant: 'destructive', title: 'Não foi possível criar o orçamento.' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const showError = (key: keyof typeof errors) => showErrors && errors[key];
+
   return (
-    <DialogContent>
+    <DialogContent className="max-w-xl sm:max-w-3xl overflow-y-auto max-h-[90vh]">
       <DialogHeader>
         <DialogTitle>Novo orçamento</DialogTitle>
-        <DialogDescription>
-          Orçamentos do tipo <strong>Compartilhado</strong> ficam visíveis para todos os membros com permissão.
-        </DialogDescription>
+        <DialogDescription>Preencha apenas o essencial e deixe o Dexpesas sincronizar com todos.</DialogDescription>
       </DialogHeader>
-      <div className="space-y-4">
-        <div>
-          <Label>Nome</Label>
-          <Input value={form.label} onChange={(e) => setForm({ ...form, label: e.target.value })} placeholder="Ex: Mercado do mês" />
-        </div>
-        <div>
-          <Label>Categoria vinculada</Label>
-          {isLoadingCategories ? (
-            <p className="text-xs text-muted-foreground">Carregando categorias...</p>
-          ) : (
-            <Select
-              value={form.categoryId}
-              onValueChange={(value) => setForm({ ...form, categoryId: value })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.label || category.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-        <div>
-          <Label>Limite</Label>
-          <Input inputMode="decimal" value={form.limit} onChange={(e) => setForm({ ...form, limit: e.target.value })} placeholder="0,00" />
-        </div>
-        <div>
-          <Label>Tipo</Label>
-          <Select
-            value={form.type}
-            onValueChange={(value) => setForm({ ...form, type: value as CellBudget['type'] })}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CELL">Compartilhado</SelectItem>
-              <SelectItem value="HYBRID">Híbrido (parte pessoal)</SelectItem>
-              <SelectItem value="PERSONAL">Pessoal vinculado ao grupo</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="space-y-4 overflow-y-auto max-h-[70vh] pr-1 sm:pr-0">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label>Recorrência</Label>
-            <Select
-              value={form.recurrenceType}
-              onValueChange={(value) => setForm({ ...form, recurrenceType: value as CellBudget['recurrenceType'] })}
-            >
+            <Label>Nome</Label>
+            <Input
+              value={form.label}
+              onChange={(e) => setForm({ ...form, label: e.target.value })}
+              placeholder="Ex.: Mercado do mês"
+              aria-invalid={Boolean(showError('label'))}
+            />
+            {showError('label') && <p className="text-xs text-destructive">{errors.label}</p>}
+          </div>
+          <div>
+            <Label>Categoria vinculada</Label>
+            {isLoadingCategories ? (
+              <p className="text-xs text-muted-foreground">Carregando categorias...</p>
+            ) : (
+              <Select value={form.categoryId} onValueChange={(value) => setForm({ ...form, categoryId: value })}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.label || category.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {showError('category') && <p className="text-xs text-destructive">{errors.category}</p>}
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label>Limite planejado</Label>
+            <Input
+              inputMode="decimal"
+              type="number"
+              min={0}
+              value={form.limit}
+              onChange={(e) => setForm({ ...form, limit: e.target.value })}
+              placeholder="0,00"
+              aria-invalid={Boolean(showError('limit'))}
+            />
+            {showError('limit') && <p className="text-xs text-destructive">{errors.limit}</p>}
+          </div>
+          <div>
+            <Label>Tipo</Label>
+            <Select value={form.type} onValueChange={(value) => setForm({ ...form, type: value as CellBudget['type'] })}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="MONTHLY">Mensal (1º ao último dia)</SelectItem>
+                <SelectItem value="CELL">Compartilhado</SelectItem>
+                <SelectItem value="HYBRID">Híbrido</SelectItem>
+                <SelectItem value="PERSONAL">Pessoal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label>Recorrência</Label>
+            <Select value={form.recurrenceType} onValueChange={(value) => setForm({ ...form, recurrenceType: value as CellBudget['recurrenceType'] })}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MONTHLY">Mensal</SelectItem>
                 <SelectItem value="WEEKLY">Semanal</SelectItem>
                 <SelectItem value="BIWEEKLY">Quinzenal</SelectItem>
                 <SelectItem value="CUSTOM">Personalizado</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs mt-1 text-muted-foreground">
-              Controla quando os espelhos serão replicados.
-            </p>
           </div>
           {form.recurrenceType === 'CUSTOM' && (
             <div>
-              <Label>Dias por ciclo</Label>
+              <Label>Intervalo (dias)</Label>
               <Input
                 inputMode="numeric"
                 value={form.recurrenceDays}
                 onChange={(e) => setForm({ ...form, recurrenceDays: e.target.value })}
-                placeholder="Ex: 15"
+                placeholder="Ex.: 15"
+                aria-invalid={Boolean(showError('recurrence'))}
               />
-              <p className="text-xs text-muted-foreground">Intervalo entre uma sincronização e outra.</p>
+              {showError('recurrence') && <p className="text-xs text-destructive">{errors.recurrence}</p>}
             </div>
           )}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label>Início planejado</Label>
-            <Input
-              type="date"
-              value={form.effectiveFrom}
-              onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })}
-            />
-            <p className="text-xs text-muted-foreground">Opcional. Deixe vazio para iniciar imediatamente.</p>
+            <Label>Início</Label>
+            <Input type="date" value={form.effectiveFrom} onChange={(e) => setForm({ ...form, effectiveFrom: e.target.value })} />
           </div>
           <div>
-            <Label>Término (opcional)</Label>
-            <Input
-              type="date"
-              value={form.effectiveTo}
-              onChange={(e) => setForm({ ...form, effectiveTo: e.target.value })}
-            />
+            <Label>Término</Label>
+            <Input type="date" value={form.effectiveTo} onChange={(e) => setForm({ ...form, effectiveTo: e.target.value })} />
           </div>
         </div>
         {splitModeEnabled && (
           <div className="space-y-3 rounded-md border p-3">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <Label>Forma de divisão</Label>
-                <p className="text-xs text-muted-foreground">Defina como o valor será distribuído entre os membros.</p>
+                <Label>Divisão</Label>
+                <p className="text-xs text-muted-foreground">Escolha como o limite aparece para os membros.</p>
               </div>
-              <Select
-                value={form.splitMode}
-                onValueChange={(value) => setForm({ ...form, splitMode: value as 'EQUAL' | 'PERCENTAGE' })}
-              >
-                <SelectTrigger className="h-8 w-48 text-xs">
+              <Select value={form.splitMode} onValueChange={(value) => setForm({ ...form, splitMode: value as 'EQUAL' | 'PERCENTAGE' })}>
+                <SelectTrigger className="h-8 w-40 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="EQUAL">Igualitário</SelectItem>
                   <SelectItem value="PERCENTAGE" disabled={!hasMembers}>
-                    Por porcentagem {hasMembers ? '' : '(convide membros)'}
+                    Percentual
                   </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             {form.splitMode === 'PERCENTAGE' && (
               <div className="space-y-2">
-                {members?.length === 0 && (
-                  <p className="text-xs text-muted-foreground">Convide membros para distribuir o orçamento.</p>
-                )}
+                {members?.length === 0 && <p className="text-xs text-muted-foreground">Convide membros para dividir o valor.</p>}
                 {members?.map((member) => (
                   <div key={member.userId} className="flex items-center justify-between gap-2 text-sm">
                     <span>{member.user?.name || 'Membro'}</span>
@@ -1574,16 +2305,14 @@ function BudgetDialog({ onSuccess, members }: { onSuccess: () => Promise<void>; 
                     </div>
                   </div>
                 ))}
-                <p className={`text-xs ${totalDistribution === 100 ? 'text-muted-foreground' : 'text-destructive'}`}>
-                  Soma atual: {totalDistribution}%
-                </p>
+                {showError('distribution') && <p className="text-xs text-destructive">{errors.distribution}</p>}
               </div>
             )}
           </div>
         )}
       </div>
       <DialogFooter>
-        <Button onClick={handleSubmit} disabled={isSubmitting || !form.label || !form.limit}>
+        <Button onClick={handleSubmit} disabled={isSubmitting}>
           {isSubmitting ? 'Salvando...' : 'Salvar orçamento'}
         </Button>
       </DialogFooter>
@@ -1601,21 +2330,25 @@ function FundDialog({ onSuccess }: { onSuccess: () => Promise<void> }) {
     '';
   const [form, setForm] = useState({
     name: '',
-    targetAmount: 0,
+    targetAmount: '',
     description: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const targetValue = parseAmount(form.targetAmount);
+  const isValid = Boolean(form.name.trim()) && targetValue > 0;
 
   const handleSubmit = async () => {
+    if (!isValid) return;
     setIsSubmitting(true);
     try {
       await api.post(`/cells/${cellId}/funds`, {
-        name: form.name,
-        targetAmount: Number(form.targetAmount),
+        name: form.name.trim(),
+        targetAmount: targetValue,
         usagePolicy: form.description ? { notes: form.description } : null,
       });
       toast({ title: 'Fundo criado!' });
       await onSuccess();
+      setForm({ name: '', targetAmount: '', description: '' });
     } catch {
       toast({ variant: 'destructive', title: 'Não foi possível criar o fundo.' });
     } finally {
@@ -1624,26 +2357,40 @@ function FundDialog({ onSuccess }: { onSuccess: () => Promise<void> }) {
   };
 
   return (
-    <DialogContent>
+    <DialogContent className="max-w-md">
       <DialogHeader>
         <DialogTitle>Nova caixinha coletiva</DialogTitle>
+        <DialogDescription>Cadastre apenas o essencial para começar a guardar juntos.</DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
-        <div>
-          <Label>Nome</Label>
-          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <Label>Nome</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Viagem" />
+          </div>
+          <div>
+            <Label>Meta</Label>
+            <Input
+              type="number"
+              min={0}
+              value={form.targetAmount}
+              onChange={(e) => setForm({ ...form, targetAmount: e.target.value })}
+              placeholder="0,00"
+            />
+          </div>
         </div>
         <div>
-          <Label>Meta financeira</Label>
-          <Input type="number" value={form.targetAmount} onChange={(e) => setForm({ ...form, targetAmount: Number(e.target.value) })} />
-        </div>
-        <div>
-          <Label>Notas / Política de uso</Label>
-          <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          <Label>Notas / regras rápidas</Label>
+          <Textarea
+            rows={3}
+            value={form.description}
+            onChange={(e) => setForm({ ...form, description: e.target.value })}
+            placeholder="Quem usa? Quando sacar?"
+          />
         </div>
       </div>
       <DialogFooter>
-        <Button onClick={handleSubmit} disabled={isSubmitting || !form.name || !form.targetAmount}>
+        <Button onClick={handleSubmit} disabled={isSubmitting || !isValid}>
           {isSubmitting ? 'Salvando...' : 'Criar fundo'}
         </Button>
       </DialogFooter>
@@ -1651,17 +2398,216 @@ function FundDialog({ onSuccess }: { onSuccess: () => Promise<void> }) {
   );
 }
 
+function FundContributionDialog({
+  fund,
+  mode,
+  onClose,
+  onSuccess,
+}: {
+  fund: CellFund | null;
+  mode: 'DEPOSIT' | 'WITHDRAW' | null;
+  onClose: () => void;
+  onSuccess: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [amount, setAmount] = useState('');
+  const [notes, setNotes] = useState('');
+  const [destination, setDestination] = useState('');
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [isLoadingAccounts, setIsLoadingAccounts] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setAmount('');
+    setNotes('');
+    setDestination('');
+    setSelectedAccountId('');
+    setAccounts([]);
+  }, [fund, mode]);
+
+  useEffect(() => {
+    if (!fund || !mode) {
+      return;
+    }
+    let active = true;
+    setIsLoadingAccounts(true);
+    api
+      .get('/accounts')
+      .then((response) => {
+        if (!active) return;
+        const list = Array.isArray(response.data) ? response.data : [];
+        setAccounts(list);
+        setSelectedAccountId(list[0]?.id || '');
+      })
+      .catch(() => {
+        if (!active) return;
+        setAccounts([]);
+        setSelectedAccountId('');
+      })
+      .finally(() => {
+        if (active) {
+          setIsLoadingAccounts(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [fund, mode]);
+
+  if (!fund || !mode) {
+    return null;
+  }
+
+  const handleSubmit = async () => {
+    const parsed = parseAmount(amount);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast({ variant: 'destructive', title: 'Informe um valor válido.' });
+      return;
+    }
+    if (!selectedAccountId) {
+      toast({ variant: 'destructive', title: 'Selecione a conta utilizada.' });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await api.post(`/cells/funds/${fund.id}/contributions`, {
+        amount: mode === 'WITHDRAW' ? parsed * -1 : parsed,
+        accountId: selectedAccountId,
+        source: mode === 'WITHDRAW' ? 'WITHDRAW' : 'MANUAL_DEPOSIT',
+        metadata: {
+          notes: notes || undefined,
+          destination: mode === 'WITHDRAW' ? destination || undefined : undefined,
+        },
+      });
+      toast({ title: mode === 'WITHDRAW' ? 'Resgate registrado!' : 'Aplicação registrada!' });
+      await onSuccess();
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: mode === 'WITHDRAW' ? 'Não foi possível registrar o resgate.' : 'Não foi possível registrar o aporte.',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={Boolean(fund && mode)} onOpenChange={(open) => (!open ? onClose() : null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{mode === 'WITHDRAW' ? 'Resgatar da caixinha' : 'Investir na caixinha'}</DialogTitle>
+          <DialogDescription>{fund.name}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Valor</Label>
+            <Input
+              type="number"
+              min={0}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0,00"
+            />
+          </div>
+          <div>
+            <Label>{mode === 'WITHDRAW' ? 'Conta que recebe' : 'Conta de origem'}</Label>
+            {isLoadingAccounts ? (
+              <p className="text-sm text-muted-foreground">Carregando contas...</p>
+            ) : accounts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Você ainda não cadastrou contas pessoais. Cadastre uma para registrar o movimento.
+              </p>
+            ) : (
+              <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          {mode === 'WITHDRAW' && (
+            <div>
+              <Label>Para onde vai o resgate?</Label>
+              <Input
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                placeholder="Conta ou objetivo"
+              />
+            </div>
+          )}
+          <div>
+            <Label>Notas</Label>
+            <Textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Motivo, comprovante, quem autorizou..."
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={handleSubmit} disabled={isSubmitting || accounts.length === 0}>
+            {isSubmitting ? 'Salvando...' : mode === 'WITHDRAW' ? 'Resgatar' : 'Investir'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function SplitRulesPanel({
   cellId,
   splitRules,
   onUpdated,
+  members,
 }: {
   cellId: string;
   splitRules: CellSplitRule[];
   onUpdated: () => Promise<void>;
+  members: Clan['members'];
 }) {
   const { toast } = useToast();
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get('/accounts')
+      .then((response) => {
+        if (!active) return;
+        setAccounts(response.data || []);
+      })
+      .catch(() => {
+        if (!active) return;
+        toast({
+          variant: 'destructive',
+          title: 'Não foi possível carregar contas.',
+          description: 'Verifique a conexão e tente novamente.',
+        });
+      });
+    return () => {
+      active = false;
+    };
+  }, [toast]);
+
+  const memberMap = useMemo(() => {
+    const entries = (members || []).map((member) => [member.userId, member.user?.name || 'Integrante']);
+    return Object.fromEntries(entries);
+  }, [members]);
+
+  const accountMap = useMemo(() => {
+    const entries = accounts.map((account) => [account.id, account.nome]);
+    return Object.fromEntries(entries);
+  }, [accounts]);
 
   const handleApplyRule = async (ruleId: string) => {
     try {
@@ -1674,70 +2620,157 @@ function SplitRulesPanel({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <CardTitle>Transações & Rateios</CardTitle>
-          <CardDescription>Automatize como cada despesa recorrente é dividida.</CardDescription>
+          <CardTitle>Rateios por conta</CardTitle>
+          <CardDescription>Defina de onde sai a despesa e quanto cada um recebe.</CardDescription>
         </div>
         <Dialog open={isWizardOpen} onOpenChange={setIsWizardOpen}>
           <DialogTrigger asChild>
             <Button>
               <SplitSquareHorizontal className="h-4 w-4 mr-2" />
-              Rateio em 3 cliques
+              Novo rateio
             </Button>
           </DialogTrigger>
-          <SplitWizard cellId={cellId} onSuccess={async () => { setIsWizardOpen(false); await onUpdated(); }} />
+          <FamilySplitWizard
+            cellId={cellId}
+            members={members}
+            accounts={accounts}
+            onSuccess={async () => {
+              setIsWizardOpen(false);
+              await onUpdated();
+            }}
+          />
         </Dialog>
       </CardHeader>
       <CardContent className="space-y-4">
-        {splitRules.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma regra configurada.</p>}
-        {splitRules.map((rule) => (
-          <div key={rule.id} className="rounded-md border p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold">{rule.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {rule.method} • {rule.trigger}
-                </p>
+        {splitRules.length === 0 && <p className="text-sm text-muted-foreground">Nenhum rateio configurado.</p>}
+        {splitRules.map((rule) => {
+          const metadata = (rule.metadata || {}) as any;
+          const distribution = Array.isArray(metadata?.distribution) ? metadata.distribution : [];
+          const sourceAccountName = metadata?.sourceAccountId
+            ? accountMap[metadata.sourceAccountId] || 'Conta vinculada'
+            : 'Conta não definida';
+
+          return (
+            <div key={rule.id} className="rounded-xl border bg-card p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+                <div>
+                  <p className="font-semibold leading-tight">{rule.name}</p>
+                  <p className="text-xs text-muted-foreground">Origem: {sourceAccountName}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {rule.method}
+                  </Badge>
+                  <Button size="sm" variant="secondary" onClick={() => handleApplyRule(rule.id)}>
+                    Rodar
+                  </Button>
+                </div>
               </div>
-              <Button size="sm" variant="secondary" onClick={() => handleApplyRule(rule.id)}>
-                Rodar agora
-              </Button>
+              {distribution.length > 0 ? (
+                <div className="space-y-2">
+                  {distribution.map((entry: any) => (
+                    <details key={`${rule.id}-${entry.memberId}`} className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">
+                      <summary className="flex items-center justify-between gap-2">
+                        <span>{memberMap[entry.memberId] || 'Integrante'}</span>
+                        <span className="font-medium text-foreground">{entry.percentage || 0}%</span>
+                      </summary>
+                      <div className="mt-2 flex flex-col gap-1">
+                        <span>Conta destino: {entry.accountId ? accountMap[entry.accountId] || 'Conta pessoal' : 'Não informado'}</span>
+                        {entry.status && <span>Status: {entry.status}</span>}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Sem detalhes de distribuição.</p>
+              )}
             </div>
-            {rule.weightsConfig && (
-              <pre className="bg-muted rounded p-2 text-xs text-muted-foreground overflow-x-auto">{JSON.stringify(rule.weightsConfig, null, 2)}</pre>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </CardContent>
     </Card>
   );
 }
 
-function SplitWizard({ cellId, onSuccess }: { cellId: string; onSuccess: () => Promise<void> }) {
-  const [step, setStep] = useState(1);
-  const [form, setForm] = useState<RateioForm>({
-    name: '',
-    trigger: 'RECURRING_BILL',
-    method: 'EQUAL',
-    autoReimburse: false,
-    description: '',
-  });
+function FamilySplitWizard({
+  cellId,
+  members,
+  accounts,
+  onSuccess,
+}: {
+  cellId: string;
+  members: Clan['members'];
+  accounts: Account[];
+  onSuccess: () => Promise<void>;
+}) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    sourceAccountId: '',
+    autoReimburse: true,
+  });
+  const [distribution, setDistribution] = useState<Record<string, { percentage: string; accountId: string }>>(() => {
+    const totalMembers = members?.length || 0;
+    const defaultShare = totalMembers ? Math.round(100 / totalMembers) : 100;
+    const initial: Record<string, { percentage: string; accountId: string }> = {};
+    members?.forEach((member) => {
+      initial[member.userId] = { percentage: String(defaultShare), accountId: '' };
+    });
+    return initial;
+  });
+
+  useEffect(() => {
+    const totalMembers = members?.length || 0;
+    const defaultShare = totalMembers ? Math.round(100 / totalMembers) : 100;
+    setDistribution((prev) => {
+      const next: Record<string, { percentage: string; accountId: string }> = {};
+      members?.forEach((member) => {
+        next[member.userId] = prev[member.userId] || { percentage: String(defaultShare), accountId: '' };
+      });
+      return next;
+    });
+  }, [members]);
+
+  useEffect(() => {
+    if (accounts.length && !form.sourceAccountId) {
+      setForm((prev) => ({ ...prev, sourceAccountId: prev.sourceAccountId || accounts[0].id }));
+    }
+  }, [accounts, form.sourceAccountId]);
+
+  const totalPercentage = Object.values(distribution).reduce((sum, item) => sum + Number(item.percentage || 0), 0);
+  const canSubmit = Boolean(form.name.trim()) && Boolean(form.sourceAccountId) && totalPercentage === 100;
 
   const handleSubmit = async () => {
+    if (!canSubmit) {
+      toast({ variant: 'destructive', title: 'Distribua 100% da despesa antes de salvar.' });
+      return;
+    }
     setIsSubmitting(true);
     try {
+      const payloadDistribution = Object.entries(distribution).map(([memberId, payload]) => ({
+        memberId,
+        percentage: Number(payload.percentage) || 0,
+        accountId: payload.accountId || null,
+      }));
+
       await api.post(`/cells/${cellId}/split-rules`, {
-        name: form.name,
-        trigger: form.trigger,
-        method: form.method,
+        name: form.name.trim(),
+        trigger: 'RECURRING_BILL',
+        method: 'WEIGHTED',
         autoReimburse: form.autoReimburse,
-        metadata: form.description ? { description: form.description } : null,
+        metadata: {
+          description: form.description || null,
+          sourceAccountId: form.sourceAccountId,
+          distribution: payloadDistribution,
+        },
       });
-      toast({ title: 'Regra criada com sucesso!' });
+      toast({ title: 'Rateio configurado!' });
       await onSuccess();
+      setForm({ name: '', description: '', sourceAccountId: accounts[0]?.id || '', autoReimburse: true });
     } catch {
       toast({ variant: 'destructive', title: 'Não foi possível salvar o rateio.' });
     } finally {
@@ -1748,102 +2781,102 @@ function SplitWizard({ cellId, onSuccess }: { cellId: string; onSuccess: () => P
   return (
     <DialogContent className="space-y-4">
       <DialogHeader>
-        <DialogTitle>Rateio em 3 cliques</DialogTitle>
-        <DialogDescription>Configure rapidamente como a despesa será dividida.</DialogDescription>
+        <DialogTitle>Novo rateio</DialogTitle>
+        <DialogDescription>Escolha a conta de origem e como o valor será dividido.</DialogDescription>
       </DialogHeader>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        {[1, 2, 3].map((current) => (
-          <div
-            key={current}
-            className={`h-2 flex-1 rounded ${step >= current ? 'bg-primary' : 'bg-muted'}`}
+      <div className="space-y-3">
+        <div>
+          <Label>Nome</Label>
+          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Luz compartilhada" />
+        </div>
+        <div>
+          <Label>Conta de origem</Label>
+          <Select value={form.sourceAccountId} onValueChange={(value) => setForm({ ...form, sourceAccountId: value })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {accounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.nome}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Notas rápidas</Label>
+          <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Quando rodar? Quem paga primeiro?" />
+        </div>
+        <div className="rounded-md border p-3 space-y-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Distribuição ({totalPercentage}%)</span>
+            <span>{totalPercentage === 100 ? 'Ok' : 'Ajuste para fechar 100%'}</span>
+          </div>
+          <div className="space-y-2">
+            {members?.map((member) => (
+              <div key={member.userId} className="rounded-md bg-muted/30 p-2 space-y-2">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span>{member.user?.name || 'Integrante'}</span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      className="w-20"
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={distribution[member.userId]?.percentage || ''}
+                      onChange={(e) =>
+                        setDistribution((prev) => ({
+                          ...prev,
+                          [member.userId]: {
+                            ...(prev[member.userId] || { accountId: '' }),
+                            percentage: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                    <span className="text-xs">%</span>
+                  </div>
+                </div>
+                <Select
+                  value={distribution[member.userId]?.accountId || ''}
+                  onValueChange={(value) =>
+                    setDistribution((prev) => ({
+                      ...prev,
+                      [member.userId]: {
+                        ...(prev[member.userId] || { percentage: '0' }),
+                        accountId: value,
+                      },
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Conta destino (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={`${member.userId}-${account.id}`} value={account.id}>
+                        {account.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center justify-between rounded-md border px-3 py-2 text-xs text-muted-foreground">
+          <span>Marcar como reembolsado automaticamente</span>
+          <Switch
+            checked={form.autoReimburse}
+            onCheckedChange={(checked) => setForm((prev) => ({ ...prev, autoReimburse: checked }))}
           />
-        ))}
+        </div>
       </div>
-      {step === 1 && (
-        <div className="space-y-3">
-          <Label>Nome da regra</Label>
-          <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <div>
-            <Label>Descrição</Label>
-            <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          </div>
-        </div>
-      )}
-      {step === 2 && (
-        <div className="space-y-3">
-          <div>
-            <Label>Gatilho</Label>
-            <Select
-              value={form.trigger}
-              onValueChange={(value) => setForm({ ...form, trigger: value as RateioForm['trigger'] })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="RECURRING_BILL">Conta recorrente</SelectItem>
-                <SelectItem value="ADHOC">Despesa pontual</SelectItem>
-                <SelectItem value="USAGE_BASED">Por consumo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>Método</Label>
-            <Select
-              value={form.method}
-              onValueChange={(value) => setForm({ ...form, method: value as RateioForm['method'] })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="EQUAL">Igualitário</SelectItem>
-                <SelectItem value="WEIGHTED">Por peso</SelectItem>
-                <SelectItem value="CONSUMPTION">Por consumo informado</SelectItem>
-                <SelectItem value="PAYER_REIMBURSED">Reembolso para quem paga</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
-      {step === 3 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-semibold">Resumo</p>
-              <p className="text-xs text-muted-foreground">Verifique antes de confirmar.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch checked={form.autoReimburse} onCheckedChange={(checked) => setForm({ ...form, autoReimburse: checked })} />
-              <span className="text-xs text-muted-foreground">Reembolsar automaticamente</span>
-            </div>
-          </div>
-          <Card className="bg-muted/40">
-            <CardContent className="p-4 text-sm text-muted-foreground space-y-2">
-              <p><strong>Nome:</strong> {form.name || '—'}</p>
-              <p><strong>Trigger:</strong> {form.trigger}</p>
-              <p><strong>Método:</strong> {form.method}</p>
-              <p><strong>Reembolso automático:</strong> {form.autoReimburse ? 'Sim' : 'Não'}</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      <DialogFooter className="flex flex-wrap gap-2">
-        {step > 1 && (
-          <Button variant="outline" onClick={() => setStep((current) => current - 1)}>
-            Voltar
-          </Button>
-        )}
-        {step < 3 && (
-          <Button onClick={() => setStep((current) => current + 1)} disabled={step === 1 && !form.name}>
-            Avançar
-          </Button>
-        )}
-        {step === 3 && (
-          <Button onClick={handleSubmit} disabled={isSubmitting || !form.name}>
-            {isSubmitting ? 'Salvando...' : 'Concluir'}
-          </Button>
-        )}
+      <DialogFooter>
+        <Button onClick={handleSubmit} disabled={isSubmitting || !canSubmit}>
+          {isSubmitting ? 'Salvando...' : 'Salvar rateio'}
+        </Button>
       </DialogFooter>
     </DialogContent>
   );
@@ -2183,70 +3216,271 @@ function EquilibriumPanel({
   entries,
   currentUserId,
   cellId,
+  members,
+  onRefresh,
 }: {
   entries: CellEquilibriumEntry[];
   currentUserId?: string;
   cellId: string;
+  members: Clan['members'];
+  onRefresh: () => Promise<void>;
 }) {
+  const { toast } = useToast();
+  const memberLookup = useMemo(() => {
+    const pairs = (members || []).map((member) => [
+      member.userId,
+      {
+        name: member.user?.name || 'Integrante',
+        avatarUrl: member.user?.avatarUrl || null,
+      },
+    ]);
+    return Object.fromEntries(pairs);
+  }, [members]);
   const positives = entries.filter((entry) => entry.balance > 0);
   const negatives = entries.filter((entry) => entry.balance < 0);
+  const totalReceive = positives.reduce((acc, entry) => acc + entry.balance, 0);
+  const totalPay = negatives.reduce((acc, entry) => acc + Math.abs(entry.balance), 0);
+  const [settlementContext, setSettlementContext] = useState<{
+    mode: 'PAY' | 'RECEIVE';
+    amount: string;
+    counterpartId: string;
+    options: Array<{ id: string; name: string; balance: number }>;
+  } | null>(null);
+  const [settlementNotes, setSettlementNotes] = useState('');
+
+  const closeDialog = () => {
+    setSettlementContext(null);
+    setSettlementNotes('');
+  };
+
+  const openSettlementDialog = (
+    mode: 'PAY' | 'RECEIVE',
+    counterpartPool: CellEquilibriumEntry[],
+    suggestedAmount: number,
+  ) => {
+    if (!counterpartPool.length) {
+      toast({
+        variant: 'destructive',
+        title: 'Nenhum membro encontrado para compensar.',
+        description: 'Convide mais pessoas ou aguarde outros registros.',
+      });
+      return;
+    }
+    setSettlementContext({
+      mode,
+      amount: Math.abs(suggestedAmount).toFixed(2),
+      counterpartId: counterpartPool[0].userId,
+      options: counterpartPool.map((entry) => ({
+        id: entry.userId,
+        name: memberLookup[entry.userId]?.name || 'Integrante',
+        balance: entry.balance,
+      })),
+    });
+    setSettlementNotes('');
+  };
+
+  const handleRegisterSettlement = async () => {
+    if (!settlementContext) return;
+    const parsed = parseAmount(settlementContext.amount);
+    if (!Number.isFinite(parsed) || parsed <= 0 || !settlementContext.counterpartId) {
+      toast({ variant: 'destructive', title: 'Informe um valor válido.' });
+      return;
+    }
+    try {
+      await api.post(`/cells/${cellId}/equilibrium/settlements`, {
+        counterpartId: settlementContext.counterpartId,
+        amount: parsed,
+        direction: settlementContext.mode,
+        notes: settlementNotes || undefined,
+      });
+      toast({ title: 'Registro adicionado ao Equilíbrio.' });
+      closeDialog();
+      await onRefresh();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível registrar o acerto.',
+        description: error?.response?.data?.message || 'Tente novamente em instantes.',
+      });
+    }
+  };
+
+  const renderMemberName = (userId: string) => memberLookup[userId]?.name || userId;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Equilíbrio familiar</CardTitle>
-        <CardDescription>Veja quem deve ou tem a receber.</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4 md:grid-cols-2">
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold flex items-center gap-2 text-green-600">
-              <Wallet className="h-4 w-4" />
-              Você tem a receber
-            </h3>
+    <>
+      <Card>
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Equilíbrio familiar</CardTitle>
+            <CardDescription>Controle quem pagou a mais e registre os ressarcimentos.</CardDescription>
           </div>
-          <div className="space-y-2">
-            {positives.length === 0 && <p className="text-xs text-muted-foreground">Ninguém te deve por enquanto.</p>}
-            {positives.map((entry) => (
-              <div key={entry.userId} className="rounded-md border p-2 flex items-center justify-between">
-                <span className="text-sm">{entry.userId}</span>
-                <span className="text-sm font-semibold text-green-600">{toCurrency(entry.balance)}</span>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Badge variant="secondary">
+              Receber: <span className="ml-1 font-semibold text-green-700">{toCurrency(totalReceive)}</span>
+            </Badge>
+            <Badge variant="outline">
+              Pagar: <span className="ml-1 font-semibold text-red-600">{toCurrency(totalPay)}</span>
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="grid gap-6 md:grid-cols-2">
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-green-600">
+                <Wallet className="h-4 w-4" />
+                A receber
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {positives.length === 0 && <p className="text-xs text-muted-foreground">Ninguém te deve por enquanto.</p>}
+              {positives.map((entry) => {
+                const isCurrent = entry.userId === currentUserId;
+                const debtorOptions = negatives.filter((candidate) => candidate.userId !== entry.userId);
+                return (
+                  <div
+                    key={entry.userId}
+                    className="rounded-md border p-3 flex items-center justify-between gap-3 text-sm"
+                  >
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-foreground">{renderMemberName(entry.userId)}</p>
+                      <p className="text-xs text-muted-foreground">Saldo: {toCurrency(entry.balance)}</p>
+                    </div>
+                    {isCurrent && debtorOptions.length > 0 ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openSettlementDialog('RECEIVE', debtorOptions, entry.balance)}
+                      >
+                        Registrar recebimento
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Aguardando</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-red-600">
+                <Wallet className="h-4 w-4" />
+                Você deve
+              </h3>
+            </div>
+            <div className="space-y-2">
+              {negatives.length === 0 && <p className="text-xs text-muted-foreground">Nenhum débito pendente.</p>}
+              {negatives.map((entry) => {
+                const isCurrent = entry.userId === currentUserId;
+                const creditorOptions = positives.filter((candidate) => candidate.userId !== entry.userId);
+                return (
+                  <div
+                    key={entry.userId}
+                    className="rounded-md border p-3 flex items-center justify-between gap-3 text-sm"
+                  >
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-foreground">{renderMemberName(entry.userId)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Saldo: {toCurrency(Math.abs(entry.balance))} a pagar
+                      </p>
+                    </div>
+                    {isCurrent && creditorOptions.length > 0 ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-red-600"
+                        onClick={() => openSettlementDialog('PAY', creditorOptions, Math.abs(entry.balance))}
+                      >
+                        Registrar Pix
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sem ações</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <Dialog open={Boolean(settlementContext)} onOpenChange={(open) => (!open ? closeDialog() : null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {settlementContext?.mode === 'PAY' ? 'Registrar pagamento' : 'Registrar recebimento'}
+            </DialogTitle>
+            <DialogDescription>
+              Atualize o Equilíbrio anotando quanto foi transferido e para quem.
+            </DialogDescription>
+          </DialogHeader>
+          {settlementContext && (
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <Label>Com quem você acertou?</Label>
+                <Select
+                  value={settlementContext.counterpartId}
+                  onValueChange={(value) =>
+                    setSettlementContext((prev) => (prev ? { ...prev, counterpartId: value } : prev))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {settlementContext.options.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            ))}
-          </div>
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-semibold flex items-center gap-2 text-red-600">
-              <Wallet className="h-4 w-4" />
-              Você deve
-            </h3>
-          </div>
-          <div className="space-y-2">
-            {negatives.length === 0 && <p className="text-xs text-muted-foreground">Sem débitos.</p>}
-            {negatives.map((entry) => (
-              <div key={entry.userId} className="rounded-md border p-2 flex items-center justify-between">
-                <span className="text-sm">{entry.userId}</span>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-red-600">
-                  Registrar Pix ({toCurrency(Math.abs(entry.balance))})
-                </Button>
+              <div className="space-y-1">
+                <Label>Valor</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={settlementContext.amount}
+                  onChange={(e) =>
+                    setSettlementContext((prev) => (prev ? { ...prev, amount: e.target.value } : prev))
+                  }
+                />
               </div>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+              <div className="space-y-1">
+                <Label>Notas</Label>
+                <Textarea
+                  rows={3}
+                  value={settlementNotes}
+                  onChange={(e) => setSettlementNotes(e.target.value)}
+                  placeholder="PIX enviado? Jogo de quem pagou e referência."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              onClick={handleRegisterSettlement}
+              disabled={!settlementContext || !settlementContext.counterpartId}
+            >
+              Registrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
 function ReportsPanel({ budgets, funds }: { budgets: CellBudget[]; funds: CellFund[] }) {
   const totalCellBudgets = budgets
     .filter((budget) => budget.type !== 'PERSONAL')
-    .reduce((acc, budget) => acc + Number(budget.limit), 0);
+    .reduce((acc, budget) => acc + parseAmount(budget.limit), 0);
   const totalHybridPersonal = budgets
     .filter((budget) => budget.type === 'PERSONAL')
-    .reduce((acc, budget) => acc + Number(budget.limit), 0);
-  const totalFunds = funds.reduce((acc, fund) => acc + Number(fund.currentAmount || 0), 0);
+    .reduce((acc, budget) => acc + parseAmount(budget.limit), 0);
+  const totalFunds = funds.reduce((acc, fund) => acc + parseAmount(fund.currentAmount), 0);
 
   return (
     <div className="grid gap-6 md:grid-cols-2">

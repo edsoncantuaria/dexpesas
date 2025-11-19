@@ -1,5 +1,6 @@
 // backend/src/services/cardBalanceService.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { getInvoicePeriod } from '../utils/date-helpers.js';
 
 const prisma = new PrismaClient();

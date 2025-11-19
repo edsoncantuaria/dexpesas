@@ -1,5 +1,6 @@
 // src/controllers/cardController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { setDate } from 'date-fns';
 import AuditService from '../services/auditService.js';
 import TransactionService from '../services/transactionService.js';

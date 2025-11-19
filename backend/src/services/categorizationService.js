@@ -1,5 +1,6 @@
 // backend/src/services/categorizationService.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { defaultRules } from '../config/seedData.js'; // Importa as regras padrão
 
 const prisma = new PrismaClient();

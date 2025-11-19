@@ -105,6 +105,7 @@ CREATE TABLE `cell_expenses` (
     `splitMethod` ENUM('EQUAL', 'PERCENTAGE', 'AMOUNT') NOT NULL,
     `categoryId` VARCHAR(191) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `splitAppliedAt` DATETIME(3) NULL,
 
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -138,6 +139,7 @@ CREATE TABLE `cell_budgets` (
     `effectiveTo` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
+    `lastSyncedAt` DATETIME(3) NULL,
 
     INDEX `cell_budgets_cellId_idx`(`cellId`),
     INDEX `cell_budgets_cellId_type_idx`(`cellId`, `type`),
@@ -152,6 +154,11 @@ CREATE TABLE `cell_funds` (
     `targetAmount` DECIMAL(18, 4) NOT NULL,
     `currentAmount` DECIMAL(18, 4) NOT NULL DEFAULT 0,
     `usagePolicy` JSON NULL,
+    `custodianId` VARCHAR(191) NULL,
+    `custodianAccountLabel` VARCHAR(191) NULL,
+    `depositInstructions` JSON NULL,
+    `withdrawalRoles` JSON NOT NULL,
+    `mirrorToCustodian` BOOLEAN NOT NULL DEFAULT false,
     `status` ENUM('ACTIVE', 'PAUSED', 'COMPLETED') NOT NULL DEFAULT 'ACTIVE',
     `goalDeadline` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
@@ -173,6 +180,23 @@ CREATE TABLE `cell_fund_contributions` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     INDEX `cell_fund_contributions_fundId_createdAt_idx`(`fundId`, `createdAt`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `cell_shared_accounts` (
+    `id` VARCHAR(191) NOT NULL,
+    `cellId` VARCHAR(191) NOT NULL,
+    `accountId` VARCHAR(191) NOT NULL,
+    `visibility` ENUM('MEMBERS', 'ADMINS', 'CUSTOM') NOT NULL DEFAULT 'MEMBERS',
+    `allowedRoles` JSON NOT NULL,
+    `metadata` JSON NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `cell_shared_accounts_cellId_idx`(`cellId`),
+    INDEX `cell_shared_accounts_accountId_idx`(`accountId`),
+    UNIQUE INDEX `cell_shared_accounts_cellId_accountId_key`(`cellId`, `accountId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -550,7 +574,7 @@ CREATE TABLE `Budget` (
 
     INDEX `Budget_userId_startDate_endDate_idx`(`userId`, `startDate`, `endDate`),
     INDEX `Budget_userId_month_idx`(`userId`, `month`),
-    UNIQUE INDEX `Budget_user_cat_type_month_cell_key`(`userId`, `categoryId`, `type`, `month`, `startDate`, `endDate`, `cellBudgetId`),
+    UNIQUE INDEX `Budget_userId_categoryId_type_month_startDate_endDate_cellBu_key`(`userId`, `categoryId`, `type`, `month`, `startDate`, `endDate`, `cellBudgetId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 

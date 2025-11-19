@@ -1,7 +1,8 @@
 // server.js
 import app from './src/app.js';
 import config from './src/config/config.js';
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { redisClient } from './src/config/redis.js';
 import minioClient from './src/config/minioClient.js';
 import { scheduleDefaultCellJobs } from './src/queues/cellJobsQueue.js';

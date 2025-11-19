@@ -1,5 +1,6 @@
 // src/controllers/transactionController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { addMonths, format, startOfMonth, endOfMonth, parseISO, addWeeks, addDays, isBefore } from 'date-fns';
 import NotificationService from '../services/notificationService.js';
 import AutomationService from '../services/automationService.js';

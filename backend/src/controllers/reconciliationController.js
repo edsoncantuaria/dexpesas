@@ -1,5 +1,6 @@
 // src/controllers/reconciliationController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { reconciliationQueue } from '../queues/reconciliationQueue.js';
 import AuditService from '../services/auditService.js';
 import GamificationService from '../services/gamificationService.js';

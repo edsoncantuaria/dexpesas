@@ -329,6 +329,9 @@ model User {
   securityEvents       SecurityEvent[]
   favoriteCategoryLinks UserFavoriteCategory[]
   cellFundContributions CellFundContribution[]
+  custodiedCellFunds   CellFund[] @relation("UserCustodiedFunds")
+  equilibriumSettlementPayments CellEquilibriumSettlement[] @relation("EquilibriumSettlementPayer")
+  equilibriumSettlementReceipts CellEquilibriumSettlement[] @relation("EquilibriumSettlementReceiver")
 
 }
 
@@ -358,6 +361,7 @@ model Clan {
   cellFunds            CellFund[]
   cellSplitRules       CellSplitRule[]
   cellEquilibriumSnapshots CellEquilibriumSnapshot[]
+  cellEquilibriumSettlements CellEquilibriumSettlement[]
   sharedAccounts       CellSharedAccount[] @relation("ClanSharedAccounts")
 
   @@map("family_cells")
@@ -468,6 +472,16 @@ model CellFund {
   targetAmount         Decimal @db.Decimal(18, 4)
   currentAmount        Decimal @default(0) @db.Decimal(18, 4)
   usagePolicy          Json?
+  /// Responsável legal pela caixinha
+  custodianId          String?
+  /// Rastro para o espelho pessoal/conta usada no mundo real
+  custodianAccountLabel String?
+  /// Configurações de aporte da família
+  depositInstructions  Json?
+  /// Quais papéis podem sacar
+  withdrawalRoles      Json @default("[\"LEADER\"]")
+  /// Se deve mostrar o espelho na visão pessoal
+  mirrorToCustodian    Boolean @default(false)
   status               CellFundStatus @default(ACTIVE)
   goalDeadline         DateTime?
   createdAt            DateTime @default(now())
@@ -475,8 +489,10 @@ model CellFund {
 
   // --- Relações ---
   cell                 Clan @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  custodian            User? @relation("UserCustodiedFunds", fields: [custodianId], references: [id], onDelete: SetNull)
   contributions        CellFundContribution[]
   budgets              CellBudget[] @relation("CellFundToBudgets")
+  goal                 Goal? @relation("CellFundGoal")
 
   @@index([cellId])
   @@map("cell_funds")
@@ -554,6 +570,24 @@ model CellEquilibriumSnapshot {
 
   @@unique([cellId, referenceMonth])
   @@map("cell_equilibrium_snapshots")
+}
+
+model CellEquilibriumSettlement {
+  id             String  @id @default(cuid())
+  cellId         String
+  payerId        String
+  receiverId     String
+  amount         Decimal @db.Decimal(18, 4)
+  notes          String?
+  referenceMonth String
+  createdAt      DateTime @default(now())
+
+  cell     Clan @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  payer    User @relation("EquilibriumSettlementPayer", fields: [payerId], references: [id], onDelete: Cascade)
+  receiver User @relation("EquilibriumSettlementReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([cellId])
+  @@map("cell_equilibrium_settlements")
 }
 
 model CellEvent {
@@ -988,11 +1022,13 @@ model Goal {
   userId               String?
   accountId            String?
   clanId               String?
+  cellFundId           String? @unique
 
   // --- Relações ---
   user                 User? @relation(fields: [userId], references: [id], onDelete: Cascade)
   account              Account? @relation(fields: [accountId], references: [id], onDelete: SetNull)
   clan                 Clan? @relation(fields: [clanId], references: [id], onDelete: Cascade)
+  cellFund             CellFund? @relation("CellFundGoal", fields: [cellFundId], references: [id], onDelete: Cascade)
   contributions        GoalContribution[] @relation("GoalContribution_goal")
   automation           Automation? @relation("GoalAutomation")
 

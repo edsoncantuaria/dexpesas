@@ -1,6 +1,7 @@
 
 // backend/src/controllers/aiController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { suggestCategoryFlow } from '../ai/flows/category-suggestion-flow.js';
 import { searchTransactionsFlow } from '../ai/flows/transaction-search-flow.js';
 import { habitAnalysisFlow } from '../ai/flows/habit-analysis-flow.js';

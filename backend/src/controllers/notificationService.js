@@ -1,6 +1,7 @@
 
 // backend/src/services/notificationService.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { addDays } from 'date-fns';
 import GamificationService from './gamificationService.js';
 import { notificationQueue } from '../queues/notificationQueue.js';

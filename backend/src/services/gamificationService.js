@@ -1,10 +1,11 @@
 
 // backend/src/services/gamificationService.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
 import { differenceInDays, subMonths, startOfMonth, endOfMonth, startOfDay, startOfWeek } from 'date-fns';
 import NotificationService from './notificationService.js';
 import AuditService from './auditService.js';
 
+const { PrismaClient } = pkg;
 const prisma = new PrismaClient();
 
 // Definição das conquistas e seus critérios

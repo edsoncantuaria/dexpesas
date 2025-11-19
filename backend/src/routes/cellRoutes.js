@@ -15,6 +15,9 @@ import {
   splitEngineSchema,
   cellInviteSchema,
   cellAcceptInviteSchema,
+  cellEquilibriumSettlementSchema,
+  cellSharedExpenseSchema,
+  cellSharedExpenseSettleSchema,
 } from '../validators/cellSchema.js';
 
 const router = express.Router();
@@ -44,6 +47,15 @@ router.get('/:cellId/split-rules', cellController.listSplitRules);
 router.post('/:cellId/split-rules', validate(cellSplitRuleSchema), cellController.createSplitRule);
 router.post('/:cellId/split-engine', validate(splitEngineSchema), cellController.runSplitEngine);
 
+router.get('/:cellId/expenses', cellController.listSharedExpenses);
+router.post('/:cellId/expenses', validate(cellSharedExpenseSchema), cellController.createSharedExpense);
+router.post(
+  '/:cellId/expenses/:expenseId/settle',
+  validate(cellSharedExpenseSettleSchema),
+  cellController.settleSharedExpense,
+);
+router.delete('/:cellId/expenses/:expenseId', cellController.deleteSharedExpense);
+
 router.get('/:cellId/decisions', cellController.listDecisions);
 router.post('/:cellId/decisions', validate(cellDecisionSchema), cellController.createDecision);
 router.post('/:cellId/decisions/:decisionId/vote', validate(cellVoteSchema), cellController.voteDecision);
@@ -51,6 +63,7 @@ router.post('/:cellId/decisions/:decisionId/vote', validate(cellVoteSchema), cel
 router.get('/:cellId/timeline', cellController.listTimeline);
 
 router.get('/:cellId/equilibrium', cellController.getEquilibrium);
+router.post('/:cellId/equilibrium/settlements', validate(cellEquilibriumSettlementSchema), cellController.recordEquilibriumSettlement);
 
 router.get('/:cellId/alerts', cellController.listAlerts);
 

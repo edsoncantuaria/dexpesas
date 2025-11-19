@@ -9,6 +9,8 @@ import type { DateRange } from "react-day-picker"
 
 export type GamificationMode = 'FULL' | 'LITE' | 'OFF';
 
+export type ClanRole = 'LEADER' | 'ADMIN' | 'MEMBER';
+
 export type User = {
     id: string;
     name: string;
@@ -45,11 +47,11 @@ export type User = {
     level: number;
     clanId?: string | null;
     clanMembership?: {
-      role: 'LEADER' | 'ADMIN' | 'MEMBER';
+      role: ClanRole;
       clanId?: string | null;
     } | null;
     clanMemberships?: {
-      role: 'LEADER' | 'ADMIN' | 'MEMBER';
+      role: ClanRole;
       clanId: string;
     }[];
     phoneNumber?: string | null;
@@ -271,6 +273,7 @@ export type Goal = {
     id: string;
     userId?: string;
     clanId?: string;
+    cellFundId?: string | null;
     name: string;
     targetAmount: number;
     currentAmount: number;
@@ -363,11 +366,26 @@ export type CellFund = {
     targetAmount: number;
     currentAmount: number;
     usagePolicy?: Record<string, unknown> | null;
+    custodianId?: string | null;
+    custodian?: {
+        id: string;
+        name: string;
+        avatarUrl?: string | null;
+    } | null;
+    custodianAccountLabel?: string | null;
+    depositInstructions?: {
+        channel: 'CELL_ACCOUNT' | 'CUSTODIAN' | 'MANUAL';
+        referenceLabel?: string | null;
+        notes?: string | null;
+    } | null;
+    withdrawalRoles?: ClanRole[];
+    mirrorToCustodian?: boolean;
     status: 'ACTIVE' | 'PAUSED' | 'COMPLETED';
     goalDeadline?: string | null;
     contributions: CellFundContribution[];
     createdAt: string;
     updatedAt: string;
+    goal?: Goal | null;
 };
 
 export type CellSharedAccount = {
@@ -375,11 +393,44 @@ export type CellSharedAccount = {
     cellId: string;
     accountId: string;
     visibility: 'MEMBERS' | 'ADMINS' | 'CUSTOM';
-    allowedRoles: Array<'LEADER' | 'ADMIN' | 'MEMBER'>;
+    allowedRoles: Array<ClanRole>;
     metadata?: Record<string, unknown> | null;
     createdAt: string;
     updatedAt: string;
-    account?: Account | null;
+  account?: Account | null;
+};
+
+export type CellSharedExpenseParticipant = {
+    id: string;
+    userId: string;
+    amountOwed: number;
+    transaction?: {
+        id: string;
+        pago: boolean;
+        status: string;
+        accountId?: string | null;
+    } | null;
+    user?: {
+        id: string;
+        name: string;
+        avatarUrl?: string | null;
+    } | null;
+};
+
+export type CellSharedExpense = {
+    id: string;
+    clanId: string;
+    creatorId: string;
+    description: string;
+    totalAmount: number;
+    splitMethod: 'EQUAL' | 'PERCENTAGE' | 'AMOUNT';
+    categoryId: string;
+    createdAt: string;
+    participants: CellSharedExpenseParticipant[];
+    category?: {
+        id: string;
+        nome: string;
+    } | null;
 };
 
 export type CellSplitRule = {
@@ -604,7 +655,7 @@ export type Clan = {
     leaderId: string;
     members?: Array<{
       userId: string;
-      role: 'LEADER' | 'ADMIN' | 'MEMBER';
+      role: ClanRole;
       permissions?: Record<string, boolean> | null;
       user?: Pick<User, 'id' | 'name' | 'avatarUrl' | 'level'> | null;
     }>;

@@ -1,18 +1,19 @@
 // backend/src/services/reconciliationService.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { parse as parseOfx } from 'ofx-js';
 import { parse as parseCsv } from 'csv-parse';
 import { differenceInDays, isValid, parse as parseDate, startOfDay, endOfDay } from 'date-fns';
-import pkg from 'string-similarity-js';
+import similarityPkg from 'string-similarity-js';
 import minioClient from '../config/minioClient.js';
 import config from '../config/config.js';
 
 const findBestStringMatch =
-  pkg?.findBestMatch ||
+  similarityPkg?.findBestMatch ||
   ((source, target) => {
     const baseScore =
-      typeof pkg?.getStringSimilarity === 'function'
-        ? pkg.getStringSimilarity(source, target)
+      typeof similarityPkg?.getStringSimilarity === 'function'
+        ? similarityPkg.getStringSimilarity(source, target)
         : source === target
           ? 1
           : 0;

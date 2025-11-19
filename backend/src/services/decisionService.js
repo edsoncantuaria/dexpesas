@@ -1,5 +1,6 @@
 // backend/src/services/decisionService.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { addHours } from 'date-fns';
 import crypto from 'crypto';
 

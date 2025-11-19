@@ -2,7 +2,8 @@
 import { Worker } from 'bullmq';
 import { redisClient } from '../config/redis.js';
 import ReconciliationService from '../services/reconciliationService.js';
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import minioClient from '../config/minioClient.js';
 import config from '../config/config.js';
 

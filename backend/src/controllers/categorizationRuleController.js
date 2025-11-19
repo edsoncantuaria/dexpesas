@@ -1,5 +1,6 @@
 // backend/src/controllers/categorizationRuleController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import AuditService from '../services/auditService.js';
 const prisma = new PrismaClient();
 

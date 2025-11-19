@@ -1,7 +1,8 @@
 
 
 // backend/src/controllers/automationController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import AutomationService from '../services/automationService.js';
 import AuditService from '../services/auditService.js';
 

@@ -32,11 +32,44 @@ import categoryAdminRoutes from './routes/categoryAdminRoutes.js';
 
 const app = express();
 
+const defaultAllowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:9004',
+    'https://dexpesas.cloudive.com.br',
+    'https://app.dexpesas.cloudive.com.br',
+];
+const envAllowedOrigins = process.env.CORS_ALLOWED_ORIGINS
+    ? process.env.CORS_ALLOWED_ORIGINS.split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean)
+    : [];
+const allowedOrigins = envAllowedOrigins.length ? envAllowedOrigins : defaultAllowedOrigins;
+const isOriginAllowed = (origin = '') => {
+    if (!origin) return true;
+    return allowedOrigins.some((allowed) => {
+        if (allowed === '*') return true;
+        if (allowed.startsWith('*.')) {
+            const domain = allowed.slice(1); // remove leading dot
+            return origin.endsWith(domain);
+        }
+        return allowed === origin;
+    });
+};
+const corsOptions = {
+    origin(origin, callback) {
+        if (isOriginAllowed(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error(`Origin ${origin} não permitido pelo CORS`));
+    },
+    credentials: true,
+    optionsSuccessStatus: 204,
+};
+
 // Middlewares
-app.use(cors({
-    origin: true,
-    credentials: true
-}));
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 // Aumenta o limite do corpo da requisição para aceitar imagens em Base64
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));

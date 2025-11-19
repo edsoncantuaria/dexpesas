@@ -1,5 +1,6 @@
 // src/controllers/notificationController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import NotificationService from '../services/notificationService.js';
 import { notificationQueue } from '../queues/notificationQueue.js';
 import webpush from 'web-push';

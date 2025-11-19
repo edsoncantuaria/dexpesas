@@ -1,5 +1,6 @@
 // backend/src/controllers/sugestoesController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import SugestoesService from '../services/sugestoesService.js';
 
 const prisma = new PrismaClient();

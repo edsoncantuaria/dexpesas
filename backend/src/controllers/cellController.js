@@ -13,11 +13,30 @@ import { applyCellPermissions } from '../middlewares/cellPermissions.js';
 import CellBudgetSyncService from '../services/cellBudgetSyncService.js';
 import CellSharedAccountService from '../services/cellSharedAccountService.js';
 
+const CATEGORY_CACHE = new Map();
+async function ensureCategoryId(label, tx = prisma) {
+  if (CATEGORY_CACHE.has(label)) {
+    return CATEGORY_CACHE.get(label);
+  }
+  const categories = await tx.category.findMany({
+    select: { id: true, nome: true },
+  });
+  categories.forEach((category) => {
+    if (!CATEGORY_CACHE.has(category.nome)) {
+      CATEGORY_CACHE.set(category.nome, category.id);
+    }
+  });
+  if (!CATEGORY_CACHE.has(label)) {
+    throw new Error(`Categoria '${label}' não encontrada.`);
+  }
+  return CATEGORY_CACHE.get(label);
+}
+
 const normalizeValue = (value) => {
   if (value === null || value === undefined) return value;
   if (typeof value === 'bigint') return value.toString();
   if (typeof value === 'object') {
-    if (value.constructor?.name === 'Decimal' && typeof value.toNumber === 'function') {
+    if (typeof value.toNumber === 'function') {
       return value.toNumber();
     }
     if (Array.isArray(value)) {
@@ -253,9 +272,35 @@ class CellController {
         where: { cellId },
         include: {
           contributions: true,
+          custodian: {
+            select: {
+              id: true,
+              name: true,
+              avatarUrl: true,
+            },
+          },
+          goal: true,
         },
       });
-      res.json(serialize(funds));
+      const ensuredFunds = await Promise.all(
+        funds.map(async (fund) => {
+          if (fund.goal) {
+            return fund;
+          }
+          const goal = await prisma.goal.create({
+            data: {
+              clanId: cellId,
+              cellFundId: fund.id,
+              name: fund.name,
+              targetAmount: fund.targetAmount,
+              currentAmount: fund.currentAmount,
+              status: 'IN_PROGRESS',
+            },
+          });
+          return { ...fund, goal };
+        }),
+      );
+      res.json(serialize(ensuredFunds));
     } catch (error) {
       next(error);
     }
@@ -266,17 +311,89 @@ class CellController {
     try {
       await applyCellPermissions(req.user.id, cellId, { manageFunds: true });
 
-      const fund = await prisma.cellFund.create({
-        data: {
-          cellId,
-          name: req.body.name,
-          targetAmount: req.body.targetAmount,
-          usagePolicy: req.body.usagePolicy || null,
-          status: req.body.status || 'ACTIVE',
-          goalDeadline: req.body.goalDeadline
-            ? new Date(req.body.goalDeadline)
-            : null,
+      const allowedRoles = ['LEADER', 'ADMIN', 'MEMBER'];
+      const requestedCustodianId = req.body.custodianId || req.user.id;
+
+      const custodianMembership = await prisma.clanMember.findFirst({
+        where: {
+          clanId: cellId,
+          userId: requestedCustodianId,
         },
+      });
+
+      if (!custodianMembership) {
+        return res.status(400).json({
+          message: 'Escolha um responsável que participe dessa família.',
+        });
+      }
+
+      const rawWithdrawalRoles = Array.isArray(req.body.withdrawalRoles) ? req.body.withdrawalRoles : [];
+      const normalizedWithdrawalRoles = rawWithdrawalRoles
+        .filter((role) => allowedRoles.includes(role))
+        .filter((role, index, array) => array.indexOf(role) === index);
+      const withdrawalRoles = normalizedWithdrawalRoles.length > 0 ? normalizedWithdrawalRoles : ['LEADER'];
+
+      const validChannels = ['CELL_ACCOUNT', 'CUSTODIAN', 'MANUAL'];
+      let depositInstructions = null;
+      const custodianAccountLabel =
+        typeof req.body.custodianAccountLabel === 'string' && req.body.custodianAccountLabel.trim().length
+          ? req.body.custodianAccountLabel.trim()
+          : null;
+      if (req.body.depositInstructions && typeof req.body.depositInstructions === 'object') {
+        const { channel, referenceLabel, notes } = req.body.depositInstructions;
+        const sanitize = (value) =>
+          typeof value === 'string' && value.trim().length ? value.trim() : null;
+        if (channel && validChannels.includes(channel)) {
+          depositInstructions = {
+            channel,
+            referenceLabel: sanitize(referenceLabel),
+            notes: sanitize(notes),
+          };
+        }
+      }
+
+      const fund = await prisma.$transaction(async (tx) => {
+        const createdFund = await tx.cellFund.create({
+          data: {
+            cellId,
+            name: req.body.name,
+            targetAmount: req.body.targetAmount,
+            usagePolicy: req.body.usagePolicy || null,
+            custodianId: requestedCustodianId,
+            custodianAccountLabel,
+            depositInstructions,
+            withdrawalRoles,
+            mirrorToCustodian: Boolean(req.body.mirrorToCustodian),
+            status: req.body.status || 'ACTIVE',
+            goalDeadline: req.body.goalDeadline ? new Date(req.body.goalDeadline) : null,
+          },
+        });
+
+        await tx.goal.create({
+          data: {
+            clanId: cellId,
+            cellFundId: createdFund.id,
+            name: req.body.name,
+            targetAmount: req.body.targetAmount,
+            currentAmount: 0,
+            status: 'IN_PROGRESS',
+          },
+        });
+
+        return tx.cellFund.findUnique({
+          where: { id: createdFund.id },
+          include: {
+            contributions: true,
+            custodian: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+            goal: true,
+          },
+        });
       });
       await AuditService.log({
         userId: req.user.id,
@@ -331,23 +448,96 @@ class CellController {
     const userId = req.user.id;
     try {
       await applyCellPermissions(req.user.id, null, { moveFunds: true }, { fundId });
-      const contribution = await prisma.cellFundContribution.create({
-        data: {
-          fundId,
-          userId,
-          amount: req.body.amount,
-          source: req.body.source || null,
-          fromBudgetId: req.body.fromBudgetId || null,
-          metadata: req.body.metadata || null,
+      const fund = await prisma.cellFund.findUnique({
+        where: { id: fundId },
+        select: {
+          name: true,
+          goal: { select: { id: true } },
         },
       });
-      await prisma.cellFund.update({
-        where: { id: fundId },
-        data: {
-          currentAmount: {
-            increment: req.body.amount,
+      if (!fund) {
+        return res.status(404).json({ message: 'Fundo não encontrado.' });
+      }
+      const amount = Number(req.body.amount);
+      if (!Number.isFinite(amount) || amount === 0) {
+        return res.status(400).json({ message: 'Informe um valor válido.' });
+      }
+      const accountId = req.body.accountId;
+      if (!accountId) {
+        return res.status(400).json({ message: 'Selecione a conta utilizada.' });
+      }
+      const contribution = await prisma.$transaction(async (tx) => {
+        const account = await tx.account.findFirst({
+          where: {
+            id: accountId,
+            userId,
           },
-        },
+        });
+        if (!account) {
+          const err = new Error('Conta não encontrada.');
+          err.statusCode = 404;
+          throw err;
+        }
+        const investimentosCategoryId = await ensureCategoryId('Investimentos', tx);
+        const investing = amount > 0;
+        const description = investing
+          ? `Aporte na caixinha ${fund.name}`
+          : `Resgate da caixinha ${fund.name}`;
+        const transaction = await tx.transaction.create({
+          data: {
+            userId,
+            accountId,
+            descricao: description,
+            valor: Math.abs(amount),
+            data: new Date(),
+            tipo: investing ? 'despesa' : 'receita',
+            categoryId: investimentosCategoryId,
+            metodoPagamento: investing ? 'debito' : 'dinheiro',
+            pago: true,
+          },
+        });
+        const metadata = {
+          ...(req.body.metadata || {}),
+          accountId,
+          transactionId: transaction.id,
+          direction: investing ? 'DEPOSIT' : 'WITHDRAW',
+        };
+        const createdContribution = await tx.cellFundContribution.create({
+          data: {
+            fundId,
+            userId,
+            amount,
+            source: req.body.source || null,
+            fromBudgetId: req.body.fromBudgetId || null,
+            metadata,
+          },
+        });
+        await tx.cellFund.update({
+          where: { id: fundId },
+          data: {
+            currentAmount: {
+              increment: amount,
+            },
+          },
+        });
+        if (fund.goal?.id) {
+          await tx.goal.update({
+            where: { id: fund.goal.id },
+            data: {
+              currentAmount: {
+                increment: amount,
+              },
+            },
+          });
+          await tx.goalContribution.create({
+            data: {
+              goalId: fund.goal.id,
+              amount,
+              debitTransactionId: investing ? transaction.id : null,
+            },
+          });
+        }
+        return createdContribution;
       });
       await AuditService.log({
         userId,
@@ -357,6 +547,286 @@ class CellController {
         details: { contribution },
       });
       res.status(201).json(serialize(contribution));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async listSharedExpenses(req, res, next) {
+    const { cellId } = req.params;
+    try {
+      await applyCellPermissions(req.user.id, cellId, {});
+      const expenses = await prisma.sharedExpense.findMany({
+        where: { clanId: cellId },
+        include: {
+          category: {
+            select: {
+              id: true,
+              nome: true,
+            },
+          },
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  avatarUrl: true,
+                },
+              },
+              transaction: {
+                select: {
+                  id: true,
+                  pago: true,
+                  status: true,
+                  accountId: true,
+                  data: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+      res.json(serialize(expenses));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async createSharedExpense(req, res, next) {
+    const { cellId } = req.params;
+    const { description, categoryId, totalAmount, splits, splitMethod } = req.body;
+    try {
+      await applyCellPermissions(req.user.id, cellId, { recordTransactions: true });
+      const parsedTotal = Number(totalAmount);
+      if (!Number.isFinite(parsedTotal) || parsedTotal <= 0) {
+        return res.status(400).json({ message: 'Informe um valor válido para o total.' });
+      }
+      const sanitizedSplits = Array.isArray(splits)
+        ? splits.map((entry) => ({
+            memberId: entry.memberId,
+            amount: Number(entry.amount),
+          }))
+        : [];
+      if (!sanitizedSplits.length) {
+        return res.status(400).json({ message: 'Defina os participantes do rateio.' });
+      }
+      const totalSplits = sanitizedSplits.reduce((acc, entry) => acc + entry.amount, 0);
+      if (Math.round(totalSplits * 100) !== Math.round(parsedTotal * 100)) {
+        return res.status(400).json({ message: 'A soma dos rateios precisa bater com o total.' });
+      }
+      const expense = await prisma.$transaction(async (tx) => {
+        const createdExpense = await tx.sharedExpense.create({
+          data: {
+            clanId: cellId,
+            creatorId: req.user.id,
+            description,
+            totalAmount: parsedTotal,
+            splitMethod: splitMethod || 'AMOUNT',
+            categoryId,
+          },
+        });
+        for (const split of sanitizedSplits) {
+          const transaction = await tx.transaction.create({
+            data: {
+              userId: split.memberId,
+              accountId: null,
+              descricao: `Despesa compartilhada: ${description}`,
+              valor: split.amount,
+              data: new Date(),
+              tipo: 'despesa',
+              categoryId,
+              metodoPagamento: 'debito',
+              pago: false,
+              status: 'PENDING',
+            },
+          });
+          await tx.sharedExpenseParticipant.create({
+            data: {
+              sharedExpenseId: createdExpense.id,
+              userId: split.memberId,
+              amountOwed: split.amount,
+              createdTransactionId: transaction.id,
+            },
+          });
+        }
+        return tx.sharedExpense.findUnique({
+          where: { id: createdExpense.id },
+          include: {
+            category: {
+              select: {
+                id: true,
+                nome: true,
+              },
+            },
+            participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    avatarUrl: true,
+                  },
+                },
+                transaction: {
+                  select: {
+                    id: true,
+                    pago: true,
+                    status: true,
+                    accountId: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+      });
+      await TimelineService.appendEvent({
+        cellId,
+        actorId: req.user.id,
+        type: 'CELL_SHARED_EXPENSE_CREATED',
+        title: 'Despesa compartilhada cadastrada',
+        description: `${description} • ${totalAmount}`,
+        payload: {
+          sharedExpenseId: expense.id,
+          description,
+          totalAmount,
+        },
+      });
+      res.status(201).json(serialize(expense));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async settleSharedExpense(req, res, next) {
+    const { cellId, expenseId } = req.params;
+    const { participantId, accountId } = req.body;
+    try {
+      const participant = await prisma.sharedExpenseParticipant.findUnique({
+        where: { id: participantId },
+        include: {
+          sharedExpense: {
+            select: {
+              clanId: true,
+              description: true,
+              categoryId: true,
+            },
+          },
+          transaction: {
+            select: {
+              pago: true,
+            },
+          },
+        },
+      });
+      if (!participant || participant.sharedExpense.clanId !== cellId) {
+        return res.status(404).json({ message: 'Participante não encontrado.' });
+      }
+      if (participant.userId !== req.user.id) {
+        await applyCellPermissions(req.user.id, cellId, { manageBudgets: true });
+      } else {
+        await applyCellPermissions(req.user.id, cellId, {});
+      }
+      if (!accountId) {
+        return res.status(400).json({ message: 'Informe a conta utilizada.' });
+      }
+      if (participant.transaction?.pago) {
+        return res.status(400).json({ message: 'Esta cota já foi quitada.' });
+      }
+      const account = await prisma.account.findFirst({
+        where: {
+          id: accountId,
+          userId: participant.userId,
+        },
+      });
+      if (!account) {
+        return res.status(404).json({ message: 'Conta não encontrada para este membro.' });
+      }
+      const updatedParticipant = await prisma.$transaction(async (tx) => {
+        const transaction = await tx.transaction.update({
+          where: { id: participant.createdTransactionId },
+          data: {
+            accountId,
+            pago: true,
+            status: 'POSTED',
+            data: new Date(),
+            clearedAt: new Date(),
+          },
+        });
+        await TimelineService.appendEvent({
+          cellId,
+          actorId: req.user.id,
+          type: 'CELL_SHARED_EXPENSE_SETTLED',
+          title: 'Rateio quitado',
+          description: `${participant.sharedExpense.description} • ${transaction.valor}`,
+          payload: {
+            participantId,
+            transactionId: transaction.id,
+          },
+        });
+        return tx.sharedExpenseParticipant.findUnique({
+          where: { id: participantId },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatarUrl: true,
+              },
+            },
+            transaction: {
+              select: {
+                id: true,
+                pago: true,
+                status: true,
+                accountId: true,
+              },
+            },
+          },
+        });
+      });
+      res.json(serialize(updatedParticipant));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deleteSharedExpense(req, res, next) {
+    const { cellId, expenseId } = req.params;
+    try {
+      const expense = await prisma.sharedExpense.findUnique({
+        where: { id: expenseId },
+        include: {
+          participants: true,
+        },
+      });
+      if (!expense || expense.clanId !== cellId) {
+        return res.status(404).json({ message: 'Despesa não encontrada.' });
+      }
+      await applyCellPermissions(req.user.id, cellId, { manageBudgets: true });
+      await prisma.$transaction(async (tx) => {
+        const transactionIds = expense.participants.map((participant) => participant.createdTransactionId);
+        if (transactionIds.length) {
+          await tx.transaction.deleteMany({
+            where: {
+              id: {
+                in: transactionIds,
+              },
+            },
+          });
+        }
+        await tx.sharedExpenseParticipant.deleteMany({
+          where: { sharedExpenseId: expense.id },
+        });
+        await tx.sharedExpense.delete({
+          where: { id: expense.id },
+        });
+      });
+      res.status(204).send();
     } catch (error) {
       next(error);
     }
@@ -608,6 +1078,56 @@ class CellController {
       await applyCellPermissions(req.user.id, cellId, { viewEquilibrium: true });
       const summary = await EquilibriumService.snapshotCell(cellId);
       res.json(serialize(summary));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async recordEquilibriumSettlement(req, res, next) {
+    const { cellId } = req.params;
+    const actorId = req.user.id;
+    const { counterpartId, amount, direction, notes } = req.body;
+    try {
+      if (counterpartId === actorId) {
+        return res.status(400).json({ message: 'Selecione outro membro para registrar o acerto.' });
+      }
+      const normalizedAmount = Number(amount);
+      if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+        return res.status(400).json({ message: 'Informe um valor válido para registrar o acerto.' });
+      }
+      await applyCellPermissions(req.user.id, cellId, { moveFunds: true });
+      const referenceMonth = EquilibriumService.buildReferenceMonth();
+      const payerId = direction === 'PAY' ? actorId : counterpartId;
+      const receiverId = direction === 'PAY' ? counterpartId : actorId;
+      const settlement = await prisma.cellEquilibriumSettlement.create({
+        data: {
+          cellId,
+          payerId,
+          receiverId,
+          amount: normalizedAmount,
+          notes: notes?.trim() || null,
+          referenceMonth,
+        },
+      });
+      await EquilibriumService.snapshotCell(cellId, referenceMonth);
+      await TimelineService.appendEvent({
+        cellId,
+        actorId,
+        type: 'CELL_EQUILIBRIUM_SETTLEMENT',
+        title: direction === 'PAY' ? 'Pagamento registrado' : 'Reembolso recebido',
+        description:
+          direction === 'PAY'
+            ? 'Você registrou um PIX para quitar parte do Equilíbrio.'
+            : 'Você registrou um recebimento no Equilíbrio.',
+        payload: {
+          settlementId: settlement.id,
+          payerId,
+          receiverId,
+          amount: normalizedAmount,
+          notes: settlement.notes,
+        },
+      });
+      res.status(201).json(serialize(settlement));
     } catch (error) {
       next(error);
     }

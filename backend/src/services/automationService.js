@@ -1,5 +1,6 @@
 // backend/src/services/automationService.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import NotificationService from './notificationService.js';
 
 const prisma = new PrismaClient();

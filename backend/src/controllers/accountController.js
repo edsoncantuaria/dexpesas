@@ -1,5 +1,6 @@
 // src/controllers/accountController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import AuditService from '../services/auditService.js'; // Importa o serviço
 import { endOfDay } from 'date-fns';
 

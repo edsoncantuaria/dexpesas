@@ -119,7 +119,10 @@
         "devices": { "type": "UserDevice", "isList": true },
         "securityEvents": { "type": "SecurityEvent", "isList": true },
         "favoriteCategoryLinks": { "type": "UserFavoriteCategory", "isList": true },
-        "cellFundContributions": { "type": "CellFundContribution", "isList": true }
+        "cellFundContributions": { "type": "CellFundContribution", "isList": true },
+        "custodiedCellFunds": { "type": "CellFund", "isList": true, "relation": { "name": "UserCustodiedFunds" } },
+        "equilibriumSettlementPayments": { "type": "CellEquilibriumSettlement", "isList": true, "relation": { "name": "EquilibriumSettlementPayer" } },
+        "equilibriumSettlementReceipts": { "type": "CellEquilibriumSettlement", "isList": true, "relation": { "name": "EquilibriumSettlementReceiver" } }
       }
     },
     "Clan": {
@@ -148,6 +151,7 @@
         "cellFunds": { "type": "CellFund", "isList": true },
         "cellSplitRules": { "type": "CellSplitRule", "isList": true },
         "cellEquilibriumSnapshots": { "type": "CellEquilibriumSnapshot", "isList": true },
+        "cellEquilibriumSettlements": { "type": "CellEquilibriumSettlement", "isList": true },
         "sharedAccounts": { "type": "CellSharedAccount", "isList": true, "relation": { "name": "ClanSharedAccounts" } }
       },
       "map": "family_cells"
@@ -267,6 +271,11 @@
         "targetAmount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
         "currentAmount": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
         "usagePolicy": { "type": "Json", "optional": true },
+        "custodianId": { "type": "String", "optional": true, "comment": "Responsável legal pela caixinha" },
+        "custodianAccountLabel": { "type": "String", "optional": true, "comment": "Rastro para o espelho pessoal/conta usada no mundo real" },
+        "depositInstructions": { "type": "Json", "optional": true, "comment": "Configurações de aporte da família" },
+        "withdrawalRoles": { "type": "Json", "attributes": ["@default(\"[\\\"LEADER\\\"]\")"], "comment": "Quais papéis podem sacar" },
+        "mirrorToCustodian": { "type": "Boolean", "attributes": ["@default(false)"], "comment": "Se deve mostrar o espelho na visão pessoal" },
         "status": { "type": "CellFundStatus", "attributes": ["@default(ACTIVE)"] },
         "goalDeadline": { "type": "DateTime", "optional": true },
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
@@ -274,8 +283,10 @@
       },
       "relations": {
         "cell": { "type": "Clan", "relation": { "fields": ["cellId"], "references": ["id"], "onDelete": "Cascade" } },
+        "custodian": { "type": "User", "optional": true, "relation": { "name": "UserCustodiedFunds", "fields": ["custodianId"], "references": ["id"], "onDelete": "SetNull" } },
         "contributions": { "type": "CellFundContribution", "isList": true },
-        "budgets": { "type": "CellBudget", "isList": true, "relation": { "name": "CellFundToBudgets" } }
+        "budgets": { "type": "CellBudget", "isList": true, "relation": { "name": "CellFundToBudgets" } },
+        "goal": { "type": "Goal", "optional": true, "relation": { "name": "CellFundGoal" } }
       },
       "indices": [{ "fields": ["cellId"] }],
       "map": "cell_funds"
@@ -355,6 +366,25 @@
       },
       "indices": [{ "fields": ["cellId", "referenceMonth"], "unique": true }],
       "map": "cell_equilibrium_snapshots"
+    },
+    "CellEquilibriumSettlement": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "cellId": { "type": "String" },
+        "payerId": { "type": "String" },
+        "receiverId": { "type": "String" },
+        "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "notes": { "type": "String", "optional": true },
+        "referenceMonth": { "type": "String" },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "cell": { "type": "Clan", "relation": { "fields": ["cellId"], "references": ["id"], "onDelete": "Cascade" } },
+        "payer": { "type": "User", "relation": { "name": "EquilibriumSettlementPayer", "fields": ["payerId"], "references": ["id"], "onDelete": "Cascade" } },
+        "receiver": { "type": "User", "relation": { "name": "EquilibriumSettlementReceiver", "fields": ["receiverId"], "references": ["id"], "onDelete": "Cascade" } }
+      },
+      "indices": [{ "fields": ["cellId"] }],
+      "map": "cell_equilibrium_settlements"
     },
     "CellEvent": {
       "fields": {
@@ -816,12 +846,14 @@
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
         "userId": { "type": "String", "optional": true },
         "accountId": { "type": "String", "optional": true },
-        "clanId": { "type": "String", "optional": true }
+        "clanId": { "type": "String", "optional": true },
+        "cellFundId": { "type": "String", "optional": true, "attributes": ["@unique"] }
       },
       "relations": {
         "user": { "type": "User", "optional": true, "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
         "account": { "type": "Account", "optional": true, "relation": { "fields": ["accountId"], "references": ["id"], "onDelete": "SetNull" } },
         "clan": { "type": "Clan", "optional": true, "relation": { "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
+        "cellFund": { "type": "CellFund", "optional": true, "relation": { "name": "CellFundGoal", "fields": ["cellFundId"], "references": ["id"], "onDelete": "Cascade" } },
         "contributions": { "type": "GoalContribution", "isList": true, "relation": { "name": "GoalContribution_goal" } },
         "automation": { "type": "Automation", "optional": true, "relation": { "name": "GoalAutomation" } }
       }

@@ -1,5 +1,6 @@
 // src/controllers/dataController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import CacheService from '../services/cacheService.js';
 import GamificationService from '../services/gamificationService.js';
 import { startOfMonth, endOfMonth, subMonths, format, endOfDay } from 'date-fns';

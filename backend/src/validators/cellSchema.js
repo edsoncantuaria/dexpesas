@@ -26,13 +26,58 @@ export const cellFundSchema = z.object({
   usagePolicy: z.any().optional(),
   status: z.enum(['ACTIVE', 'PAUSED', 'COMPLETED']).optional(),
   goalDeadline: z.string().optional(),
+  custodianId: z.string().optional().nullable(),
+  custodianAccountLabel: z.string().max(120).optional().nullable(),
+  depositInstructions: z
+    .object({
+      channel: z.enum(['CELL_ACCOUNT', 'CUSTODIAN', 'MANUAL']),
+      referenceLabel: z.string().max(140).optional().nullable(),
+      notes: z.string().max(280).optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+  withdrawalRoles: z
+    .array(z.enum(['LEADER', 'ADMIN', 'MEMBER']))
+    .min(1, 'Selecione pelo menos um papel autorizado')
+    .optional(),
+  mirrorToCustodian: z.boolean().optional(),
 });
 
 export const cellFundContributionSchema = z.object({
-  amount: z.number().positive(),
+  amount: z.number().refine((value) => Number.isFinite(value) && value !== 0, {
+    message: 'Informe um valor válido.',
+  }),
+  accountId: z.string().min(1, 'Selecione a conta utilizada.'),
   source: z.string().optional().nullable(),
   fromBudgetId: z.string().optional().nullable(),
   metadata: z.any().optional(),
+});
+
+export const cellEquilibriumSettlementSchema = z.object({
+  counterpartId: z.string().min(1),
+  amount: z.number().positive(),
+  direction: z.enum(['PAY', 'RECEIVE']),
+  notes: z.string().max(280).optional().nullable(),
+});
+
+export const cellSharedExpenseSchema = z.object({
+  description: z.string().min(2),
+  categoryId: z.string().min(1),
+  totalAmount: z.number().positive(),
+  splitMethod: z.enum(['EQUAL', 'PERCENTAGE', 'AMOUNT']).optional(),
+  splits: z
+    .array(
+      z.object({
+        memberId: z.string().min(1),
+        amount: z.number().positive(),
+      }),
+    )
+    .min(1, 'Informe os participantes do rateio.'),
+});
+
+export const cellSharedExpenseSettleSchema = z.object({
+  participantId: z.string().min(1),
+  accountId: z.string().min(1),
 });
 
 export const cellSharedAccountSchema = z

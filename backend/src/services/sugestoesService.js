@@ -1,5 +1,6 @@
 // backend/src/services/sugestoesService.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { findBestMatch } from 'string-similarity';
 import { differenceInDays } from 'date-fns';
 

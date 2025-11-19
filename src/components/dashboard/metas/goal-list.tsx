@@ -3,7 +3,7 @@
 
 import type { Goal } from '@/lib/definitions';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
-import { MoreVertical, Pencil, Trash2, PiggyBank, Plus, CheckCircle, Trophy, History, Undo2 } from 'lucide-react';
+import { MoreVertical, Pencil, Trash2, PiggyBank, Plus, CheckCircle, Trophy, History, Undo2, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import api from '@/lib/api';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from 'next/navigation';
 
 
 type GoalListProps = {
@@ -67,6 +68,7 @@ function GoalImage({ imageUrl, goalName }: { imageUrl: string | null | undefined
 
 export function GoalList({ goals, onEdit, onDelete, onAddContribution, onFinalize, onViewDetails, onRescue }: GoalListProps) {
   const [deletingGoal, setDeletingGoal] = useState<Goal | null>(null);
+  const router = useRouter();
 
   const handleConfirmDelete = () => {
     if (!deletingGoal) return;
@@ -78,6 +80,7 @@ export function GoalList({ goals, onEdit, onDelete, onAddContribution, onFinaliz
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {goals.map((goal) => {
+          const isFamilyGoal = Boolean(goal.clanId);
           const targetAmount = Number(goal.targetAmount);
           const currentAmount = Number(goal.currentAmount);
           const percentage = targetAmount > 0 ? (currentAmount / targetAmount) * 100 : 0;
@@ -101,11 +104,30 @@ export function GoalList({ goals, onEdit, onDelete, onAddContribution, onFinaliz
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
-                           {!isCompleted && <DropdownMenuItem onClick={() => onEdit(goal)}><Pencil className="mr-2 h-4 w-4" />Editar Meta</DropdownMenuItem>}
-                           {currentAmount > 0 && !isCompleted && <DropdownMenuItem onClick={() => onRescue(goal)}><Undo2 className="mr-2 h-4 w-4" />Resgatar Valor</DropdownMenuItem>}
-                           <DropdownMenuItem onClick={() => onViewDetails(goal)}><History className="mr-2 h-4 w-4" />Ver Histórico</DropdownMenuItem>
-                           <DropdownMenuSeparator />
-                           <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10" onClick={() => setDeletingGoal(goal)}><Trash2 className="mr-2 h-4 w-4" />Excluir</DropdownMenuItem>
+                           {!isFamilyGoal && !isCompleted && <DropdownMenuItem onClick={() => onEdit(goal)}><Pencil className="mr-2 h-4 w-4" />Editar Meta</DropdownMenuItem>}
+                           {!isFamilyGoal && currentAmount > 0 && !isCompleted && (
+                             <DropdownMenuItem onClick={() => onRescue(goal)}>
+                               <Undo2 className="mr-2 h-4 w-4" />Resgatar Valor
+                             </DropdownMenuItem>
+                           )}
+                           <DropdownMenuItem onClick={() => onViewDetails(goal)}>
+                             <History className="mr-2 h-4 w-4" />Ver Histórico
+                           </DropdownMenuItem>
+                           {isFamilyGoal ? (
+                             <DropdownMenuItem disabled className="text-muted-foreground">
+                               Gerencie no Modo Família
+                             </DropdownMenuItem>
+                           ) : (
+                             <>
+                               <DropdownMenuSeparator />
+                               <DropdownMenuItem
+                                 className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                 onClick={() => setDeletingGoal(goal)}
+                               >
+                                 <Trash2 className="mr-2 h-4 w-4" />Excluir
+                               </DropdownMenuItem>
+                             </>
+                           )}
                         </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -115,10 +137,34 @@ export function GoalList({ goals, onEdit, onDelete, onAddContribution, onFinaliz
                            <CheckCircle className="mr-2 h-4 w-4"/> Concluída
                         </Badge>
                     )}
+                    {isFamilyGoal && !isCompleted && (
+                      <Badge variant="secondary" className="absolute top-3 left-3 flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        Família
+                      </Badge>
+                    )}
                 </div>
 
                 <CardContent className="flex-grow flex flex-col justify-between p-4 space-y-4">
-                    <div>
+                    <div className="space-y-1">
+                        {isFamilyGoal && (
+                            <div className="flex items-center justify-between rounded-md border border-dashed px-3 py-2 text-xs text-primary">
+                                <span className="flex items-center gap-1 font-medium">
+                                    <Users className="h-3.5 w-3.5" />
+                                    Meta colaborativa
+                                </span>
+                                <Button
+                                    variant="link"
+                                    className="h-auto p-0 text-xs"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push('/dashboard/cells');
+                                    }}
+                                >
+                                    Abrir Modo Família
+                                </Button>
+                            </div>
+                        )}
                         <CardTitle className="font-headline text-lg">{goal.name}</CardTitle>
                         {deadline && timeRemaining && (
                             <p className="text-xs text-muted-foreground mt-1">Prazo: {format(deadline, 'dd/MM/yyyy')} ({timeRemaining})</p>
@@ -140,7 +186,19 @@ export function GoalList({ goals, onEdit, onDelete, onAddContribution, onFinaliz
                         <Progress value={Math.min(percentage, 100)} className="h-2" />
                     </div>
 
-                    {isReadyToFinalize ? (
+                    {isFamilyGoal ? (
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push('/dashboard/cells');
+                        }}
+                      >
+                        <Users className="mr-2 h-4 w-4" />
+                        Abrir Modo Família
+                      </Button>
+                    ) : isReadyToFinalize ? (
                          <Button className="w-full bg-green-500 hover:bg-green-600" onClick={(e) => { e.stopPropagation(); onFinalize(goal);}}>
                             <Trophy className="mr-2 h-4 w-4" />
                             Finalizar Objetivo

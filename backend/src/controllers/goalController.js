@@ -1,6 +1,7 @@
 
 // backend/src/controllers/goalController.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import GamificationService from '../services/gamificationService.js';
 import AuditService from '../services/auditService.js';
 
@@ -23,8 +24,22 @@ class GoalController {
     async getGoals(req, res, next) {
         const userId = req.user.id;
         try {
-            const goals = await prisma.goal.findMany({
+            const memberships = await prisma.clanMember.findMany({
                 where: { userId },
+                select: { clanId: true },
+            });
+            const clanIds = memberships.map((membership) => membership.clanId);
+            const whereClause =
+                clanIds.length > 0
+                    ? {
+                          OR: [
+                              { userId },
+                              { clanId: { in: clanIds } },
+                          ],
+                      }
+                    : { userId };
+            const goals = await prisma.goal.findMany({
+                where: whereClause,
                 include: { contributions: true },
                 orderBy: { createdAt: 'desc' }
             });
@@ -46,12 +61,33 @@ class GoalController {
         const { goalId } = req.params;
         const userId = req.user.id;
         try {
-            // Garante que a meta pertence ao usuário
-            const goal = await prisma.goal.findFirst({ where: { id: goalId, userId }});
+            const goal = await prisma.goal.findUnique({
+                where: { id: goalId },
+            });
             if (!goal) {
                 const err = new Error('Meta não encontrada.');
                 err.statusCode = 404;
                 return next(err);
+            }
+            if (goal.userId !== userId) {
+                if (!goal.clanId) {
+                    const err = new Error('Meta não encontrada.');
+                    err.statusCode = 404;
+                    return next(err);
+                }
+                const membership = await prisma.clanMember.findUnique({
+                    where: {
+                        userId_clanId: {
+                            userId,
+                            clanId: goal.clanId,
+                        },
+                    },
+                });
+                if (!membership) {
+                    const err = new Error('Meta não encontrada.');
+                    err.statusCode = 404;
+                    return next(err);
+                }
             }
 
             const contributions = await prisma.goalContribution.findMany({

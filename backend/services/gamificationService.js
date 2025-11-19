@@ -1,5 +1,6 @@
 // backend/src/services/gamificationService.js
-import { PrismaClient } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient } = pkg;
 import { differenceInDays, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import NotificationService from './notificationService.js';
 import AuditService from './auditService.js';

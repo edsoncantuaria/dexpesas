@@ -1,5 +1,6 @@
 // backend/src/controllers/budgetController.js
-import { PrismaClient, Prisma } from '@prisma/client';
+import pkg from '@prisma/client';
+const { PrismaClient, Prisma } = pkg;
 import { startOfMonth, endOfMonth, parseISO, subMonths } from 'date-fns';
 import GamificationService from '../services/gamificationService.js';
 import AuditService from '../services/auditService.js';
