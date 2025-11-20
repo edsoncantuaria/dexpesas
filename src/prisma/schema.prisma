@@ -432,6 +432,13 @@ model Reconciliation {
   status               ReconciliationStatus @default(PROCESSING)
   filePath             String
   fileType             String
+  statementOpeningBalance Decimal? @db.Decimal(14, 2)
+  statementClosingBalance Decimal? @db.Decimal(14, 2)
+  statementCurrency    String? @default("BRL")
+  statementTimezone    String? @default("America/Sao_Paulo")
+  systemOpeningBalance Decimal? @db.Decimal(14, 2)
+  systemClosingBalance Decimal? @db.Decimal(14, 2)
+  balanceDifference    Decimal? @db.Decimal(14, 2)
   totalJobs            Int @default(0)
   completedJobs        Int @default(0)
   createdAt            DateTime @default(now())

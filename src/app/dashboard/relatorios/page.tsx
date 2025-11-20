@@ -2,10 +2,10 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { BarChart3, Download, Filter, Loader2, Sparkles, X } from 'lucide-react';
-import type { Transaction, Category, Account, Card as CardType, Tag, Goal } from '@/lib/definitions';
+import { BarChart3, Download, Filter, Loader2 } from 'lucide-react';
+import type { Transaction, Category, Account, Card as CardType, Tag, Goal, Budget } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
-import type { FilterState } from '@/components/dashboard/transacoes/transaction-filters';
+import { TransactionFilters, type FilterState } from '@/components/dashboard/transacoes/transaction-filters';
 import { ExpensesByCategoryChart } from '@/components/dashboard/relatorios/expenses-by-category-chart';
 import { DailyFlowChart } from '@/components/dashboard/relatorios/daily-flow-chart';
 import { PaymentMethodsChart } from '@/components/dashboard/relatorios/payment-methods-chart';
@@ -15,49 +15,95 @@ import api from '@/lib/api';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Input } from '@/components/ui/input';
-import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { format, subDays, subMonths, parseISO, startOfMonth, endOfMonth, subYears } from 'date-fns';
-import type { DateRange } from 'react-day-picker';
-import { ptBR } from 'date-fns/locale';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
+import { endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { NetWorthCard } from '@/components/dashboard/relatorios/net-worth-card';
 import { GoalSummaryCard } from '@/components/dashboard/relatorios/goal-summary-card';
 import { ComparativeExpensesChart } from '@/components/dashboard/relatorios/comparative-expenses-chart';
 import { DetailedSummary } from '@/components/dashboard/relatorios/detailed-summary';
+import { CashflowForecastChart } from '@/components/dashboard/relatorios/cashflow-forecast-chart';
+import { BudgetPerformanceTable } from '@/components/dashboard/relatorios/budget-performance-table';
+import { GoalsFundsOverview } from '@/components/dashboard/relatorios/goals-funds-overview';
+import { CardInsightsCard } from '@/components/dashboard/relatorios/card-insights-card';
+import { TagInsightsCard } from '@/components/dashboard/relatorios/tag-insights-card';
+
+type FilterChip =
+  | { key: string; label: string; type: 'dateRange' | 'type' | 'text' }
+  | { key: string; label: string; type: 'account' | 'card' | 'category' | 'method' | 'tag'; value: string };
+
+const createDefaultFilters = (): FilterState => ({
+  text: null,
+  accounts: [],
+  cards: [],
+  categories: [],
+  methods: [],
+  tags: [],
+  type: null,
+  dateRange: undefined,
+});
+
+const getCurrentMonthRange = () => {
+  const now = new Date();
+  return {
+    from: startOfMonth(now),
+    to: endOfMonth(now),
+  };
+};
+
+const METHOD_LABELS: Record<string, string> = {
+  credito: 'Cartão de Crédito',
+  debito: 'Débito',
+  pix: 'PIX',
+  dinheiro: 'Dinheiro',
+  transferencia: 'Transferência',
+};
 
 export default function RelatoriosPage() {
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [cards, setCards] = useState<CardType[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [includePending, setIncludePending] = useState(false);
-  
-  const [aiQuery, setAiQuery] = useState('');
-  const [isAiSearching, setIsAiSearching] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-      from: startOfMonth(new Date()),
-      to: endOfMonth(new Date()),
-  });
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [filters, setFilters] = useState<FilterState>(() => ({
+    ...createDefaultFilters(),
+    dateRange: getCurrentMonthRange(),
+  }));
 
   const { toast } = useToast();
-  
+
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [transRes, goalsRes, accRes] = await Promise.all([
-        api.get('/transactions/all?includeShared=true'), // Modificação para buscar transações do clã
+      const params = new URLSearchParams();
+      params.set('month', 'all');
+      params.set('includePending', 'true');
+      params.set('includeShared', 'true');
+      const currentMonth = format(new Date(), 'yyyy-MM');
+      const [transRes, goalsRes, accRes, cardsRes, catRes, tagsRes, budgetsRes] = await Promise.all([
+        api.get(`/transactions?${params.toString()}`),
         api.get('/goals'),
         api.get('/accounts'),
+        api.get('/cards'),
+        api.get('/categories'),
+        api.get('/tags'),
+        api.get(`/budgets?month=${currentMonth}`),
       ]);
       setAllTransactions(transRes.data);
       setGoals(goalsRes.data);
       setAccounts(accRes.data);
+      setCards(cardsRes.data);
+      setCategories(catRes.data);
+      setTags(tagsRes.data);
+      setBudgets(budgetsRes.data);
     } catch(error) {
       toast({ variant: 'destructive', title: 'Erro ao buscar dados para relatórios' });
     } finally {
@@ -69,28 +115,193 @@ export default function RelatoriosPage() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    const handleTransactionUpdate = () => {
+      fetchData().catch(() => {});
+    };
+    window.addEventListener('transaction-updated', handleTransactionUpdate);
+    return () => window.removeEventListener('transaction-updated', handleTransactionUpdate);
+  }, [fetchData]);
 
   const filteredTransactions = useMemo(() => {
-    let results = allTransactions;
+    let results = includePending ? allTransactions : allTransactions.filter(t => t.pago === true);
 
-    if (!includePending) {
-        results = results.filter(t => t.pago === true);
+    if(filters.dateRange?.from) {
+      const fromDate = filters.dateRange.from;
+      const toDate = filters.dateRange.to || new Date();
+      results = results.filter(t => {
+        const transactionDate = parseISO(t.data);
+        return transactionDate >= fromDate! && transactionDate <= toDate;
+      });
     }
-
-    if(dateRange?.from) {
-        results = results.filter(t => {
-            const transactionDate = parseISO(t.data);
-            return transactionDate >= dateRange.from! && transactionDate <= (dateRange.to || new Date());
-        });
+    if (filters.text) {
+      results = results.filter(t => t.descricao.toLowerCase().includes(filters.text!.toLowerCase()));
+    }
+    if (filters.accounts.length > 0) {
+      results = results.filter(t => t.accountId && filters.accounts.includes(t.accountId));
+    }
+    if (filters.cards.length > 0) {
+      results = results.filter(t => t.cardId && filters.cards.includes(t.cardId));
+    }
+    if (filters.categories.length > 0) {
+      results = results.filter(t => filters.categories.includes(t.categoria || ''));
+    }
+    if (filters.methods.length > 0) {
+      results = results.filter(t => filters.methods.includes(t.metodoPagamento));
+    }
+    if (filters.type) {
+      results = results.filter(t => t.tipo === filters.type);
+    }
+    if (filters.tags.length > 0) {
+      results = results.filter(t => {
+        const transactionTagIds = t.tags.map(tag => tag.id);
+        return filters.tags.every(filterTagId => transactionTagIds.includes(filterTagId));
+      });
     }
 
     return results;
-  }, [allTransactions, dateRange, includePending]);
+  }, [allTransactions, includePending, filters]);
+
+  const isDefaultDateRange = (() => {
+    if (!filters.dateRange?.from || !filters.dateRange?.to) return false;
+    const currentRange = getCurrentMonthRange();
+    return (
+      filters.dateRange.from.getTime() === currentRange.from.getTime() &&
+      filters.dateRange.to.getTime() === currentRange.to.getTime()
+    );
+  })();
+
+  const hasCustomDateRange = Boolean(filters.dateRange?.from && !isDefaultDateRange);
+
+  const isFilterActive = useMemo(() => {
+    return Boolean(
+      filters.text ||
+      filters.accounts.length ||
+      filters.cards.length ||
+      filters.categories.length ||
+      filters.methods.length ||
+      filters.tags.length ||
+      filters.type ||
+      hasCustomDateRange
+    );
+  }, [filters, hasCustomDateRange]);
+
+  const filterChips = useMemo<FilterChip[]>(() => {
+    const chips: FilterChip[] = [];
+    if (hasCustomDateRange && filters.dateRange?.from) {
+      const from = format(filters.dateRange.from, 'dd/MM/yy');
+      const to = filters.dateRange.to ? format(filters.dateRange.to, 'dd/MM/yy') : from;
+      chips.push({ key: 'dateRange', type: 'dateRange', label: `Período: ${from} - ${to}` });
+    }
+    if (filters.type) {
+      chips.push({ key: 'type', type: 'type', label: filters.type === 'receita' ? 'Somente receitas' : 'Somente despesas' });
+    }
+    if (filters.text) {
+      chips.push({ key: 'text', type: 'text', label: `Busca: ${filters.text}` });
+    }
+    filters.accounts.forEach((accountId) => {
+      const account = accounts.find(acc => acc.id === accountId);
+      chips.push({
+        key: `account-${accountId}`,
+        type: 'account',
+        value: accountId,
+        label: `Conta: ${account?.nome || 'Desconhecida'}`,
+      });
+    });
+    filters.cards.forEach((cardId) => {
+      const card = cards.find(card => card.id === cardId);
+      chips.push({
+        key: `card-${cardId}`,
+        type: 'card',
+        value: cardId,
+        label: `Cartão: ${card?.nome || 'Cartão'}`,
+      });
+    });
+    filters.categories.forEach((categoryName) => {
+      const category = categories.find(cat => cat.nome === categoryName || cat.label === categoryName);
+      chips.push({
+        key: `category-${categoryName}`,
+        type: 'category',
+        value: categoryName,
+        label: `Categoria: ${category?.label || categoryName}`,
+      });
+    });
+    filters.methods.forEach((method) => {
+      const methodLabel = METHOD_LABELS[method] || method;
+      chips.push({
+        key: `method-${method}`,
+        type: 'method',
+        value: method,
+        label: `Método: ${methodLabel}`,
+      });
+    });
+    filters.tags.forEach((tagId) => {
+      const tag = tags.find(t => t.id === tagId);
+      chips.push({
+        key: `tag-${tagId}`,
+        type: 'tag',
+        value: tagId,
+        label: `Tag: ${tag?.name || 'Tag'}`,
+      });
+    });
+    return chips;
+  }, [filters, accounts, cards, categories, tags, hasCustomDateRange]);
+
+  const handleRemoveChip = (chip: FilterChip) => {
+    setFilters(prev => {
+      switch (chip.type) {
+        case 'dateRange':
+          return { ...prev, dateRange: undefined };
+        case 'type':
+          return { ...prev, type: null };
+        case 'text':
+          return { ...prev, text: null };
+        case 'account':
+          return { ...prev, accounts: prev.accounts.filter(id => id !== chip.value) };
+        case 'card':
+          return { ...prev, cards: prev.cards.filter(id => id !== chip.value) };
+        case 'category':
+          return { ...prev, categories: prev.categories.filter(cat => cat !== chip.value) };
+        case 'method':
+          return { ...prev, methods: prev.methods.filter(method => method !== chip.value) };
+        case 'tag':
+          return { ...prev, tags: prev.tags.filter(tag => tag !== chip.value) };
+        default:
+          return prev;
+      }
+    });
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      ...createDefaultFilters(),
+      dateRange: getCurrentMonthRange(),
+    });
+  };
+
+  const handleFilterChange = (newFilters: FilterState) => {
+    setFilters(newFilters);
+    setIsFilterSheetOpen(false);
+  };
   
   const handleExport = async () => {
     setIsExporting(true);
     try {
-        const response = await api.post('/transactions/export', { dateRange, includePending }, {
+        const response = await api.post('/transactions/export', {
+            includePending,
+            text: filters.text,
+            categories: filters.categories,
+            accounts: filters.accounts,
+            cards: filters.cards,
+            methods: filters.methods,
+            type: filters.type,
+            dateRange: filters.dateRange?.from
+              ? {
+                  from: filters.dateRange.from?.toISOString(),
+                  to: filters.dateRange.to?.toISOString(),
+                }
+              : undefined,
+        }, {
             responseType: 'blob',
         });
         
@@ -108,26 +319,6 @@ export default function RelatoriosPage() {
         setIsExporting(false);
     }
   };
-  
-  const handleAiSearch = async () => {
-    if (!aiQuery) return;
-    setIsAiSearching(true);
-    try {
-      const response = await api.post('/ai/search-transactions', { query: aiQuery });
-      const filtersFromAI = response.data;
-      if (filtersFromAI.start_date || filtersFromAI.end_date) {
-        setDateRange({
-            from: filtersFromAI.start_date ? parseISO(filtersFromAI.start_date) : undefined,
-            to: filtersFromAI.end_date ? parseISO(filtersFromAI.end_date) : undefined
-        });
-      }
-      toast({ title: "Filtros aplicados pela IA." });
-    } catch (e) {
-       toast({ variant: 'destructive', title: "Erro na busca com IA." });
-    } finally {
-      setIsAiSearching(false);
-    }
-  };
 
 
   if (isLoading) {
@@ -141,78 +332,129 @@ export default function RelatoriosPage() {
                 <BarChart3 className="h-8 w-8 text-primary" />
                 <div>
                     <h1 className="text-3xl font-bold font-headline">Relatórios</h1>
-                    <p className="text-muted-foreground">Analise sua jornada financeira.</p>
+                    <p className="text-muted-foreground">Analise sua jornada financeira com filtros avançados.</p>
                 </div>
             </div>
             <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4" />}
-                Exportar
+                Exportar CSV
             </Button>
         </div>
 
-        <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="filters">
-                <AccordionTrigger>
-                    <div className='flex items-center gap-2'>
-                        <Filter className="h-4 w-4" />
-                        <span className='font-semibold'>Filtros e Período</span>
-                    </div>
+        <div className="rounded-2xl border bg-card">
+          <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Filter className="h-4 w-4" />
+                    Filtros avançados
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-full max-w-md p-0">
+                  <TransactionFilters
+                    accounts={accounts}
+                    cards={cards}
+                    categories={categories}
+                    tags={tags}
+                    currentFilters={filters}
+                    onFilterChange={handleFilterChange}
+                  />
+                </SheetContent>
+              </Sheet>
+              <div className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm">
+                <Switch id="include-pending" checked={includePending} onCheckedChange={setIncludePending}/>
+                <Label htmlFor="include-pending" className="cursor-pointer">Mostrar pendentes</Label>
+              </div>
+            </div>
+            {isFilterActive && (
+              <Button variant="ghost" size="sm" onClick={handleClearFilters}>
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+          <div className="border-t px-4 py-3">
+            {isFilterActive ? (
+              <div className="flex flex-wrap gap-2">
+                {filterChips.map(chip => (
+                  <Badge key={chip.key} variant="secondary" className="flex items-center gap-1">
+                    {chip.label}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveChip(chip)}
+                      className="rounded-full p-0.5 hover:text-destructive"
+                      aria-label={`Remover filtro ${chip.label}`}
+                    >
+                      &times;
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nenhum filtro adicional aplicado. Use os filtros avançados para segmentar seus dados.
+              </p>
+            )}
+          </div>
+        </div>
+        
+        <Accordion type="multiple" className="w-full space-y-4">
+            <AccordionItem value="overview" className="border rounded-lg overflow-hidden">
+                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
+                    <h3 className="text-lg font-semibold">Resumo Geral</h3>
                 </AccordionTrigger>
-                <AccordionContent className='space-y-4 pt-4'>
-                     <div className="space-y-2">
-                        <Label htmlFor="ai-search">Busca Inteligente com IA</Label>
-                        <div className="flex gap-2">
-                        <Input id="ai-search" placeholder="Ex: gastos com iFood no mês passado" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}/>
-                        <Button onClick={handleAiSearch} disabled={isAiSearching || !aiQuery} className="px-3">
-                            {isAiSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                        </Button>
-                        </div>
-                    </div>
-                    <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                        <div className="space-y-2">
-                            <Label>Período</Label>
-                            <Popover><PopoverTrigger asChild>
-                                <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !dateRange && "text-muted-foreground")}>
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {dateRange?.from ? ( dateRange.to ? `${format(dateRange.from, "LLL dd, y")} - ${format(dateRange.to, "LLL dd, y")}` : format(dateRange.from, "LLL dd, y")) : <span>Escolha um período</span>}
-                                </Button>
-                            </PopoverTrigger><PopoverContent className="w-auto p-0" align="start">
-                                <Calendar 
-                                    initialFocus 
-                                    mode="range" 
-                                    defaultMonth={dateRange?.from} 
-                                    selected={dateRange} 
-                                    onSelect={setDateRange} 
-                                    numberOfMonths={2} 
-                                    locale={ptBR}
-                                />
-                            </PopoverContent></Popover>
-                        </div>
-                         <div className="space-y-2">
-                             <Label>Períodos Rápidos</Label>
-                             <div className="flex flex-wrap gap-2">
-                                <Button variant="outline" size="sm" onClick={() => setDateRange({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) })}>Este Mês</Button>
-                                <Button variant="outline" size="sm" onClick={() => setDateRange({ from: subDays(new Date(), 90), to: new Date() })}>90 dias</Button>
-                                <Button variant="outline" size="sm" onClick={() => setDateRange({ from: subYears(new Date(), 1), to: new Date() })}>1 Ano</Button>
-                             </div>
-                        </div>
-                    </div>
-                     <div className="flex items-center space-x-2 pt-2">
-                        <Switch id="include-pending" checked={includePending} onCheckedChange={setIncludePending}/>
-                        <Label htmlFor="include-pending" className="text-sm font-medium">Incluir transações pendentes</Label>
+                <AccordionContent className="p-4">
+                    <DetailedSummary transactions={filteredTransactions} />
+                </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="patrimony" className="border rounded-lg overflow-hidden">
+                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
+                    <h3 className="text-lg font-semibold">Metas e Patrimônio</h3>
+                </AccordionTrigger>
+                <AccordionContent className="p-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <GoalSummaryCard goals={goals} />
+                        <NetWorthCard transactions={allTransactions} accounts={accounts} />
                     </div>
                 </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="cashflow" className="border rounded-lg overflow-hidden">
+                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
+                    <h3 className="text-lg font-semibold">Fluxo e Orçamentos</h3>
+                </AccordionTrigger>
+                <AccordionContent className="p-4">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <CashflowForecastChart transactions={allTransactions} accounts={accounts} />
+                        <BudgetPerformanceTable budgets={budgets} />
+                    </div>
+                </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="funds" className="border rounded-lg overflow-hidden">
+                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
+                    <h3 className="text-lg font-semibold">Metas/Fundos e Cartões</h3>
+                </AccordionTrigger>
+                <AccordionContent className="p-4">
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <GoalsFundsOverview goals={goals} />
+                        <CardInsightsCard cards={cards} transactions={filteredTransactions} />
+                    </div>
+                </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="tags" className="border rounded-lg overflow-hidden">
+                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
+                    <h3 className="text-lg font-semibold">Tags e Projetos</h3>
+                </AccordionTrigger>
+                <AccordionContent className="p-4">
+                    <TagInsightsCard transactions={filteredTransactions} />
+                </AccordionContent>
+            </AccordionItem>
         </Accordion>
-        
-        <DetailedSummary transactions={filteredTransactions} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <GoalSummaryCard goals={goals} />
-            <NetWorthCard transactions={allTransactions} accounts={accounts} />
-        </div>
-
-        <Accordion type="multiple" defaultValue={['expenses']} className="w-full space-y-4">
+        <Accordion type="multiple" className="w-full space-y-4 mt-6">
             <AccordionItem value="expenses" className='border rounded-lg overflow-hidden'>
                 <AccordionTrigger className='p-4 hover:no-underline bg-muted/30'>
                     <h3 className="text-lg font-semibold">Análise de Despesas</h3>
@@ -220,7 +462,7 @@ export default function RelatoriosPage() {
                 <AccordionContent className='p-4 space-y-6'>
                     <ExpensesByCategoryChart transactions={filteredTransactions} />
                     <TopExpensesTable transactions={filteredTransactions} />
-                    <ComparativeExpensesChart transactions={allTransactions} currentDateRange={dateRange} />
+                    <ComparativeExpensesChart transactions={allTransactions} currentDateRange={filters.dateRange} />
                 </AccordionContent>
             </AccordionItem>
 

@@ -5,6 +5,7 @@ import { addMonths, format, startOfMonth, endOfMonth, parseISO, addWeeks, addDay
 import NotificationService from '../services/notificationService.js';
 import AutomationService from '../services/automationService.js';
 import CategorizationService from '../services/categorizationService.js';
+import ReconciliationService from '../services/reconciliationService.js';
 import { stringify as stringifyCsv } from 'csv-stringify/sync';
 import AuditService from '../services/auditService.js';
 import GamificationService from '../services/gamificationService.js';
@@ -568,10 +569,12 @@ class TransactionController {
                     ipAddress: req.ip,
                 });
 
-                return newManualTx;
+                return { transaction: newManualTx, reconciliationId: importedTx.reconciliationId };
             });
             
-            res.status(201).json(result);
+            await ReconciliationService.updateBalanceSnapshot(result.reconciliationId);
+
+            res.status(201).json(result.transaction);
 
         } catch (error) {
             if (error.statusCode) {

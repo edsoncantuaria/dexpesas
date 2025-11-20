@@ -164,6 +164,7 @@ class AccountController {
                 color,
                 icone,
                 isArchived,
+                saldo,
             } = req.body;
 
             const originalAccount = await prisma.account.findUnique({ where: { id: id, userId: req.user.id }});
@@ -185,6 +186,13 @@ class AccountController {
                 icone: icone ?? originalAccount.icone,
                 isArchived: typeof isArchived === 'boolean' ? isArchived : originalAccount.isArchived,
             };
+            if (saldo !== undefined && saldo !== null && saldo !== '') {
+                const parsed = parseFloat(saldo);
+                if (Number.isNaN(parsed)) {
+                    return res.status(400).json({ message: 'Saldo inválido.' });
+                }
+                updateData.saldoInicial = parsed;
+            }
             Object.keys(updateData).forEach((key) => updateData[key] === undefined && delete updateData[key]);
 
             const updatedAccount = await prisma.account.update({

@@ -38,6 +38,16 @@ class NotificationService {
         }
     }
 
+    static truncate(text = '', maxLength = 240) {
+        if (typeof text !== 'string') {
+            return '';
+        }
+        if (text.length <= maxLength) {
+            return text;
+        }
+        return `${text.slice(0, maxLength - 1)}…`;
+    }
+
     static async createNotification(prismaInstance, user, { title, message, type, relatedId, actions }) {
         let canNotify = true;
         switch (type) {
@@ -67,15 +77,17 @@ class NotificationService {
             return null;
         }
 
+        const safeMessage = this.truncate(message, 240);
+
         // Envia a notificação push para a fila
-        await this.sendPushNotification(user.pushSubscription, title, message, { type, relatedId: relatedId || '' });
+        await this.sendPushNotification(user.pushSubscription, title, safeMessage, { type, relatedId: relatedId || '' });
 
         // Salva a notificação no banco de dados
         return prismaInstance.notification.create({
             data: {
                 userId: user.id,
                 title,
-                message,
+                message: safeMessage,
                 type,
                 relatedId: relatedId || null,
                 actions: actions || [],

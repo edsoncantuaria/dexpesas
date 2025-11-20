@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,13 @@ const statusConfig = {
     DISCARDED: { text: 'Descartado', icon: X, color: 'text-destructive', bgColor: 'bg-destructive/10' },
 }
 
+const BALANCE_TOLERANCE = 0.05;
+
+const formatMoney = (value?: number | null, currency = 'BRL') => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return '—';
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(Number(value));
+};
+
 export function ReconcileView({ reconciliation, manualTransactions, onMatch, onDiscard, onTransactionCreated, onFinalize, onCancel, onBulkImportStart }: ReconcileViewProps) {
     const [selectedImported, setSelectedImported] = useState<ImportedTransaction | null>(null);
     const [selectedManual, setSelectedManual] = useState<Transaction | null>(null);
@@ -54,6 +62,26 @@ export function ReconcileView({ reconciliation, manualTransactions, onMatch, onD
     const [manualDate, setManualDate] = useState<Date | undefined>();
     const [dialogState, setDialogState] = useState<'import' | 'finalize' | 'cancel' | null>(null);
     const { toast } = useToast();
+    const pendingImportedCount = reconciliation.importedTransactions.filter(t => ['PENDING', 'SUGGESTED'].includes(t.status)).length;
+    const statementCurrency = reconciliation.statementCurrency || 'BRL';
+    const bankOpening = reconciliation.statementOpeningBalance !== null && reconciliation.statementOpeningBalance !== undefined ? Number(reconciliation.statementOpeningBalance) : null;
+    const bankClosing = reconciliation.statementClosingBalance !== null && reconciliation.statementClosingBalance !== undefined ? Number(reconciliation.statementClosingBalance) : null;
+    const systemOpening = reconciliation.systemOpeningBalance !== null && reconciliation.systemOpeningBalance !== undefined ? Number(reconciliation.systemOpeningBalance) : null;
+    const systemClosing = reconciliation.systemClosingBalance !== null && reconciliation.systemClosingBalance !== undefined ? Number(reconciliation.systemClosingBalance) : null;
+    const balanceDifferenceValue = reconciliation.balanceDifference !== null && reconciliation.balanceDifference !== undefined ? Number(reconciliation.balanceDifference) : null;
+    const balanceWarning = balanceDifferenceValue !== null && Math.abs(balanceDifferenceValue) > BALANCE_TOLERANCE;
+    const isProcessingJobs = reconciliation.status === 'PROCESSING';
+    const jobsProgressLabel = isProcessingJobs && reconciliation.totalJobs
+        ? `${reconciliation.completedJobs ?? 0}/${reconciliation.totalJobs}`
+        : null;
+    const finalizeDisabledReason = isProcessingJobs
+        ? 'Aguardando a importação em lote finalizar.'
+        : balanceWarning
+            ? 'A diferença entre o extrato e o sistema precisa ser zerada.'
+            : pendingImportedCount > 0
+                ? 'Concilie ou descarte todas as transações antes de finalizar.'
+                : null;
+    const canFinalize = !finalizeDisabledReason;
 
     const handleSelectImported = (tx: ImportedTransaction) => {
         if (tx.status !== 'PENDING' && tx.status !== 'SUGGESTED') return;
@@ -121,10 +149,84 @@ export function ReconcileView({ reconciliation, manualTransactions, onMatch, onD
         );
     }
 
-    const pendingImportedCount = reconciliation.importedTransactions.filter(t => ['PENDING', 'SUGGESTED'].includes(t.status)).length;
+    const statusLabelMap = {
+        PROCESSING: 'Processando',
+        PENDING_REVIEW: 'Aguardando revisão',
+        COMPLETED: 'Finalizado',
+        FAILED: 'Falhou',
+    } as const;
 
     return (
         <>
+            <div className="space-y-4 mb-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">Status atual</p>
+                        <Badge variant="outline">{statusLabelMap[reconciliation.status]}</Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-3">
+                        {reconciliation.statementTimezone && <span>Fuso: {reconciliation.statementTimezone.replace(/_/g, ' ')}</span>}
+                        {jobsProgressLabel && (
+                            <span className="flex items-center gap-1 text-foreground">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                Processando {jobsProgressLabel}
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-3">
+                    <Card className="border border-border/50">
+                        <CardHeader className="pb-1">
+                            <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Extrato do banco</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                            <div>
+                                <p className="text-xs text-muted-foreground">Saldo inicial</p>
+                                <p className="text-lg font-semibold">{formatMoney(bankOpening, statementCurrency)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Saldo final</p>
+                                <p className="text-lg font-semibold">{formatMoney(bankClosing, statementCurrency)}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="border border-border/50">
+                        <CardHeader className="pb-1">
+                            <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Saldo no Dexpesas</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-sm">
+                            <div>
+                                <p className="text-xs text-muted-foreground">Saldo inicial</p>
+                                <p className="text-lg font-semibold">{formatMoney(systemOpening, statementCurrency)}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">Saldo final</p>
+                                <p className="text-lg font-semibold">{formatMoney(systemClosing, statementCurrency)}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className={cn("border", balanceWarning ? "border-destructive/50 bg-destructive/5" : "border-border/50 bg-muted/20")}>
+                        <CardHeader className="pb-1">
+                            <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Diferença</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-1">
+                            <p className={cn("text-2xl font-bold", balanceWarning ? "text-destructive" : "text-green-600 dark:text-green-400")}>
+                                {balanceDifferenceValue !== null ? formatMoney(balanceDifferenceValue, statementCurrency) : '—'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Limite aceitável: {formatMoney(BALANCE_TOLERANCE, statementCurrency)}</p>
+                            <p className="text-xs text-muted-foreground">Pendentes: {pendingImportedCount}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+                {balanceWarning && (
+                    <Alert variant="destructive">
+                        <AlertTitle>Diferença encontrada</AlertTitle>
+                        <AlertDescription>
+                            Ajuste ou crie lançamentos até que o saldo final do Dexpesas seja igual ao saldo final do extrato para finalizar a reconciliação.
+                        </AlertDescription>
+                    </Alert>
+                )}
+            </div>
             <div className="flex flex-col lg:flex-row items-start gap-4">
                 {/* Coluna de Transações Importadas */}
                 <Card className="w-full lg:flex-1">
@@ -303,13 +405,28 @@ export function ReconcileView({ reconciliation, manualTransactions, onMatch, onD
                     </CardContent>
                 </Card>
             </div>
-             <div className="w-full flex justify-end items-center gap-2 mt-4 border-t pt-4">
+            <div className="w-full flex justify-end items-center gap-2 mt-4 border-t pt-4">
                 <Button onClick={() => setDialogState('cancel')} variant="destructive">
                     <Ban className="h-4 w-4 mr-2"/> Cancelar
                 </Button>
-                <Button onClick={() => setDialogState('finalize')} variant="default" className="bg-green-600 hover:bg-green-700">
-                    <SquareCheckBig className="h-4 w-4 mr-2"/> Finalizar Reconciliação
-                </Button>
+                {finalizeDisabledReason ? (
+                    <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <span className="w-full lg:w-auto">
+                                    <Button disabled variant="default" className="bg-green-600 opacity-60 cursor-not-allowed">
+                                        <SquareCheckBig className="h-4 w-4 mr-2"/> Finalizar Reconciliação
+                                    </Button>
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">{finalizeDisabledReason}</TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                ) : (
+                    <Button onClick={() => setDialogState('finalize')} variant="default" className="bg-green-600 hover:bg-green-700">
+                        <SquareCheckBig className="h-4 w-4 mr-2"/> Finalizar Reconciliação
+                    </Button>
+                )}
             </div>
 
             <ConfirmActionDialog

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import Link from 'next/link';
 import {
   Tabs,
@@ -31,6 +32,16 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetTrigger,
+  SheetFooter,
+  SheetClose,
+} from '@/components/ui/sheet';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -75,22 +86,22 @@ import {
   ReceiptText,
   CircleCheck,
   Clock4,
+  Filter,
 } from 'lucide-react';
 import { withdrawalRoleOptions } from './withdrawal-options';
 import { ClanIcon } from '@/components/dashboard/clans/clan-icon';
+import { ClanInvitesList } from '@/components/dashboard/clans/clan-invites-list';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 
 type WizardInviteForm = {
-  email: string;
-  permissions: {
+  identifier: string;
+  visibility: {
     viewPersonalBudget: boolean;
-    recordTransactions: boolean;
-    moveFunds: boolean;
-    vote: boolean;
+    viewAccounts: boolean;
+    shareDebtSummary: boolean;
   };
-  sharePersonalData: boolean;
 };
 
 type FundDepositChannel = 'CELL_ACCOUNT' | 'CUSTODIAN' | 'MANUAL';
@@ -370,6 +381,7 @@ export default function CellsDashboardPage() {
               </Link>
             </CardContent>
           </Card>
+          <ClanInvitesList onActionSuccess={handleMembershipChange} />
         </div>
       </>
     );
@@ -448,6 +460,8 @@ export default function CellsDashboardPage() {
         />
       )}
 
+      <ClanInvitesList onActionSuccess={handleMembershipChange} />
+
       <Tabs defaultValue="home" className="space-y-6">
         <TabsList className="flex w-full flex-wrap gap-2 overflow-x-auto rounded-md bg-muted/40 p-1">
           <TabsTrigger value="home" className="flex-1 min-w-[140px]">
@@ -469,7 +483,6 @@ export default function CellsDashboardPage() {
             budgets={budgets}
             funds={funds}
             sharedAccounts={sharedAccounts}
-            sharedExpenses={sharedExpenses}
             alerts={alerts}
             members={cell.members || []}
             canManageSharedAccounts={canManageSharedAccounts}
@@ -488,6 +501,7 @@ export default function CellsDashboardPage() {
             cellId={cellId}
             expenses={sharedExpenses}
             members={cell.members || []}
+            sharedAccounts={sharedAccounts}
             currentUserId={user?.id}
             isLeader={isLeader}
             onRefresh={refreshSharedExpenses}
@@ -515,59 +529,43 @@ export default function CellsDashboardPage() {
       </Tabs>
       </div>
       <Dialog open={isHelpOpen} onOpenChange={setIsHelpOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Como funciona o Modo Família</DialogTitle>
-            <DialogDescription>Resumo rápido para entender o módulo e preencher cada campo com segurança.</DialogDescription>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
+          <DialogHeader className="space-y-2">
+            <DialogTitle>Guia rápido do Modo Família</DialogTitle>
+            <DialogDescription>
+              Sincronize orçamentos, metas e rateios entre todos os membros preservando permissões individuais. Use este resumo para tirar dúvidas rápidas.
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-5 text-sm text-muted-foreground">
+          <div className="max-h-[70vh] space-y-6 overflow-y-auto pr-3 text-sm text-muted-foreground">
             <section className="space-y-2">
-              <h4 className="text-base font-semibold text-foreground">Por que usar?</h4>
-              <p>
-                A família é um cofre compartilhado onde cada membro enxerga budgets sincronizados no orçamento pessoal, controla fundos
-                dedicados e registra decisões em grupo. Tudo respeita permissões: quem não tem acesso não vê valores sensíveis.
-              </p>
+              <h4 className="text-base font-semibold text-foreground">Fluxo em três passos</h4>
+              <ol className="list-decimal space-y-2 pl-5">
+                <li>Convide os membros e defina quem é líder/admin. As permissões determinam quem pode criar budgets, fundos e rateios.</li>
+                <li>Configure orçamentos compartilhados ou híbridos. Eles aparecem como “espelhos” no orçamento pessoal de cada membro.</li>
+                <li>Registre caixinhas e despesas compartilhadas. Cada parte gera uma transação pendente na conta pessoal escolhida.</li>
+              </ol>
             </section>
             <section className="space-y-2">
-              <h4 className="text-base font-semibold text-foreground">Campos dos budgets</h4>
+              <h4 className="text-base font-semibold text-foreground">Orçamentos e metas</h4>
               <ul className="list-disc space-y-1 pl-5">
-                <li>
-                  <span className="font-medium text-foreground">Categoria:</span> escolha uma das categorias globais (as mesmas usadas ao
-                  lançar transações). É ela que define onde o espelho aparecerá no orçamento pessoal.
-                </li>
-                <li>
-                  <span className="font-medium text-foreground">Limite:</span> valor máximo que o grupo pretende gastar naquele período.
-                  Esse limite é dividido entre os membros conforme a estratégia escolhida (igualitária ou porcentagens).
-                </li>
-                <li>
-                  <span className="font-medium text-foreground">Tipo:</span> define se o budget é totalmente compartilhado (CELL),
-                  híbrido (parte vai para cada membro) ou apenas pessoal atrelado ao grupo.
-                </li>
-                <li>
-                  <span className="font-medium text-foreground">Divisão:</span> no modo porcentagem, distribua 100% entre os membros
-                  ativos. Se não houver membros, convide-os antes de habilitar essa opção.
-                </li>
+                <li><span className="font-medium text-foreground">Categoria:</span> usa as mesmas categorias do módulo pessoal. Assim o espelho cai no lugar certo.</li>
+                <li><span className="font-medium text-foreground">Limite:</span> valor máximo mensal. Escolha divisão igualitária ou porcentagens customizadas.</li>
+                <li><span className="font-medium text-foreground">Tipo:</span> CELL (todos), HYBRID (parte pessoal + parte coletiva) ou PERSONAL (apenas referência vinculada).</li>
+                <li><span className="font-medium text-foreground">Caixinhas:</span> sempre vinculam uma meta espelho ao responsável. Investir/Resgatar pede conta de origem/destino.</li>
               </ul>
             </section>
             <section className="space-y-2">
-              <h4 className="text-base font-semibold text-foreground">Outros blocos</h4>
+              <h4 className="text-base font-semibold text-foreground">Rateios e transações</h4>
               <ul className="list-disc space-y-1 pl-5">
-                <li>
-                  <span className="font-medium text-foreground">Fundos e caixinhas:</span> reservam metas coletivas (ex.: viagem, reserva
-                  de emergência).
-                </li>
-                <li>
-                  <span className="font-medium text-foreground">Timeline e alertas:</span> mostram tudo que foi editado/aprovado e te
-                  avisam quando um budget está estourando.
-                </li>
-                <li>
-                  <span className="font-medium text-foreground">Decisões e rateios:</span> permitem criar votações e regras automáticas
-                  para dividir despesas recorrentes.
-                </li>
+                <li>“Nova despesa” cria uma transação pendente para cada participante. É preciso selecionar a conta pessoal de cada um.</li>
+                <li>Ao registrar pagamento, a transação é quitada e o histórico fica disponível para todos.</li>
+                <li>O filtro lateral ajuda a encontrar despesas por descrição, status ou mês.</li>
               </ul>
-              <p className="text-xs">
-                Dica: qualquer alteração relevante gera log na timeline. Use-a para auditar quem mudou limites, fundos ou permissões.
-              </p>
+            </section>
+            <section className="space-y-2">
+              <h4 className="text-base font-semibold text-foreground">Permissões e rastreio</h4>
+              <p>Timeline e alertas registram toda alteração (limites, fundos, decisões). Use-os para auditar quem editou o quê e quando.</p>
+              <p className="text-xs">Dica: se um membro não vê saldos, verifique se ele possui permissão e se a conta foi compartilhada na aba “Contas”.</p>
             </section>
           </div>
         </DialogContent>
@@ -1183,6 +1181,7 @@ function SharedExpensesPanel({
   cellId,
   expenses,
   members,
+  sharedAccounts,
   onRefresh,
   currentUserId,
   isLeader,
@@ -1190,6 +1189,7 @@ function SharedExpensesPanel({
   cellId: string;
   expenses: CellSharedExpense[];
   members: Clan['members'];
+  sharedAccounts: CellSharedAccount[];
   onRefresh: () => Promise<void>;
   currentUserId?: string;
   isLeader: boolean;
@@ -1201,6 +1201,44 @@ function SharedExpensesPanel({
   }, [members]);
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [settlementTarget, setSettlementTarget] = useState<SettlementTarget | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'PAID'>('ALL');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [monthFilter, setMonthFilter] = useState('');
+  const [isFilterSheetOpen, setFilterSheetOpen] = useState(false);
+  const activeFilterCount = [Boolean(searchTerm.trim()), statusFilter !== 'ALL', Boolean(monthFilter)].filter(Boolean).length;
+  const resetFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('ALL');
+    setMonthFilter('');
+  };
+
+  const filteredExpenses = useMemo(() => {
+    return expenses
+      .filter((expense) => {
+        if (searchTerm.trim() && !expense.description.toLowerCase().includes(searchTerm.trim().toLowerCase())) {
+          return false;
+        }
+        if (monthFilter) {
+          const expenseDate = new Date(expense.expenseDate || expense.createdAt);
+          const yearMonth = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}`;
+          if (yearMonth !== monthFilter) {
+            return false;
+          }
+        }
+        if (statusFilter === 'PENDING') {
+          return expense.participants.some((participant) => !participant.transaction?.pago);
+        }
+        if (statusFilter === 'PAID') {
+          return expense.participants.length > 0 && expense.participants.every((participant) => participant.transaction?.pago);
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.expenseDate || a.createdAt).getTime();
+        const dateB = new Date(b.expenseDate || b.createdAt).getTime();
+        return dateB - dateA;
+      });
+  }, [expenses, searchTerm, monthFilter, statusFilter]);
 
   const handleDeleteExpense = async (expenseId: string) => {
     try {
@@ -1224,27 +1262,87 @@ function SharedExpensesPanel({
             <CardTitle>Despesas compartilhadas</CardTitle>
             <CardDescription>Registre contas da casa e acompanhe quem já pagou.</CardDescription>
           </div>
-          <Button size="sm" className="w-full sm:w-auto" onClick={() => setDialogOpen(true)}>
-            <ReceiptText className="mr-2 h-4 w-4" />
-            Nova despesa
-          </Button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <Sheet open={isFilterSheetOpen} onOpenChange={setFilterSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filtros
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="flex h-full w-full flex-col p-0 sm:max-w-sm">
+                  <SheetHeader className="border-b p-4 text-left">
+                    <SheetTitle>Filtrar rateios</SheetTitle>
+                    <SheetDescription>Busque por descrição, status ou mês de referência.</SheetDescription>
+                  </SheetHeader>
+                  <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                    <div className="space-y-2">
+                      <Label>Descrição</Label>
+                      <Input
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Ex.: Conta de luz"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select value={statusFilter} onValueChange={(value: 'ALL' | 'PENDING' | 'PAID') => setStatusFilter(value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">Todas</SelectItem>
+                          <SelectItem value="PENDING">Pendentes</SelectItem>
+                          <SelectItem value="PAID">Quitadas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Mês</Label>
+                      <Input type="month" value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)} />
+                    </div>
+                  </div>
+                  <SheetFooter className="flex items-center justify-between border-t p-4">
+                    <Button variant="ghost" onClick={resetFilters} disabled={!activeFilterCount}>
+                      Limpar filtros
+                    </Button>
+                    <SheetClose asChild>
+                      <Button>Fechar</Button>
+                    </SheetClose>
+                  </SheetFooter>
+                </SheetContent>
+              </Sheet>
+              {activeFilterCount > 0 && (
+                <Badge variant="secondary" className="px-2 py-0.5 text-xs font-medium">
+                  {activeFilterCount} ativo{activeFilterCount > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </div>
+            <Button size="sm" className="w-full sm:w-auto" onClick={() => setDialogOpen(true)}>
+              <ReceiptText className="mr-2 h-4 w-4" />
+              Nova despesa
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {expenses.length === 0 && (
+          {filteredExpenses.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              Nenhuma despesa compartilhada foi cadastrada ainda. Use o botão acima para lançar uma conta e dividir automaticamente entre os membros.
+              Nenhuma despesa corresponde aos filtros selecionados. Ajuste os filtros ou cadastre uma nova conta.
             </p>
           )}
-          {expenses.map((expense) => (
-            <div key={expense.id} className="rounded-xl border bg-card p-4 space-y-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+          {filteredExpenses.map((expense) => {
+            const expenseDate = new Date(expense.expenseDate || expense.createdAt);
+            return (
+              <div key={expense.id} className="rounded-xl border bg-card p-4 space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold leading-tight">{expense.description}</p>
                   <p className="text-xs text-muted-foreground">
                     {toCurrency(expense.totalAmount)} • {expense.category?.nome || 'Sem categoria'}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(expense.createdAt).toLocaleDateString('pt-BR')}
+                    {expenseDate.toLocaleDateString('pt-BR')}
                   </p>
                 </div>
                 {isLeader && (
@@ -1315,7 +1413,8 @@ function SharedExpensesPanel({
                 })}
               </div>
             </div>
-          ))}
+          );
+          })}
         </CardContent>
       </Card>
       <NewSharedExpenseDialog
@@ -1323,6 +1422,7 @@ function SharedExpensesPanel({
         onOpenChange={setDialogOpen}
         cellId={cellId}
         members={members}
+        sharedAccounts={sharedAccounts}
         onSuccess={async () => {
           setDialogOpen(false);
           await onRefresh();
@@ -1346,12 +1446,14 @@ function NewSharedExpenseDialog({
   onOpenChange,
   cellId,
   members,
+  sharedAccounts,
   onSuccess,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   cellId: string;
   members: Clan['members'];
+  sharedAccounts: CellSharedAccount[];
   onSuccess: () => Promise<void>;
 }) {
   const { toast } = useToast();
@@ -1359,13 +1461,33 @@ function NewSharedExpenseDialog({
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mode, setMode] = useState<'EQUAL' | 'CUSTOM'>('EQUAL');
+  const today = new Date().toISOString().slice(0, 10);
   const [form, setForm] = useState({
     description: '',
     categoryId: '',
     totalAmount: '',
+    expenseDate: today,
   });
   const [splits, setSplits] = useState<Record<string, string>>({});
   const [selectedMembers, setSelectedMembers] = useState<Record<string, boolean>>({});
+  const [selectedAccounts, setSelectedAccounts] = useState<Record<string, string>>({});
+
+  const accountsByMember = useMemo(() => {
+    const map: Record<string, Account[]> = {};
+    sharedAccounts.forEach((record) => {
+      if (!record.account || !record.account.userId) {
+        return;
+      }
+      const ownerId = record.account.userId;
+      if (!map[ownerId]) {
+        map[ownerId] = [];
+      }
+      map[ownerId].push(record.account);
+    });
+    return map;
+  }, [sharedAccounts]);
+
+  const memberHasAccount = (memberId: string) => (accountsByMember[memberId]?.length || 0) > 0;
 
   useEffect(() => {
     let active = true;
@@ -1388,28 +1510,34 @@ function NewSharedExpenseDialog({
       });
     const initialSplits: Record<string, string> = {};
     const initialSelection: Record<string, boolean> = {};
+    const initialAccounts: Record<string, string> = {};
     (members || []).forEach((member) => {
+      const availableAccounts = accountsByMember[member.userId] || [];
       initialSplits[member.userId] = '';
-      initialSelection[member.userId] = true;
+      initialSelection[member.userId] = availableAccounts.length > 0;
+      initialAccounts[member.userId] = availableAccounts[0]?.id || '';
     });
     setSplits(initialSplits);
     setSelectedMembers(initialSelection);
-    setForm({ description: '', categoryId: '', totalAmount: '' });
+    setSelectedAccounts(initialAccounts);
+    setForm({ description: '', categoryId: '', totalAmount: '', expenseDate: today });
     setMode('EQUAL');
     return () => {
       active = false;
     };
-  }, [open, members]);
+  }, [open, members, accountsByMember, today]);
 
   useEffect(() => {
     if (mode !== 'EQUAL') return;
     const total = parseAmount(form.totalAmount);
-    const active = members.filter((member) => selectedMembers[member.userId]);
-    const perMember = active.length ? total / active.length : 0;
+    const activeEligible = members.filter(
+      (member) => selectedMembers[member.userId] && memberHasAccount(member.userId),
+    );
+    const perMember = activeEligible.length ? total / activeEligible.length : 0;
     setSplits((prev) => {
       const next: Record<string, string> = {};
       members.forEach((member) => {
-        if (selectedMembers[member.userId]) {
+        if (selectedMembers[member.userId] && memberHasAccount(member.userId)) {
           next[member.userId] = perMember ? perMember.toFixed(2) : prev[member.userId] || '';
         } else {
           next[member.userId] = '';
@@ -1417,21 +1545,34 @@ function NewSharedExpenseDialog({
       });
       return next;
     });
-  }, [mode, form.totalAmount, members, selectedMembers]);
+  }, [mode, form.totalAmount, members, selectedMembers, accountsByMember]);
 
   const totalAmount = parseAmount(form.totalAmount);
-  const activeMembers = members.filter((member) => selectedMembers[member.userId]);
-  const splitEntries = activeMembers
+  const eligibleMembers = members.filter(
+    (member) => selectedMembers[member.userId] && memberHasAccount(member.userId),
+  );
+  const hasSelection = eligibleMembers.length > 0;
+  const splitEntries = eligibleMembers
     .map((member) => ({
       memberId: member.userId,
       amount: parseAmount(splits[member.userId]),
+      accountId: selectedAccounts[member.userId],
     }))
     .filter((entry) => entry.amount > 0);
   const splitSum = splitEntries.reduce((acc, entry) => acc + entry.amount, 0);
   const totalsMatch = Math.round(splitSum * 100) === Math.round(totalAmount * 100);
+  const missingAccount = splitEntries.some((entry) => !entry.accountId);
 
   const handleSubmit = async () => {
-    if (!form.description.trim() || !form.categoryId || !totalAmount || !splitEntries.length || !totalsMatch) {
+    if (
+      !form.description.trim() ||
+      !form.categoryId ||
+      !totalAmount ||
+      !splitEntries.length ||
+      !totalsMatch ||
+      !hasSelection ||
+      missingAccount
+    ) {
       toast({ variant: 'destructive', title: 'Revise os campos da despesa antes de salvar.' });
       return;
     }
@@ -1443,6 +1584,7 @@ function NewSharedExpenseDialog({
         totalAmount,
         splitMethod: mode === 'EQUAL' ? 'EQUAL' : 'AMOUNT',
         splits: splitEntries,
+        expenseDate: form.expenseDate,
       });
       toast({ title: 'Despesa compartilhada cadastrada!' });
       await onSuccess();
@@ -1459,13 +1601,13 @@ function NewSharedExpenseDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Nova despesa compartilhada</DialogTitle>
           <DialogDescription>Divida contas da casa e acompanhe quem já quitou cada parte.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+        <div className="max-h-[68vh] space-y-4 overflow-y-auto pr-1">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <Label>Descrição</Label>
               <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ex.: Conta de luz" />
@@ -1488,6 +1630,14 @@ function NewSharedExpenseDialog({
                   </SelectContent>
                 </Select>
               )}
+            </div>
+            <div>
+              <Label>Data da despesa</Label>
+              <Input
+                type="date"
+                value={form.expenseDate}
+                onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
+              />
             </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -1521,37 +1671,87 @@ function NewSharedExpenseDialog({
                 Soma: {toCurrency(splitSum)} {totalsMatch ? '' : '(ajuste necessário)'}
               </span>
             </div>
-            <div className="space-y-2">
-              {members.map((member) => (
-                <div key={member.userId} className="flex items-center justify-between gap-3 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={Boolean(selectedMembers[member.userId])}
-                      onCheckedChange={(checked) =>
-                        setSelectedMembers((prev) => ({
+            <div className="space-y-3">
+              {members.map((member) => {
+                const memberAccounts = accountsByMember[member.userId] || [];
+                const hasAccount = memberAccounts.length > 0;
+                const isChecked = Boolean(selectedMembers[member.userId] && hasAccount);
+                return (
+                  <div key={member.userId} className="rounded-lg border p-3 space-y-2 text-sm">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={isChecked}
+                          disabled={!hasAccount}
+                          onCheckedChange={(checked) => {
+                            if (!hasAccount) {
+                              toast({
+                                variant: 'destructive',
+                                title: 'Vincule uma conta para incluir este membro.',
+                              });
+                              return;
+                            }
+                            setSelectedMembers((prev) => ({
+                              ...prev,
+                              [member.userId]: Boolean(checked),
+                            }));
+                            if (checked && !selectedAccounts[member.userId]) {
+                              setSelectedAccounts((prev) => ({
+                                ...prev,
+                                [member.userId]: memberAccounts[0]?.id || '',
+                              }));
+                            }
+                          }}
+                        />
+                        <span>{member.user?.name || 'Membro'}</span>
+                      </div>
+                      {hasAccount ? (
+                        <Select
+                          value={selectedAccounts[member.userId] || memberAccounts[0]?.id || ''}
+                          onValueChange={(value) =>
+                            setSelectedAccounts((prev) => ({
+                              ...prev,
+                              [member.userId]: value,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="w-full sm:w-48">
+                            <SelectValue placeholder="Conta de origem" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {memberAccounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id}>
+                                {account.nome}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Sem conta compartilhada — mantenha o valor em 0,00.
+                        </p>
+                      )}
+                    </div>
+                    <Input
+                      className="sm:w-40"
+                      type="number"
+                      min={0}
+                      value={splits[member.userId] ?? ''}
+                      onChange={(e) =>
+                        setSplits((prev) => ({
                           ...prev,
-                          [member.userId]: Boolean(checked),
+                          [member.userId]: e.target.value,
                         }))
                       }
+                      disabled={mode === 'EQUAL' || !isChecked}
                     />
-                    <span>{member.user?.name || 'Membro'}</span>
                   </div>
-                  <Input
-                    className="w-32"
-                    type="number"
-                    min={0}
-                    value={splits[member.userId] ?? ''}
-                    onChange={(e) =>
-                      setSplits((prev) => ({
-                        ...prev,
-                        [member.userId]: e.target.value,
-                      }))
-                    }
-                    disabled={mode === 'EQUAL' || !selectedMembers[member.userId]}
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
+            {!hasSelection && (
+              <p className="text-xs text-destructive">Inclua ao menos um membro com conta vinculada ao rateio.</p>
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -1595,7 +1795,12 @@ function SettleSharedExpenseDialog({
         if (!active) return;
         const list = response.data || [];
         setAccounts(list);
-        setSelectedAccountId(list[0]?.id || '');
+        const defaultAccountId = target.participant.defaultAccountId;
+        if (defaultAccountId && list.some((account) => account.id === defaultAccountId)) {
+          setSelectedAccountId(defaultAccountId);
+        } else {
+          setSelectedAccountId(list[0]?.id || '');
+        }
       })
       .catch(() => {
         if (!active) return;
@@ -2958,7 +3163,12 @@ function MembersPanel({
                 </TooltipTrigger>
                 <TooltipContent>Convidar membro</TooltipContent>
               </Tooltip>
-              <InviteWizard cellId={cell.id} onSuccess={async () => { setIsInviteOpen(false); await onChange(); }} />
+              <InviteWizard
+                cellId={cell.id}
+                open={isInviteOpen}
+                onClose={() => setIsInviteOpen(false)}
+                onSuccess={onChange}
+              />
             </Dialog>
             <AlertDialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
               <Tooltip>
@@ -3061,79 +3271,212 @@ function MembersPanel({
   );
 }
 
-function InviteWizard({ cellId, onSuccess }: { cellId: string; onSuccess: () => Promise<void> }) {
+function InviteWizard({
+  cellId,
+  open,
+  onClose,
+  onSuccess,
+}: {
+  cellId: string;
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => Promise<void>;
+}) {
+  type LookupUser = { id: string; name?: string; email?: string; username?: string; avatarUrl?: string | null };
   const [step, setStep] = useState(1);
   const { toast } = useToast();
   const [form, setForm] = useState<WizardInviteForm>({
-    email: '',
-    permissions: {
+    identifier: '',
+    visibility: {
       viewPersonalBudget: false,
-      recordTransactions: true,
-      moveFunds: false,
-      vote: true,
+      viewAccounts: false,
+      shareDebtSummary: false,
     },
-    sharePersonalData: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lookupResult, setLookupResult] = useState<LookupUser | null>(null);
+  const [validatedIdentifier, setValidatedIdentifier] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+
+  const resetWizard = useCallback(() => {
+    setStep(1);
+    setForm({
+      identifier: '',
+      visibility: {
+        viewPersonalBudget: false,
+        viewAccounts: false,
+        shareDebtSummary: false,
+      },
+    });
+    setLookupResult(null);
+    setValidatedIdentifier('');
+    setLookupError(null);
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      resetWizard();
+    }
+  }, [open, resetWizard]);
+
+  const ensureLookup = useCallback(async () => {
+    const trimmed = form.identifier.trim();
+    if (!trimmed) {
+      setLookupError('Informe o email ou ID do convidado.');
+      return false;
+    }
+    if (lookupResult && validatedIdentifier === trimmed) {
+      return true;
+    }
+    setIsSearching(true);
+    try {
+      const response = await api.get('/user/lookup', { params: { identifier: trimmed } });
+      setLookupResult(response.data);
+      setValidatedIdentifier(trimmed);
+      setLookupError(null);
+      return true;
+    } catch (error: any) {
+      setLookupResult(null);
+      setLookupError(error?.response?.data?.message || 'Usuário não encontrado.');
+      return false;
+    } finally {
+      setIsSearching(false);
+    }
+  }, [form.identifier, lookupResult, validatedIdentifier]);
+
+  const handleNext = async () => {
+    if (step === 1) {
+      const ok = await ensureLookup();
+      if (!ok) return;
+    }
+    setStep((current) => Math.min(3, current + 1));
+  };
 
   const handleSubmit = async () => {
+    if (!lookupResult) {
+      toast({ variant: 'destructive', title: 'Valide o convidado antes de enviar.' });
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await api.post(`/cells/${cellId}/decisions`, {
-        title: `Convite para ${form.email}`,
-        description: 'Solicitação para novo membro com permissões personalizadas.',
-        options: ['APROVAR', 'RECUSAR'],
-        payload: { ...form },
+      await api.post(`/cells/${cellId}/invite`, {
+        invitedUserId: lookupResult.id,
+        requestedVisibility: form.visibility,
       });
-      toast({ title: 'Solicitação registrada. Avise os membros para aprovar.' });
+      toast({ title: 'Convite enviado!' });
       await onSuccess();
-    } catch {
-      toast({ variant: 'destructive', title: 'Não foi possível registrar a solicitação.' });
+      onClose();
+      resetWizard();
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Não foi possível enviar o convite.',
+        description: error?.response?.data?.message || 'Revise os dados e tente novamente.',
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const visibilityOptions: Array<{ key: keyof WizardInviteForm['visibility']; label: string }> = [
+    { key: 'viewPersonalBudget', label: 'Ver orçamento coletivo no pessoal' },
+    { key: 'viewAccounts', label: 'Ver contas compartilhadas' },
+    { key: 'shareDebtSummary', label: 'Acessar resumo de dívidas' },
+  ];
+
   return (
-    <DialogContent className="space-y-4">
+    <DialogContent className="max-w-lg max-h-[85vh] space-y-4 overflow-hidden">
       <DialogHeader>
         <DialogTitle>Convidar novo membro</DialogTitle>
-        <DialogDescription>Configurações de visibilidade e permissão personalizadas.</DialogDescription>
+        <DialogDescription>Localize a pessoa pelo ID ou email e ajuste o que ela poderá ver.</DialogDescription>
       </DialogHeader>
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         {[1, 2, 3].map((current) => (
           <div key={current} className={`h-2 flex-1 rounded ${step >= current ? 'bg-primary' : 'bg-muted'}`} />
         ))}
       </div>
-      {step === 1 && (
-        <div className="space-y-3">
-          <Label>Email ou ID do convidado</Label>
-          <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="pessoa@exemplo.com" />
-        </div>
-      )}
-      {step === 2 && (
-        <div className="space-y-3">
-          <p className="text-sm font-semibold">Permissões</p>
-          {Object.entries(form.permissions).map(([key, value]) => (
-            <div key={key} className="flex items-center justify-between text-sm">
-              <span>{permissionLabel(key)}</span>
-              <Switch checked={value} onCheckedChange={(checked) => setForm({ ...form, permissions: { ...form.permissions, [key]: checked } })} />
+      <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
+        {step === 1 && (
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Email ou ID do convidado</Label>
+              <Input
+                value={form.identifier}
+                onChange={(e) => {
+                  setForm({ ...form, identifier: e.target.value });
+                  setLookupError(null);
+                }}
+                placeholder="pessoa@exemplo.com ou usr_123"
+              />
             </div>
-          ))}
-        </div>
-      )}
-      {step === 3 && (
-        <div className="space-y-3">
-          <p className="text-sm font-semibold">Compartilhamento de dados pessoais</p>
-          <div className="flex items-center justify-between">
-            <span className="text-sm">Permitir visualizar meu orçamento pessoal</span>
-            <Switch checked={form.sharePersonalData} onCheckedChange={(checked) => setForm({ ...form, sharePersonalData: checked })} />
+            <Button
+              variant="outline"
+              onClick={ensureLookup}
+              disabled={!form.identifier.trim() || isSearching}
+            >
+              {isSearching ? 'Buscando...' : 'Validar pessoa'}
+            </Button>
+            {lookupResult && (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <p className="font-semibold">{lookupResult.name || lookupResult.username || lookupResult.email}</p>
+                <p className="text-xs text-muted-foreground">
+                  {lookupResult.email || lookupResult.username || `ID: ${lookupResult.id}`}
+                </p>
+              </div>
+            )}
+            {lookupError && <p className="text-xs text-destructive">{lookupError}</p>}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Essa configuração é armazenada como uma decisão. Após aprovação, o convite é liberado automaticamente.
-          </p>
-        </div>
-      )}
+        )}
+        {step === 2 && (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold">Escolha o que essa pessoa poderá enxergar</p>
+            {visibilityOptions.map((option) => (
+              <div key={option.key} className="flex items-center justify-between text-sm">
+                <span>{option.label}</span>
+                <Switch
+                  checked={form.visibility[option.key]}
+                  onCheckedChange={(checked) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      visibility: { ...prev.visibility, [option.key]: checked },
+                    }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        )}
+        {step === 3 && (
+          <div className="space-y-3">
+            <p className="text-sm font-semibold">Revise antes de enviar</p>
+            {lookupResult ? (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+                <p className="font-semibold">{lookupResult.name || lookupResult.username || lookupResult.email}</p>
+                <p className="text-xs text-muted-foreground">
+                  {lookupResult.email || lookupResult.username || `ID: ${lookupResult.id}`}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-destructive">Valide o convidado antes de continuar.</p>
+            )}
+            <div className="rounded-md border p-3 text-xs space-y-1">
+              <p className="font-semibold text-foreground">Permissões solicitadas</p>
+              {visibilityOptions
+                .filter((option) => form.visibility[option.key])
+                .map((option) => (
+                  <p key={option.key}>• {option.label}</p>
+                ))}
+              {Object.values(form.visibility).every((value) => !value) && (
+                <p>Nenhuma permissão especial selecionada.</p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O convidado receberá um alerta para aceitar ou recusar. Você pode ajustar permissões depois em “Membros”.
+            </p>
+          </div>
+        )}
+      </div>
       <DialogFooter className="flex flex-wrap gap-2">
         {step > 1 && (
           <Button variant="outline" onClick={() => setStep((current) => current - 1)}>
@@ -3141,13 +3484,16 @@ function InviteWizard({ cellId, onSuccess }: { cellId: string; onSuccess: () => 
           </Button>
         )}
         {step < 3 && (
-          <Button onClick={() => setStep((current) => current + 1)} disabled={step === 1 && !form.email}>
+          <Button
+            onClick={handleNext}
+            disabled={step === 1 && (!form.identifier.trim() || !lookupResult)}
+          >
             Avançar
           </Button>
         )}
         {step === 3 && (
-          <Button onClick={handleSubmit} disabled={isSubmitting || !form.email}>
-            {isSubmitting ? 'Registrando...' : 'Enviar para aprovação'}
+          <Button onClick={handleSubmit} disabled={isSubmitting || !lookupResult}>
+            {isSubmitting ? 'Enviando...' : 'Enviar convite'}
           </Button>
         )}
       </DialogFooter>
@@ -3155,25 +3501,18 @@ function InviteWizard({ cellId, onSuccess }: { cellId: string; onSuccess: () => 
   );
 }
 
-function permissionLabel(key: string) {
-  switch (key) {
-    case 'viewPersonalBudget':
-      return 'Ver orçamento pessoal';
-    case 'recordTransactions':
-      return 'Registrar transações';
-    case 'moveFunds':
-      return 'Mover fundos';
-    case 'vote':
-      return 'Participar de votações';
-    default:
-      return key;
-  }
-}
-
 function TimelineFeed({ events }: { events: CellTimelineEvent[] }) {
   const [filter, setFilter] = useState<string>('all');
   const filtered = filter === 'all' ? events : events.filter((event) => event.type === filter);
   const uniqueTypes = Array.from(new Set(events.map((event) => event.type)));
+  const formatTimestamp = (value: string | null | undefined) => {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '—';
+    }
+    return format(date, 'dd MMM · HH:mm', { locale: ptBR });
+  };
 
   return (
     <Card>
@@ -3196,17 +3535,24 @@ function TimelineFeed({ events }: { events: CellTimelineEvent[] }) {
           </SelectContent>
         </Select>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {filtered.length === 0 && <p className="text-sm text-muted-foreground">Nenhum evento recente.</p>}
-        {filtered.slice(0, 10).map((event) => (
-          <div key={event.id} className="rounded-md border p-3 space-y-1">
-            <div className="flex items-center justify-between text-sm">
-              <p className="font-semibold">{event.title || event.type}</p>
-              <span className="text-xs text-muted-foreground">{new Date(event.createdAt).toLocaleString('pt-BR')}</span>
-            </div>
-            {event.description && <p className="text-sm text-muted-foreground">{event.description}</p>}
+      <CardContent>
+        {filtered.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum evento recente.</p>
+        ) : (
+          <div className="max-h-96 space-y-3 overflow-y-auto pr-2">
+            {filtered.map((event) => (
+              <div key={event.id} className="rounded-md border p-3 space-y-1">
+                <div className="flex items-center justify-between text-sm">
+                  <p className="font-semibold">{event.title || event.type}</p>
+                  <span className="text-xs text-muted-foreground">
+                    {formatTimestamp(event.createdAt)}
+                  </span>
+                </div>
+                {event.description && <p className="text-sm text-muted-foreground">{event.description}</p>}
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </CardContent>
     </Card>
   );

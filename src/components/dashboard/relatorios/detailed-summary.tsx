@@ -64,22 +64,22 @@ export function DetailedSummary({ transactions }: DetailedSummaryProps) {
     <Card className="w-full shadow-lg">
         <CardContent className="p-4 space-y-4">
             {/* Main Summary Card */}
-            <div className="rounded-xl bg-gray-900 dark:bg-black text-white p-4 space-y-3">
-                <div className="flex justify-around text-center">
+            <div className="rounded-xl border bg-card/80 p-4 shadow-sm backdrop-blur-sm">
+                <div className="flex justify-around text-center gap-6">
                     <div>
-                        <p className="text-sm text-gray-300">Entradas</p>
-                        <p className="text-2xl font-bold text-green-400">{formatCurrency(summary.totalEntradas)}</p>
+                        <p className="text-sm text-muted-foreground">Entradas</p>
+                        <p className="text-2xl font-bold text-emerald-500">{formatCurrency(summary.totalEntradas)}</p>
                     </div>
                      <div>
-                        <p className="text-sm text-gray-300">Saídas</p>
-                        <p className="text-2xl font-bold text-red-400">{formatCurrency(summary.totalSaidas)}</p>
+                        <p className="text-sm text-muted-foreground">Saídas</p>
+                        <p className="text-2xl font-bold text-red-500">{formatCurrency(summary.totalSaidas)}</p>
                     </div>
                 </div>
-                 <div className="flex items-center justify-center gap-2 text-center border-t border-gray-700 pt-3">
-                    <Scale className="h-5 w-5 text-green-400" />
+                 <div className="flex items-center justify-center gap-2 text-center border-t border-border pt-3 mt-3">
+                    <Scale className="h-5 w-5 text-primary" />
                     <div>
-                        <p className="text-sm text-gray-300">Balanço</p>
-                        <p className="text-xl font-bold text-green-400">{formatCurrency(summary.balanco)}</p>
+                        <p className="text-sm text-muted-foreground">Balanço</p>
+                        <p className="text-xl font-bold text-primary">{formatCurrency(summary.balanco)}</p>
                     </div>
                 </div>
             </div>

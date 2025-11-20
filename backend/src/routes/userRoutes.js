@@ -11,6 +11,7 @@ const router = express.Router();
 router.use(authMiddleware);
 
 router.get('/', userController.getUser);
+router.get('/lookup', userController.lookupUser);
 router.put('/profile', validate(updateProfileSchema), userController.updateProfile);
 router.put('/preferences', validate(updatePreferencesSchema), userController.updatePreferences);
 router.put('/account-info', validate(updateAccountInfoSchema), userController.updateAccountInfo);

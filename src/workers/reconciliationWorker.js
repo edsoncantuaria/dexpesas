@@ -37,7 +37,11 @@ class ReconciliationWorker {
         });
 
         this.worker.on('failed', async (job, err) => {
-            console.error(`❌ Job de reconciliação #${job.id} (${job.name}) falhou:`, err.message);
+            console.error(`❌ Job de reconciliação #${job.id} (${job.name}) falhou:`, {
+                message: err.message,
+                stack: err.stack,
+                jobData: job.data,
+            });
             if (job.data.reconciliationId && job.name !== 'process-chunk') {
                 try {
                     await prisma.reconciliation.update({
@@ -93,64 +97,90 @@ class ReconciliationWorker {
      * Processa um lote (chunk) de transações importadas.
      */
     async processTransactionChunk(data) {
-        const { reconciliationId, userId, accountId, transactions } = data;
-        
-        const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user) {
-            throw new Error(`Usuário ${userId} não encontrado para processamento de lote.`);
-        }
+        const { reconciliationId, userId, accountId, cardId, transactions } = data;
 
-        const categoryMap = await getCategoryMap();
-        let transactionsToCategorizeByAI = [];
-
-        // 1. Aplica regras manuais
-        for (const tx of transactions) {
-            const categoryName = await CategorizationService.applyRulesAndGetName(userId, tx.description);
-            if (categoryName && categoryMap.has(categoryName)) {
-                tx.categoryId = categoryMap.get(categoryName);
-            } else {
-                transactionsToCategorizeByAI.push({ id: tx.id, description: tx.description });
+        try {
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            if (!user) {
+                throw new Error(`Usuário ${userId} não encontrado para processamento de lote.`);
             }
-        }
 
-        // 2. Aplica IA para o restante, se habilitado
-        if (user.enableReconciliationAi && transactionsToCategorizeByAI.length > 0) {
-            const aiResult = await bulkSuggestCategoryFlow({ transactions: JSON.stringify(transactionsToCategorizeByAI) });
+            const categoryMap = await getCategoryMap();
+            const fallbackDebitCategory = categoryMap.get('Compras') || categoryMap.get('Outros') || null;
+            const fallbackCreditCategory = categoryMap.get('OutrasReceitas') || categoryMap.get('Outros') || fallbackDebitCategory;
+            let transactionsToCategorizeByAI = [];
+
+            // 1. Aplica regras manuais
             for (const tx of transactions) {
-                if (aiResult[tx.id]) {
-                    const categoryName = aiResult[tx.id];
-                    if (categoryMap.has(categoryName)) {
-                        tx.categoryId = categoryMap.get(categoryName);
+                const categoryName = await CategorizationService.applyRulesAndGetName(userId, tx.description);
+                if (categoryName && categoryMap.has(categoryName)) {
+                    tx.categoryId = categoryMap.get(categoryName);
+                } else {
+                    transactionsToCategorizeByAI.push({ id: tx.id, description: tx.description });
+                }
+            }
+
+            // 2. Aplica IA para o restante, se habilitado
+            if (user.enableReconciliationAi && transactionsToCategorizeByAI.length > 0) {
+                const aiResult = await bulkSuggestCategoryFlow({ transactions: JSON.stringify(transactionsToCategorizeByAI) });
+                for (const tx of transactions) {
+                    if (aiResult[tx.id]) {
+                        const categoryName = aiResult[tx.id];
+                        if (categoryMap.has(categoryName)) {
+                            tx.categoryId = categoryMap.get(categoryName);
+                        }
                     }
                 }
             }
-        }
 
-        // 3. Cria as transações no banco
-        await prisma.$transaction(async (txPrisma) => {
-            for (const importedTx of transactions) {
-                const newManualTx = await txPrisma.transaction.create({
-                    data: {
-                        userId,
-                        accountId,
-                        descricao: importedTx.description,
-                        valor: importedTx.amount,
-                        data: new Date(importedTx.date),
-                        tipo: importedTx.type === 'CREDIT' ? 'receita' : 'despesa',
-                        pago: true,
-                        isReconciled: true,
-                        categoryId: importedTx.categoryId || categoryMap.get('Compras'),
-                        metodoPagamento: 'debito',
-                        importedTransactionId: importedTx.id,
-                    },
-                });
+            // 3. Cria as transações no banco
+            await prisma.$transaction(async (txPrisma) => {
+                for (const importedTx of transactions) {
+                    const newManualTx = await txPrisma.transaction.create({
+                        data: {
+                            userId,
+                            accountId,
+                            cardId,
+                            descricao: importedTx.description,
+                            valor: importedTx.amount,
+                            data: new Date(importedTx.date),
+                            tipo: importedTx.type === 'CREDIT' ? 'receita' : 'despesa',
+                            pago: true,
+                            isReconciled: true,
+                            categoryId: importedTx.categoryId || (importedTx.type === 'CREDIT' ? fallbackCreditCategory : fallbackDebitCategory),
+                            metodoPagamento: accountId ? 'debito' : 'credito',
+                            importedTransactionId: importedTx.id,
+                        },
+                    });
 
-                await txPrisma.importedTransaction.update({
-                    where: { id: importedTx.id },
-                    data: { status: 'RECONCILED', manualTransactionId: newManualTx.id },
+                    await txPrisma.importedTransaction.update({
+                        where: { id: importedTx.id },
+                        data: { status: 'RECONCILED', manualTransactionId: newManualTx.id },
+                    });
+                }
+            });
+
+            await ReconciliationService.updateBalanceSnapshot(reconciliationId);
+            const progress = await prisma.reconciliation.update({
+                where: { id: reconciliationId },
+                data: { completedJobs: { increment: 1 } },
+                select: { completedJobs: true, totalJobs: true },
+            });
+
+            if (progress.totalJobs > 0 && progress.completedJobs >= progress.totalJobs) {
+                await prisma.reconciliation.update({
+                    where: { id: reconciliationId },
+                    data: { status: 'PENDING_REVIEW' },
                 });
             }
-        });
+        } catch (error) {
+            console.error(`[Reconciliation ${reconciliationId}] Erro ao processar chunk.`, {
+                message: error.message,
+                stack: error.stack,
+                chunkSize: transactions?.length,
+            });
+            throw error;
+        }
     }
 
 

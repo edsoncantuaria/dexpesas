@@ -26,7 +26,7 @@ export function ClanInvitesList({ onActionSuccess }: ClanInvitesListProps) {
     const fetchInvites = useCallback(async () => {
         setIsLoading(true);
         try {
-            const response = await api.get('/clans/invites/pending');
+            const response = await api.get('/cells/invites/pending');
             setInvites(response.data);
         } catch (error) {
             // Silencioso, pois nem todo usuário terá convites
@@ -42,7 +42,7 @@ export function ClanInvitesList({ onActionSuccess }: ClanInvitesListProps) {
     const handleAction = async (inviteId: string, action: 'accept' | 'decline') => {
         setProcessingId(inviteId);
         try {
-            await api.post(`/clans/invites/${inviteId}/${action}`);
+            await api.post(`/cells/invites/${inviteId}/${action}`);
             toast({ title: `Convite ${action === 'accept' ? 'aceito' : 'recusado'}!` });
             onActionSuccess();
         } catch (error: any) {

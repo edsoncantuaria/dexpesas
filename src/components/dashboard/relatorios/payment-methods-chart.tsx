@@ -10,18 +10,20 @@ import { useIsMobile } from '@/hooks/use-mobile';
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
-const COLORS = {
+const COLORS: Record<string, string> = {
   credito: 'hsl(var(--chart-1))',
   debito: 'hsl(var(--chart-2))',
   pix: 'hsl(var(--chart-3))',
   dinheiro: 'hsl(var(--chart-4))',
+  transferencia: 'hsl(var(--chart-5))',
 };
 
-const METHOD_NAMES = {
+const METHOD_NAMES: Record<string, string> = {
   credito: 'Crédito',
   debito: 'Débito',
   pix: 'PIX',
   dinheiro: 'Dinheiro',
+  transferencia: 'Transferência',
 };
 
 type PaymentMethodsChartProps = {
@@ -31,22 +33,22 @@ type PaymentMethodsChartProps = {
 export function PaymentMethodsChart({ transactions }: PaymentMethodsChartProps) {
   const isMobile = useIsMobile();
   const paymentMethodData = useMemo(() => {
-    const methodTotals: { [key: string]: number } = {
-        credito: 0, debito: 0, pix: 0, dinheiro: 0
-    };
-    
+    const methodTotals = new Map<string, number>();
+
     transactions
       .filter(t => t.tipo === 'despesa')
       .forEach(t => {
-        methodTotals[t.metodoPagamento] += Number(t.valor);
+        const method = t.metodoPagamento || 'outros';
+        const currentTotal = methodTotals.get(method) || 0;
+        methodTotals.set(method, currentTotal + Number(t.valor));
       });
       
-    return Object.entries(methodTotals)
-      .map(([name, value]) => ({ 
-          name: METHOD_NAMES[name as keyof typeof METHOD_NAMES], 
-          value,
-          fill: COLORS[name as keyof typeof COLORS] 
-        }))
+    return Array.from(methodTotals.entries())
+      .map(([method, value]) => ({
+        name: METHOD_NAMES[method] || method.charAt(0).toUpperCase() + method.slice(1),
+        value,
+        fill: COLORS[method] || 'hsl(var(--muted-foreground))',
+      }))
       .filter(item => item.value > 0)
       .sort((a, b) => b.value - a.value);
   }, [transactions]);

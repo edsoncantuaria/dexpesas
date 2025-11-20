@@ -24,9 +24,10 @@ type AddAccountFormProps = {
     onSuccess: (account: Omit<Account, 'id' | 'userId'> & { id?: string }) => void;
     onClose: () => void;
     isSubmitting: boolean;
+    cancelLabel?: string;
 };
 
-export function AddAccountForm({ account, onSuccess, onClose, isSubmitting }: AddAccountFormProps) {
+export function AddAccountForm({ account, onSuccess, onClose, isSubmitting, cancelLabel = 'Cancelar' }: AddAccountFormProps) {
   const isEditing = !!account;
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -122,17 +123,20 @@ export function AddAccountForm({ account, onSuccess, onClose, isSubmitting }: Ad
             name="saldo"
             render={({ field }) => (
                 <FormItem>
-                <FormLabel>Saldo {isEditing ? 'Atual' : 'Inicial'}</FormLabel>
+                <FormLabel>Saldo {isEditing ? 'atual (ajuste conforme extrato)' : 'inicial'}</FormLabel>
                 <FormControl>
-                    <Input type="number" placeholder="R$ 0,00" {...field} step="0.01" disabled={isEditing}/>
+                    <Input type="number" placeholder="R$ 0,00" {...field} step="0.01" />
                 </FormControl>
+                <p className="text-xs text-muted-foreground">
+                    Use o mesmo valor exibido como saldo inicial no extrato que você vai reconciliar. Pode ser alterado a qualquer momento.
+                </p>
                 <FormMessage />
                 </FormItem>
             )}
             />
         </div>
         <div className="flex justify-end pt-4 gap-2">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>{cancelLabel}</Button>
             <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSubmitting ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Adicionar Conta'}

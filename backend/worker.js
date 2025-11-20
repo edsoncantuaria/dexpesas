@@ -6,6 +6,7 @@ import StreaksWorker from './src/workers/streaksWorker.js';
 import AuditWorker from './src/workers/auditWorker.js';
 import SeriesCreationWorker from './src/workers/transactionValidationWorker.js';
 import CellJobsWorker from './src/workers/cellJobsWorker.js';
+import InvestmentWorker from './src/workers/investmentWorker.js';
 
 console.log('🌱 Iniciando processo de Worker...');
 
@@ -21,6 +22,7 @@ try {
         AuditWorker.run();
         SeriesCreationWorker.run();
         CellJobsWorker.run();
+        InvestmentWorker.run();
 
         console.log('🚀 Todos os workers estão rodando e aguardando jobs.');
 
@@ -42,6 +44,7 @@ process.on('SIGINT', async () => {
     await AuditWorker.close();
     await SeriesCreationWorker.close();
     await CellJobsWorker.close();
+    await InvestmentWorker.close();
     redisClient.quit();
     console.log('✅ Conexões do worker encerradas.');
     process.exit(0);

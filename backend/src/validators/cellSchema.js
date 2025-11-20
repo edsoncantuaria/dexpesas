@@ -65,11 +65,13 @@ export const cellSharedExpenseSchema = z.object({
   categoryId: z.string().min(1),
   totalAmount: z.number().positive(),
   splitMethod: z.enum(['EQUAL', 'PERCENTAGE', 'AMOUNT']).optional(),
+  expenseDate: z.string().optional(),
   splits: z
     .array(
       z.object({
         memberId: z.string().min(1),
         amount: z.number().positive(),
+        accountId: z.string().min(1),
       }),
     )
     .min(1, 'Informe os participantes do rateio.'),

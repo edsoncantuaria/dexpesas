@@ -392,6 +392,37 @@ class UserController {
             next(error);
         }
     }
+
+    async lookupUser(req, res, next) {
+        const identifier = String(req.query.identifier || '').trim();
+        if (!identifier) {
+            return res.status(400).json({ message: 'Informe o email, usuário ou ID do convidado.' });
+        }
+        try {
+            const user = await prisma.user.findFirst({
+                where: {
+                    OR: [
+                        { id: identifier },
+                        { email: identifier },
+                        { username: identifier },
+                    ],
+                },
+                select: {
+                    id: true,
+                    email: true,
+                    username: true,
+                    name: true,
+                    avatarUrl: true,
+                },
+            });
+            if (!user) {
+                return res.status(404).json({ message: 'Usuário não encontrado.' });
+            }
+            res.json(user);
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export default new UserController();

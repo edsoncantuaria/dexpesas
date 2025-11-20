@@ -19,7 +19,8 @@ import {
     GitCompareArrows,
     Tags,
     Users,
-    Swords
+    Swords,
+    TrendingUp
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
@@ -55,6 +56,13 @@ const baseServiceItems: ServiceItem[] = [
         description: 'Acompanhe seus objetivos',
         Icon: PiggyBank,
         iconBgClass: 'bg-teal-100 dark:bg-teal-900/50 text-teal-600 dark:text-teal-400'
+    },
+    {
+        href: '/dashboard/investimentos',
+        title: 'Investimentos',
+        description: 'Planner inteligente de sobras, Casa/Mercado e rentabilidade',
+        Icon: TrendingUp,
+        iconBgClass: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400'
     },
     // Ferramentas de Análise e Automação
      {

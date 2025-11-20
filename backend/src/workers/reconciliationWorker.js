@@ -6,30 +6,43 @@ import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
 import minioClient from '../config/minioClient.js';
 import config from '../config/config.js';
+import CategorizationService from '../services/categorizationService.js';
+import { bulkSuggestCategoryFlow } from '../ai/flows/bulk-category-suggestion-flow.js';
+
 
 const prisma = new PrismaClient();
 const QUEUE_NAME = 'reconciliation';
+
+// Helper para buscar e mapear categorias
+async function getCategoryMap(tx) {
+    const prismaInstance = tx || prisma;
+    const categories = await prismaInstance.category.findMany();
+    return new Map(categories.map(cat => [cat.nome, cat.id]));
+}
+
 
 class ReconciliationWorker {
     constructor() {
         const workerConnection = redisClient.duplicate();
         this.worker = new Worker(QUEUE_NAME, this.processJob.bind(this), {
             connection: workerConnection,
-            concurrency: 5,
+            concurrency: 5, // Aumenta a concorrência para processar chunks em paralelo
         });
 
         this.worker.on('completed', async (job, result) => {
             console.log(`✅ Job de reconciliação #${job.id} (${job.name}) completo.`);
-            // Limpa o arquivo do storage após o sucesso do processamento inicial
             if (job.name === 'process-statement-file') {
                  await this.cleanupFile(job.data.filePath);
             }
         });
 
         this.worker.on('failed', async (job, err) => {
-            console.error(`❌ Job de reconciliação #${job.id} (${job.name}) falhou:`, err.message);
-            // Atualiza o status da reconciliação para FAILED no banco
-            if (job.data.reconciliationId) {
+            console.error(`❌ Job de reconciliação #${job.id} (${job.name}) falhou:`, {
+                message: err.message,
+                stack: err.stack,
+                jobData: job.data,
+            });
+            if (job.data.reconciliationId && job.name !== 'process-chunk') {
                 try {
                     await prisma.reconciliation.update({
                         where: { id: job.data.reconciliationId },
@@ -39,7 +52,6 @@ class ReconciliationWorker {
                     console.error("Erro ao atualizar status da reconciliação para FAILED:", updateError);
                 }
             }
-            // Limpa o arquivo do storage mesmo em caso de falha para evitar lixo
              if (job.name === 'process-statement-file') {
                 await this.cleanupFile(job.data.filePath);
             }
@@ -56,6 +68,11 @@ class ReconciliationWorker {
                     throw new Error("Dados do job inválidos. filePath, reconciliationId e userId são obrigatórios.");
                 }
                 return await ReconciliationService.processStatementFile(data.filePath, data.reconciliationId, data.userId, data.fileType, data.mapping);
+
+            case 'process-chunk':
+                console.log(`🤖 Processando lote de transações para reconciliação: ${data.reconciliationId}`);
+                await this.processTransactionChunk(data);
+                break;
             
             default:
                 throw new Error(`Tipo de job de reconciliação desconhecido: ${name}`);
@@ -73,9 +90,99 @@ class ReconciliationWorker {
             }
         } catch (err) {
             console.error(`Erro ao deletar arquivo ${objectName} do MinIO:`, err);
-            // Não relança o erro para não fazer o job falhar apenas por falha na limpeza
         }
     }
+    
+    /**
+     * Processa um lote (chunk) de transações importadas.
+     */
+    async processTransactionChunk(data) {
+        const { reconciliationId, userId, accountId, cardId, transactions } = data;
+
+        try {
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            if (!user) {
+                throw new Error(`Usuário ${userId} não encontrado para processamento de lote.`);
+            }
+
+            const categoryMap = await getCategoryMap();
+            const fallbackDebitCategory = categoryMap.get('Compras') || categoryMap.get('Outros') || null;
+            const fallbackCreditCategory = categoryMap.get('OutrasReceitas') || categoryMap.get('Outros') || fallbackDebitCategory;
+            let transactionsToCategorizeByAI = [];
+
+            // 1. Aplica regras manuais
+            for (const tx of transactions) {
+                const categoryName = await CategorizationService.applyRulesAndGetName(userId, tx.description);
+                if (categoryName && categoryMap.has(categoryName)) {
+                    tx.categoryId = categoryMap.get(categoryName);
+                } else {
+                    transactionsToCategorizeByAI.push({ id: tx.id, description: tx.description });
+                }
+            }
+
+            // 2. Aplica IA para o restante, se habilitado
+            if (user.enableReconciliationAi && transactionsToCategorizeByAI.length > 0) {
+                const aiResult = await bulkSuggestCategoryFlow({ transactions: JSON.stringify(transactionsToCategorizeByAI) });
+                for (const tx of transactions) {
+                    if (aiResult[tx.id]) {
+                        const categoryName = aiResult[tx.id];
+                        if (categoryMap.has(categoryName)) {
+                            tx.categoryId = categoryMap.get(categoryName);
+                        }
+                    }
+                }
+            }
+
+            // 3. Cria as transações no banco
+            await prisma.$transaction(async (txPrisma) => {
+                for (const importedTx of transactions) {
+                    const newManualTx = await txPrisma.transaction.create({
+                        data: {
+                            userId,
+                            accountId,
+                            cardId,
+                            descricao: importedTx.description,
+                            valor: importedTx.amount,
+                            data: new Date(importedTx.date),
+                            tipo: importedTx.type === 'CREDIT' ? 'receita' : 'despesa',
+                            pago: true,
+                            isReconciled: true,
+                            categoryId: importedTx.categoryId || (importedTx.type === 'CREDIT' ? fallbackCreditCategory : fallbackDebitCategory),
+                            metodoPagamento: accountId ? 'debito' : 'credito',
+                            importedTransactionId: importedTx.id,
+                        },
+                    });
+
+                    await txPrisma.importedTransaction.update({
+                        where: { id: importedTx.id },
+                        data: { status: 'RECONCILED', manualTransactionId: newManualTx.id },
+                    });
+                }
+            });
+
+            await ReconciliationService.updateBalanceSnapshot(reconciliationId);
+            const progress = await prisma.reconciliation.update({
+                where: { id: reconciliationId },
+                data: { completedJobs: { increment: 1 } },
+                select: { completedJobs: true, totalJobs: true },
+            });
+
+            if (progress.totalJobs > 0 && progress.completedJobs >= progress.totalJobs) {
+                await prisma.reconciliation.update({
+                    where: { id: reconciliationId },
+                    data: { status: 'PENDING_REVIEW' },
+                });
+            }
+        } catch (error) {
+            console.error(`[Reconciliation ${reconciliationId}] Erro ao processar chunk.`, {
+                message: error.message,
+                stack: error.stack,
+                chunkSize: transactions?.length,
+            });
+            throw error;
+        }
+    }
+
 
     run() {
         console.log(`🛠️  Worker de reconciliação (${QUEUE_NAME}) iniciado.`);

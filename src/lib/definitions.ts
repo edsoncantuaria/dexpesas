@@ -199,6 +199,138 @@ export type Transaction = {
     importedTransactionId?: string | null;
     tags: Tag[];
 };
+
+export type InvestmentPriority = 'investir' | 'lazer' | 'balanceado';
+export type InvestmentPlanStatus = 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+export type InvestmentContributionSource = 'MANUAL' | 'AUTOMATION' | 'WINDFALL' | 'AI_SUGGESTION';
+export type InvestmentContributionStatus = 'PENDING' | 'EXECUTED' | 'FAILED';
+
+export type InvestmentPlan = {
+    id: string | null;
+    userId: string;
+    priority: InvestmentPriority;
+    targetPercent: number;
+    targetAmountMin: number;
+    targetAmount?: number | null;
+    leisureFloor: number;
+    leisurePercentMin: number;
+    emergencyFundTarget?: number | null;
+    notes?: string | null;
+    status: InvestmentPlanStatus;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type InvestmentPlanPayload = {
+    priority?: InvestmentPriority;
+    targetPercent?: number;
+    targetAmountMin?: number;
+    targetAmount?: number | null;
+    leisureFloor?: number;
+    leisurePercentMin?: number;
+    emergencyFundTarget?: number | null;
+    status?: InvestmentPlanStatus;
+    notes?: string | null;
+};
+
+export type InvestmentAnalysis = {
+    month: string;
+    range: { start: string; end: string };
+    planUsed: InvestmentPlan | null;
+    planWasDefault: boolean;
+    netIncome: number;
+    totalSpent: number;
+    essentialBudget: number;
+    essentialSpent: number;
+    leisureSpent: number;
+    safetyBuffer: number;
+    available: number;
+    rawAvailable: number;
+    suggestedInvestment: number;
+    leisureSuggested: number;
+    leisureFloor: number;
+    confidenceScore: number;
+    warnings?: string[];
+    basicNeeds?: Array<{ key: string; label: string; limit: number; spent: number }>;
+};
+
+export type InvestmentContribution = {
+    id: string;
+    planId: string;
+    userId: string;
+    amount: number;
+    leisureImpact?: number | null;
+    status: InvestmentContributionStatus;
+    source: InvestmentContributionSource;
+    notes?: string | null;
+    month: string;
+    executedAt?: string | null;
+    destinationAccountId: string;
+    sourceAccountId: string;
+    holdingId?: string | null;
+    analysisSnapshot?: Record<string, unknown> | null;
+    destinationAccount?: { id: string; nome: string } | null;
+    sourceAccount?: { id: string; nome: string } | null;
+    holding?: { id: string; assetClass: string; ticker?: string | null } | null;
+};
+
+export type InvestmentSnapshot = {
+    id: string;
+    planId: string;
+    userId: string;
+    month: string;
+    totalInvested: number;
+    totalReturns: number;
+    leisureSpent: number;
+    deltaVsPlan: number;
+    confidenceScore?: number | null;
+    commentaryJson?: Record<string, unknown> | null;
+    createdAt: string;
+};
+
+export type InvestmentMonthlyTotal = {
+    month: string;
+    amount: number;
+    leisureImpact: number;
+    contributions: number;
+};
+
+export type InvestmentPerformance = {
+    plan: InvestmentPlan | null;
+    snapshots: InvestmentSnapshot[];
+    contributions: InvestmentContribution[];
+    monthlyTotals: InvestmentMonthlyTotal[];
+    month?: string | null;
+};
+
+export type InvestmentHolding = {
+    id: string;
+    planId: string;
+    userId: string;
+    accountId: string;
+    goalId?: string | null;
+    assetClass: string;
+    ticker?: string | null;
+    currentAmount: number;
+    expectedReturn?: number | null;
+    metadata?: Record<string, unknown> | null;
+    createdAt: string;
+    updatedAt: string;
+    account: Account;
+    goal?: Goal | null;
+};
+
+export type InvestmentMetricSnapshot = {
+    id?: string;
+    month: string;
+    soloPlanAdoptionPct: number;
+    avgContributionIncomeRatio: number;
+    planAdherenceRate: number;
+    nudgeConversionRate: number;
+    adoptionRate: number;
+    churnRate: number;
+    createdAt: string;
+};
   
 export type Category = {
     id: string;
@@ -404,6 +536,7 @@ export type CellSharedExpenseParticipant = {
     id: string;
     userId: string;
     amountOwed: number;
+    defaultAccountId?: string | null;
     transaction?: {
         id: string;
         pago: boolean;
@@ -425,6 +558,7 @@ export type CellSharedExpense = {
     totalAmount: number;
     splitMethod: 'EQUAL' | 'PERCENTAGE' | 'AMOUNT';
     categoryId: string;
+    expenseDate?: string | null;
     createdAt: string;
     participants: CellSharedExpenseParticipant[];
     category?: {
@@ -571,11 +705,19 @@ export type ImportedTransaction = {
 export type Reconciliation = {
     id: string;
     userId: string;
-    accountId: string;
-    startDate: string;
-    endDate: string;
-    startBalance: number;
-    endBalance: number;
+    accountId?: string | null;
+    cardId?: string | null;
+    startDate?: string | null;
+    endDate?: string | null;
+    statementOpeningBalance?: number | null;
+    statementClosingBalance?: number | null;
+    statementCurrency?: string | null;
+    statementTimezone?: string | null;
+    systemOpeningBalance?: number | null;
+    systemClosingBalance?: number | null;
+    balanceDifference?: number | null;
+    totalJobs?: number;
+    completedJobs?: number;
     status: 'PROCESSING' | 'PENDING_REVIEW' | 'COMPLETED' | 'FAILED';
     importedTransactions: ImportedTransaction[];
     createdAt: string;

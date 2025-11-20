@@ -7,10 +7,21 @@ import GamificationService from '../services/gamificationService.js';
 import minioClient from '../config/minioClient.js';
 import config from '../config/config.js';
 import crypto from 'crypto';
+import ReconciliationService, { BALANCE_TOLERANCE } from '../services/reconciliationService.js';
 
 
 const prisma = new PrismaClient();
 
+const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
+const DEFAULT_CURRENCY = 'BRL';
+
+const parseDecimalInput = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value === 'number') return value;
+    const normalized = value.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+    const parsed = parseFloat(normalized);
+    return Number.isNaN(parsed) ? null : parsed;
+};
 
 class ReconciliationController {
 
@@ -19,7 +30,7 @@ class ReconciliationController {
      * e adiciona um job à fila para processamento em background.
      */
     async uploadStatement(req, res, next) {
-        const { targetId, targetType, fileType, mapping, saveTemplate, templateName } = req.body;
+        const { targetId, targetType, fileType, mapping, saveTemplate, templateName, statementOpeningBalance, statementClosingBalance, statementCurrency, statementTimezone } = req.body;
         const userId = req.user.id;
 
         if (!req.file) {
@@ -50,6 +61,10 @@ class ReconciliationController {
                 status: 'PROCESSING',
                 filePath: objectName,
                 fileType: fileType || 'OFX',
+                statementOpeningBalance: parseDecimalInput(statementOpeningBalance),
+                statementClosingBalance: parseDecimalInput(statementClosingBalance),
+                statementCurrency: statementCurrency || DEFAULT_CURRENCY,
+                statementTimezone: statementTimezone || DEFAULT_TIMEZONE,
             };
 
             if (targetType === 'account') {
@@ -63,13 +78,18 @@ class ReconciliationController {
             const reconciliation = await prisma.reconciliation.create({ data });
             
             let templateId = null;
+            let parsedMapping = null;
+
+            if (fileType === 'CSV' && mapping) {
+                parsedMapping = JSON.parse(mapping);
+            }
 
             if (fileType === 'CSV' && saveTemplate === 'true' && templateName) {
                 const newTemplate = await prisma.importTemplate.create({
                     data: {
                         userId,
                         name: templateName,
-                        mapping: JSON.parse(mapping),
+                        mapping: parsedMapping,
                     }
                 });
                 templateId = newTemplate.id;
@@ -86,7 +106,7 @@ class ReconciliationController {
                 reconciliationId: reconciliation.id,
                 userId: userId,
                 fileType: fileType || 'OFX',
-                mapping: fileType === 'CSV' ? JSON.parse(mapping) : null
+                mapping: fileType === 'CSV' ? parsedMapping : null
             });
             
             await AuditService.log({
@@ -331,16 +351,40 @@ class ReconciliationController {
         const userId = req.user.id;
 
         try {
+            const reconciliation = await prisma.reconciliation.findFirst({
+                where: { id: reconciliationId, userId },
+                include: {
+                    importedTransactions: {
+                        where: { status: { in: ['PENDING', 'SUGGESTED'] } },
+                    },
+                },
+            });
+
+            if (!reconciliation) {
+                return res.status(404).json({ message: 'Reconciliação não encontrada ou não pertence ao usuário.' });
+            }
+
+            if (reconciliation.importedTransactions.length > 0) {
+                return res.status(400).json({ message: 'Existem transações pendentes. Concilie ou descarte todas antes de finalizar.' });
+            }
+
+            await ReconciliationService.updateBalanceSnapshot(reconciliationId);
+            const refreshed = await prisma.reconciliation.findUnique({ where: { id: reconciliationId } });
+            if (
+                refreshed?.statementClosingBalance !== null &&
+                refreshed?.statementClosingBalance !== undefined &&
+                refreshed?.balanceDifference !== null &&
+                Math.abs(Number(refreshed.balanceDifference)) > BALANCE_TOLERANCE
+            ) {
+                return res.status(409).json({ message: 'O saldo do sistema não confere com o extrato. Ajuste os lançamentos antes de finalizar.' });
+            }
+
             await prisma.$transaction(async (tx) => {
                 // 1. Atualiza a reconciliação principal para 'COMPLETED'
-                const updatedReconciliation = await tx.reconciliation.updateMany({
-                    where: { id: reconciliationId, userId },
+                await tx.reconciliation.update({
+                    where: { id: reconciliationId },
                     data: { status: 'COMPLETED' },
                 });
-                
-                if (updatedReconciliation.count === 0) {
-                    throw { statusCode: 404, message: 'Reconciliação não encontrada ou não pertence ao usuário.' };
-                }
 
                 // 2. Atualiza todas as transações importadas pendentes para 'DISCARDED'
                 await tx.importedTransaction.updateMany({

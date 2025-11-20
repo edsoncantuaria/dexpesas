@@ -172,7 +172,8 @@ export default function WelcomePage() {
 
   const introSteps: OnboardingStepConfig[] = introSlides.map((slide) => ({
     component: InfoStep,
-    props: slide,
+    props: { ...slide, ctaLabel: 'Continuar' },
+    skipNav: true,
   }));
 
   const outroSteps: OnboardingStepConfig[] = outroSlides.map((slide) => ({
@@ -340,6 +341,7 @@ export default function WelcomePage() {
   const onboardingSteps: OnboardingStepConfig[] = [
     {
       component: GamificationModeStep,
+      skipNav: true,
       props: {
         selectedMode: gamificationMode,
         onConfirm: handleGamificationModeSelect,
@@ -406,7 +408,7 @@ export default function WelcomePage() {
         <Logo className="justify-center" />
 
         <div className="flex-1">
-          <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border bg-card/80 px-4 py-6 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-card/70">
+          <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border bg-card/80 px-4 py-6 shadow-xl backdrop-blur supports-[backdrop-filter]:bg-card/70 h-[70vh] min-h-[460px] max-h-[720px]">
             <AnimatePresence initial={false} custom={direction} mode="wait">
               <motion.div
                 key={step}
@@ -416,7 +418,7 @@ export default function WelcomePage() {
                 animate="center"
                 exit="exit"
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="w-full"
+                className="h-full w-full overflow-y-auto pr-1 sm:pr-2"
               >
                 <StepComponent {...stepProps} onNext={() => paginate(1)} />
               </motion.div>
@@ -562,16 +564,34 @@ function GamificationModeStep({
   );
 }
 
-function InfoStep({ icon: Icon, title, description }: { icon: LucideIcon, title: string, description: string }) {
+function InfoStep({
+  icon: Icon,
+  title,
+  description,
+  ctaLabel,
+  onNext,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  ctaLabel?: string;
+  onNext?: () => void;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center gap-8 text-center">
-        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Icon className="h-12 w-12" />
-        </div>
-        <div className="space-y-2">
-            <h1 className="text-2xl font-bold font-headline">{title}</h1>
-            <p className="text-muted-foreground">{description}</p>
-        </div>
+    <div className="flex h-full flex-col items-center justify-center gap-8 text-center px-2">
+      <div className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Icon className="h-12 w-12" />
+      </div>
+      <div className="space-y-2">
+        <h1 className="text-2xl font-bold font-headline">{title}</h1>
+        <p className="text-muted-foreground">{description}</p>
+      </div>
+      {ctaLabel && onNext && (
+        <Button size="lg" className="mt-2" onClick={onNext}>
+          {ctaLabel}
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -592,6 +612,7 @@ function AddAccountStep({ title, description, onSave, isSubmitting, onSkip }: { 
             onSuccess={onSave}
             onClose={onSkip}
             isSubmitting={isSubmitting}
+            cancelLabel="Pular"
         />
     </div>
   );
@@ -613,6 +634,7 @@ function AddCardStep({ title, description, onSave, isSubmitting, onSkip }: { tit
             onSuccess={onSave}
             onClose={onSkip}
             isSubmitting={isSubmitting}
+            cancelLabel="Pular"
         />
     </div>
   );

@@ -29,6 +29,7 @@ import achievementRoutes from './routes/achievementRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import requestMetrics from './middlewares/requestMetrics.js';
 import categoryAdminRoutes from './routes/categoryAdminRoutes.js';
+import investmentRoutes from './routes/investmentRoutes.js';
 
 const app = express();
 
@@ -106,6 +107,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/sugestoes', sugestoesRoutes);
 app.use('/api/admin/categories', categoryAdminRoutes);
+app.use('/api/investments', investmentRoutes);
 app.use('/api', dataRoutes);
 app.use('/api/health', healthRoutes);
 

@@ -251,6 +251,31 @@ enum CellSharedAccountVisibility {
   CUSTOM
 }
 
+enum InvestmentPriority {
+  investir
+  lazer
+  balanceado
+}
+
+enum InvestmentPlanStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum InvestmentContributionStatus {
+  PENDING
+  EXECUTED
+  FAILED
+}
+
+enum InvestmentContributionSource {
+  MANUAL
+  AUTOMATION
+  WINDFALL
+  AI_SUGGESTION
+}
+
 model User {
   id                   String @id @default(cuid())
   name                 String
@@ -332,6 +357,11 @@ model User {
   custodiedCellFunds   CellFund[] @relation("UserCustodiedFunds")
   equilibriumSettlementPayments CellEquilibriumSettlement[] @relation("EquilibriumSettlementPayer")
   equilibriumSettlementReceipts CellEquilibriumSettlement[] @relation("EquilibriumSettlementReceiver")
+  investmentPlan       InvestmentPlan?
+  investmentHoldings   InvestmentHolding[]
+  investmentContributions InvestmentContribution[]
+  investmentSnapshots  InvestmentSnapshot[]
+  investmentNudgeConversions InvestmentNudgeConversion[]
 
 }
 
@@ -408,6 +438,7 @@ model SharedExpense {
   totalAmount          Decimal @db.Decimal(18, 4)
   splitMethod          SplitMethod
   categoryId           String
+  expenseDate          DateTime @default(now())
   createdAt            DateTime @default(now())
   splitAppliedAt       DateTime?
 
@@ -425,11 +456,13 @@ model SharedExpenseParticipant {
   sharedExpenseId      String
   userId               String
   amountOwed           Decimal @db.Decimal(18, 4)
+  defaultAccountId     String?
   createdTransactionId String @unique
 
   // --- Relações ---
   sharedExpense        SharedExpense @relation("SharedExpense_Participants", fields: [sharedExpenseId], references: [id], onDelete: Cascade)
   user                 User @relation("User_SharedExpenseParticipants", fields: [userId], references: [id], onDelete: Cascade)
+  defaultAccount       Account? @relation("ParticipantDefaultAccount", fields: [defaultAccountId], references: [id], onDelete: SetNull)
   transaction          Transaction @relation("GeneratedTransactionForParticipant", fields: [createdTransactionId], references: [id])
 
   @@unique([sharedExpenseId, userId])
@@ -573,18 +606,19 @@ model CellEquilibriumSnapshot {
 }
 
 model CellEquilibriumSettlement {
-  id             String  @id @default(cuid())
-  cellId         String
-  payerId        String
-  receiverId     String
-  amount         Decimal @db.Decimal(18, 4)
-  notes          String?
-  referenceMonth String
-  createdAt      DateTime @default(now())
+  id                   String @id @default(cuid())
+  cellId               String
+  payerId              String
+  receiverId           String
+  amount               Decimal @db.Decimal(18, 4)
+  notes                String?
+  referenceMonth       String
+  createdAt            DateTime @default(now())
 
-  cell     Clan @relation(fields: [cellId], references: [id], onDelete: Cascade)
-  payer    User @relation("EquilibriumSettlementPayer", fields: [payerId], references: [id], onDelete: Cascade)
-  receiver User @relation("EquilibriumSettlementReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  // --- Relações ---
+  cell                 Clan @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  payer                User @relation("EquilibriumSettlementPayer", fields: [payerId], references: [id], onDelete: Cascade)
+  receiver             User @relation("EquilibriumSettlementReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@index([cellId])
   @@map("cell_equilibrium_settlements")
@@ -720,6 +754,10 @@ model Account {
   autoPayRecurringBills RecurringBill[] @relation("RecurringBill_AutoPayAccount")
   budgetAccounts       Budget[] @relation("Budget_account")
   sharedCells          CellSharedAccount[] @relation("AccountSharedCells")
+  sharedExpenseDefaultParticipants SharedExpenseParticipant[] @relation("ParticipantDefaultAccount")
+  investmentHoldings   InvestmentHolding[]
+  investmentContributionDestinations InvestmentContribution[] @relation("InvestmentContributionDestination")
+  investmentContributionSources InvestmentContribution[] @relation("InvestmentContributionSource")
 
 }
 
@@ -813,6 +851,8 @@ model Transaction {
   cardInvoiceItems     CardInvoiceItem[] @relation("Transaction_CardInvoiceItems")
   billOccurrences      BillOccurrence[] @relation("Transaction_BillOccurrences")
   attachments          Attachment[] @relation("Transaction_Attachments")
+  investmentContributionDebits InvestmentContribution[] @relation("InvestmentContributionDebit")
+  investmentContributionCredits InvestmentContribution[] @relation("InvestmentContributionCredit")
 
   @@index([recorrenciaId])
   @@index([installmentId])
@@ -1031,6 +1071,7 @@ model Goal {
   cellFund             CellFund? @relation("CellFundGoal", fields: [cellFundId], references: [id], onDelete: Cascade)
   contributions        GoalContribution[] @relation("GoalContribution_goal")
   automation           Automation? @relation("GoalAutomation")
+  investmentHoldings   InvestmentHolding[]
 
 }
 
@@ -1153,8 +1194,15 @@ model Reconciliation {
   status               ReconciliationStatus @default(PROCESSING)
   filePath             String
   fileType             String
-  totalJobs            Int?
-  completedJobs        Int?
+  totalJobs            Int @default(0)
+  completedJobs        Int @default(0)
+  balanceDifference    Decimal? @db.Decimal(14, 2)
+  statementOpeningBalance Decimal? @db.Decimal(14, 2)
+  statementClosingBalance Decimal? @db.Decimal(14, 2)
+  statementCurrency    String? @default("BRL")
+  statementTimezone    String? @default("America/Sao_Paulo")
+  systemOpeningBalance Decimal? @db.Decimal(14, 2)
+  systemClosingBalance Decimal? @db.Decimal(14, 2)
   createdAt            DateTime @default(now())
   userId               String
   accountId            String?
@@ -1215,6 +1263,7 @@ model AiAnalysis {
 
   // --- Relações ---
   user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  nudgeConversions     InvestmentNudgeConversion[]
 
 }
 
@@ -1306,5 +1355,135 @@ model Boss {
   startAt              DateTime?
   endAt                DateTime?
   createdAt            DateTime @default(now())
+
+}
+
+model InvestmentPlan {
+  id                   String @id @default(cuid())
+  priority             InvestmentPriority @default(investir)
+  targetPercent        Decimal @default(0.2) @db.Decimal(5, 4)
+  targetAmountMin      Decimal @default(0) @db.Decimal(18, 2)
+  targetAmount         Decimal? @db.Decimal(18, 2)
+  leisureFloor         Decimal @default(0) @db.Decimal(18, 2)
+  leisurePercentMin    Decimal @default(0.15) @db.Decimal(5, 4)
+  emergencyFundTarget  Decimal? @db.Decimal(18, 2)
+  notes                String? @db.Text
+  status               InvestmentPlanStatus @default(ACTIVE)
+  userId               String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // --- Relações ---
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings             InvestmentHolding[]
+  contributions        InvestmentContribution[]
+  snapshots            InvestmentSnapshot[]
+  nudgeConversions     InvestmentNudgeConversion[]
+
+  @@unique([userId])
+}
+
+model InvestmentHolding {
+  id                   String @id @default(cuid())
+  planId               String
+  userId               String
+  accountId            String
+  goalId               String?
+  assetClass           String
+  ticker               String?
+  currentAmount        Decimal @default(0) @db.Decimal(18, 4)
+  expectedReturn       Decimal? @db.Decimal(10, 4)
+  metadata             Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // --- Relações ---
+  plan                 InvestmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  account              Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  goal                 Goal? @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contributions        InvestmentContribution[]
+
+}
+
+model InvestmentContribution {
+  id                   String @id @default(cuid())
+  planId               String
+  userId               String
+  accountId            String
+  fromAccountId        String
+  holdingId            String?
+  amount               Decimal @db.Decimal(18, 4)
+  leisureImpact        Decimal? @default(0) @db.Decimal(18, 4)
+  status               InvestmentContributionStatus @default(EXECUTED)
+  source               InvestmentContributionSource @default(MANUAL)
+  notes                String? @db.Text
+  analysisSnapshot     Json?
+  debitTransactionId   String? @unique
+  creditTransactionId  String? @unique
+  executedAt           DateTime?
+  month                String
+  createdAt            DateTime @default(now())
+
+  // --- Relações ---
+  plan                 InvestmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  destinationAccount   Account @relation("InvestmentContributionDestination", fields: [accountId], references: [id], onDelete: Cascade)
+  sourceAccount        Account @relation("InvestmentContributionSource", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  holding              InvestmentHolding? @relation(fields: [holdingId], references: [id], onDelete: SetNull)
+  debitTransaction     Transaction? @relation("InvestmentContributionDebit", fields: [debitTransactionId], references: [id], onDelete: SetNull)
+  creditTransaction    Transaction? @relation("InvestmentContributionCredit", fields: [creditTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([planId, month])
+}
+
+model InvestmentSnapshot {
+  id                   String @id @default(cuid())
+  planId               String
+  userId               String
+  month                String
+  totalInvested        Decimal @default(0) @db.Decimal(18, 4)
+  totalReturns         Decimal @default(0) @db.Decimal(18, 4)
+  leisureSpent         Decimal @default(0) @db.Decimal(18, 4)
+  deltaVsPlan          Decimal @default(0) @db.Decimal(18, 4)
+  confidenceScore      Decimal? @db.Decimal(5, 2)
+  commentaryJson       Json?
+  createdAt            DateTime @default(now())
+
+  // --- Relações ---
+  plan                 InvestmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, month])
+}
+
+model InvestmentMetricSnapshot {
+  id                   String @id @default(cuid())
+  month                String
+  soloPlanAdoptionPct  Decimal @default(0) @db.Decimal(6, 4)
+  avgContributionIncomeRatio Decimal @default(0) @db.Decimal(10, 4)
+  planAdherenceRate    Decimal @default(0) @db.Decimal(6, 4)
+  nudgeConversionRate  Decimal @default(0) @db.Decimal(6, 4)
+  adoptionRate         Decimal @default(0) @db.Decimal(6, 4)
+  churnRate            Decimal @default(0) @db.Decimal(6, 4)
+  createdAt            DateTime @default(now())
+
+  @@unique([month])
+}
+
+model InvestmentNudgeConversion {
+  id                   String @id @default(cuid())
+  planId               String
+  userId               String
+  aiAnalysisId         String
+  targetAmount         Decimal @db.Decimal(18, 4)
+  triggeredAt          DateTime
+  convertedAt          DateTime?
+  createdAt            DateTime @default(now())
+
+  // --- Relações ---
+  plan                 InvestmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  user                 User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiAnalysis           AiAnalysis @relation(fields: [aiAnalysisId], references: [id], onDelete: Cascade)
 
 }

@@ -38,7 +38,11 @@
     "CellSplitTrigger": ["RECURRING_BILL", "ADHOC", "USAGE_BASED"],
     "CellSplitMethod": ["EQUAL", "WEIGHTED", "CONSUMPTION", "PAYER_REIMBURSED"],
     "CellBudgetRecurrence": ["MONTHLY", "WEEKLY", "BIWEEKLY", "CUSTOM"],
-    "CellSharedAccountVisibility": ["MEMBERS", "ADMINS", "CUSTOM"]
+    "CellSharedAccountVisibility": ["MEMBERS", "ADMINS", "CUSTOM"],
+    "InvestmentPriority": ["investir", "lazer", "balanceado"],
+    "InvestmentPlanStatus": ["ACTIVE", "PAUSED", "ARCHIVED"],
+    "InvestmentContributionStatus": ["PENDING", "EXECUTED", "FAILED"],
+    "InvestmentContributionSource": ["MANUAL", "AUTOMATION", "WINDFALL", "AI_SUGGESTION"]
   },
   "models": {
     "User": {
@@ -122,7 +126,12 @@
         "cellFundContributions": { "type": "CellFundContribution", "isList": true },
         "custodiedCellFunds": { "type": "CellFund", "isList": true, "relation": { "name": "UserCustodiedFunds" } },
         "equilibriumSettlementPayments": { "type": "CellEquilibriumSettlement", "isList": true, "relation": { "name": "EquilibriumSettlementPayer" } },
-        "equilibriumSettlementReceipts": { "type": "CellEquilibriumSettlement", "isList": true, "relation": { "name": "EquilibriumSettlementReceiver" } }
+        "equilibriumSettlementReceipts": { "type": "CellEquilibriumSettlement", "isList": true, "relation": { "name": "EquilibriumSettlementReceiver" } },
+        "investmentPlan": { "type": "InvestmentPlan", "optional": true },
+        "investmentHoldings": { "type": "InvestmentHolding", "isList": true },
+        "investmentContributions": { "type": "InvestmentContribution", "isList": true },
+        "investmentSnapshots": { "type": "InvestmentSnapshot", "isList": true },
+        "investmentNudgeConversions": { "type": "InvestmentNudgeConversion", "isList": true }
       }
     },
     "Clan": {
@@ -205,6 +214,7 @@
         "totalAmount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
         "splitMethod": { "type": "SplitMethod" },
         "categoryId": { "type": "String" },
+        "expenseDate": { "type": "DateTime", "attributes": ["@default(now())"] },
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
         "splitAppliedAt": { "type": "DateTime", "optional": true }
       },
@@ -222,11 +232,13 @@
         "sharedExpenseId": { "type": "String" },
         "userId": { "type": "String" },
         "amountOwed": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "defaultAccountId": { "type": "String", "optional": true },
         "createdTransactionId": { "type": "String", "attributes": ["@unique"] }
       },
       "relations": {
         "sharedExpense": { "type": "SharedExpense", "relation": { "name": "SharedExpense_Participants", "fields": ["sharedExpenseId"], "references": ["id"], "onDelete": "Cascade" } },
         "user": { "type": "User", "relation": { "name": "User_SharedExpenseParticipants", "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "defaultAccount": { "type": "Account", "optional": true, "relation": { "name": "ParticipantDefaultAccount", "fields": ["defaultAccountId"], "references": ["id"], "onDelete": "SetNull" } },
         "transaction": { "type": "Transaction", "relation": { "name": "GeneratedTransactionForParticipant", "fields": ["createdTransactionId"], "references": ["id"] } }
       },
       "indices": [{ "fields": ["sharedExpenseId", "userId"], "unique": true }],
@@ -534,7 +546,11 @@
         "recurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_BillAccount" } },
         "autoPayRecurringBills": { "type": "RecurringBill", "isList": true, "relation": { "name": "RecurringBill_AutoPayAccount" } },
         "budgetAccounts": { "type": "Budget", "isList": true, "relation": { "name": "Budget_account" } },
-        "sharedCells": { "type": "CellSharedAccount", "isList": true, "relation": { "name": "AccountSharedCells" } }
+        "sharedCells": { "type": "CellSharedAccount", "isList": true, "relation": { "name": "AccountSharedCells" } },
+        "sharedExpenseDefaultParticipants": { "type": "SharedExpenseParticipant", "isList": true, "relation": { "name": "ParticipantDefaultAccount" } },
+        "investmentHoldings": { "type": "InvestmentHolding", "isList": true },
+        "investmentContributionDestinations": { "type": "InvestmentContribution", "isList": true, "relation": { "name": "InvestmentContributionDestination" } },
+        "investmentContributionSources": { "type": "InvestmentContribution", "isList": true, "relation": { "name": "InvestmentContributionSource" } }
       }
     },
     "Card": {
@@ -627,7 +643,9 @@
         "ledgerEntries": { "type": "LedgerEntry", "isList": true, "relation": { "name": "LedgerEntry_Transaction" } },
         "cardInvoiceItems": { "type": "CardInvoiceItem", "isList": true, "relation": { "name": "Transaction_CardInvoiceItems" } },
         "billOccurrences": { "type": "BillOccurrence", "isList": true, "relation": { "name": "Transaction_BillOccurrences" } },
-        "attachments": { "type": "Attachment", "isList": true, "relation": { "name": "Transaction_Attachments" } }
+        "attachments": { "type": "Attachment", "isList": true, "relation": { "name": "Transaction_Attachments" } },
+        "investmentContributionDebits": { "type": "InvestmentContribution", "isList": true, "relation": { "name": "InvestmentContributionDebit" } },
+        "investmentContributionCredits": { "type": "InvestmentContribution", "isList": true, "relation": { "name": "InvestmentContributionCredit" } }
       },
       "indices": [
         { "fields": ["recorrenciaId"] },
@@ -855,7 +873,8 @@
         "clan": { "type": "Clan", "optional": true, "relation": { "fields": ["clanId"], "references": ["id"], "onDelete": "Cascade" } },
         "cellFund": { "type": "CellFund", "optional": true, "relation": { "name": "CellFundGoal", "fields": ["cellFundId"], "references": ["id"], "onDelete": "Cascade" } },
         "contributions": { "type": "GoalContribution", "isList": true, "relation": { "name": "GoalContribution_goal" } },
-        "automation": { "type": "Automation", "optional": true, "relation": { "name": "GoalAutomation" } }
+        "automation": { "type": "Automation", "optional": true, "relation": { "name": "GoalAutomation" } },
+        "investmentHoldings": { "type": "InvestmentHolding", "isList": true }
       }
     },
     "GoalContribution": {
@@ -978,8 +997,15 @@
             "status": { "type": "ReconciliationStatus", "attributes": ["@default(PROCESSING)"] },
             "filePath": { "type": "String" },
             "fileType": { "type": "String" },
-            "totalJobs": { "type": "Int", "optional": true },
-            "completedJobs": { "type": "Int", "optional": true },
+            "totalJobs": { "type": "Int", "attributes": ["@default(0)"] },
+            "completedJobs": { "type": "Int", "attributes": ["@default(0)"] },
+            "balanceDifference": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(14, 2)"] },
+            "statementOpeningBalance": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(14, 2)"] },
+            "statementClosingBalance": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(14, 2)"] },
+            "statementCurrency": { "type": "String", "optional": true, "attributes": ["@default(\"BRL\")"] },
+            "statementTimezone": { "type": "String", "optional": true, "attributes": ["@default(\"America/Sao_Paulo\")"] },
+            "systemOpeningBalance": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(14, 2)"] },
+            "systemClosingBalance": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(14, 2)"] },
             "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
             "userId": { "type": "String" },
             "accountId": { "type": "String", "optional": true },
@@ -1030,17 +1056,18 @@
         }
     },
     "AiAnalysis": {
-        "fields": {
-            "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
-            "type": { "type": "AiAnalysisType" },
-            "analysisText": { "type": "String", "attributes": ["@db.Text"] },
-            "relevantTransactionIds": { "type": "String", "attributes": ["@db.Text"] },
-            "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
-            "userId": { "type": "String" }
-        },
-        "relations": {
-            "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
-        }
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "type": { "type": "AiAnalysisType" },
+        "analysisText": { "type": "String", "attributes": ["@db.Text"] },
+        "relevantTransactionIds": { "type": "String", "attributes": ["@db.Text"] },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "userId": { "type": "String" }
+      },
+      "relations": {
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "nudgeConversions": { "type": "InvestmentNudgeConversion", "isList": true }
+      }
     },
     "UserMission": {
       "fields": {
@@ -1137,6 +1164,145 @@
         "startAt": { "type": "DateTime", "optional": true },
         "endAt": { "type": "DateTime", "optional": true },
         "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      }
+    },
+    "InvestmentPlan": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "priority": { "type": "InvestmentPriority", "attributes": ["@default(investir)"] },
+        "targetPercent": { "type": "Decimal", "attributes": ["@default(0.2)", "@db.Decimal(5, 4)"] },
+        "targetAmountMin": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 2)"] },
+        "targetAmount": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 2)"] },
+        "leisureFloor": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 2)"] },
+        "leisurePercentMin": { "type": "Decimal", "attributes": ["@default(0.15)", "@db.Decimal(5, 4)"] },
+        "emergencyFundTarget": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(18, 2)"] },
+        "notes": { "type": "String", "optional": true, "attributes": ["@db.Text"] },
+        "status": { "type": "InvestmentPlanStatus", "attributes": ["@default(ACTIVE)"] },
+        "userId": { "type": "String" },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
+      },
+      "relations": {
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "holdings": { "type": "InvestmentHolding", "isList": true },
+        "contributions": { "type": "InvestmentContribution", "isList": true },
+        "snapshots": { "type": "InvestmentSnapshot", "isList": true }
+        ,
+        "nudgeConversions": { "type": "InvestmentNudgeConversion", "isList": true }
+      },
+      "indices": [
+        { "fields": ["userId"], "unique": true }
+      ]
+    },
+    "InvestmentHolding": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "planId": { "type": "String" },
+        "userId": { "type": "String" },
+        "accountId": { "type": "String" },
+        "goalId": { "type": "String", "optional": true },
+        "assetClass": { "type": "String" },
+        "ticker": { "type": "String", "optional": true },
+        "currentAmount": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
+        "expectedReturn": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(10, 4)"] },
+        "metadata": { "type": "Json", "optional": true },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] },
+        "updatedAt": { "type": "DateTime", "attributes": ["@updatedAt"] }
+      },
+      "relations": {
+        "plan": { "type": "InvestmentPlan", "relation": { "fields": ["planId"], "references": ["id"], "onDelete": "Cascade" } },
+        "account": { "type": "Account", "relation": { "fields": ["accountId"], "references": ["id"], "onDelete": "Cascade" } },
+        "goal": { "type": "Goal", "optional": true, "relation": { "fields": ["goalId"], "references": ["id"], "onDelete": "SetNull" } },
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "contributions": { "type": "InvestmentContribution", "isList": true }
+      }
+    },
+    "InvestmentContribution": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "planId": { "type": "String" },
+        "userId": { "type": "String" },
+        "accountId": { "type": "String" },
+        "fromAccountId": { "type": "String" },
+        "holdingId": { "type": "String", "optional": true },
+        "amount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "leisureImpact": { "type": "Decimal", "optional": true, "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
+        "status": { "type": "InvestmentContributionStatus", "attributes": ["@default(EXECUTED)"] },
+        "source": { "type": "InvestmentContributionSource", "attributes": ["@default(MANUAL)"] },
+        "notes": { "type": "String", "optional": true, "attributes": ["@db.Text"] },
+        "analysisSnapshot": { "type": "Json", "optional": true },
+        "debitTransactionId": { "type": "String", "optional": true, "attributes": ["@unique"] },
+        "creditTransactionId": { "type": "String", "optional": true, "attributes": ["@unique"] },
+        "executedAt": { "type": "DateTime", "optional": true },
+        "month": { "type": "String" },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "plan": { "type": "InvestmentPlan", "relation": { "fields": ["planId"], "references": ["id"], "onDelete": "Cascade" } },
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "destinationAccount": { "type": "Account", "relation": { "name": "InvestmentContributionDestination", "fields": ["accountId"], "references": ["id"], "onDelete": "Cascade" } },
+        "sourceAccount": { "type": "Account", "relation": { "name": "InvestmentContributionSource", "fields": ["fromAccountId"], "references": ["id"], "onDelete": "Cascade" } },
+        "holding": { "type": "InvestmentHolding", "optional": true, "relation": { "fields": ["holdingId"], "references": ["id"], "onDelete": "SetNull" } },
+        "debitTransaction": { "type": "Transaction", "optional": true, "relation": { "name": "InvestmentContributionDebit", "fields": ["debitTransactionId"], "references": ["id"], "onDelete": "SetNull" } },
+        "creditTransaction": { "type": "Transaction", "optional": true, "relation": { "name": "InvestmentContributionCredit", "fields": ["creditTransactionId"], "references": ["id"], "onDelete": "SetNull" } }
+      },
+      "indices": [
+        { "fields": ["planId", "month"] }
+      ]
+    },
+    "InvestmentSnapshot": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "planId": { "type": "String" },
+        "userId": { "type": "String" },
+        "month": { "type": "String" },
+        "totalInvested": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
+        "totalReturns": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
+        "leisureSpent": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
+        "deltaVsPlan": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(18, 4)"] },
+        "confidenceScore": { "type": "Decimal", "optional": true, "attributes": ["@db.Decimal(5, 2)"] },
+        "commentaryJson": { "type": "Json", "optional": true },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "plan": { "type": "InvestmentPlan", "relation": { "fields": ["planId"], "references": ["id"], "onDelete": "Cascade" } },
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } }
+      },
+      "indices": [
+        { "fields": ["planId", "month"], "unique": true }
+      ]
+    },
+    "InvestmentMetricSnapshot": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "month": { "type": "String" },
+        "soloPlanAdoptionPct": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(6, 4)"] },
+        "avgContributionIncomeRatio": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(10, 4)"] },
+        "planAdherenceRate": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(6, 4)"] },
+        "nudgeConversionRate": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(6, 4)"] },
+        "adoptionRate": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(6, 4)"] },
+        "churnRate": { "type": "Decimal", "attributes": ["@default(0)", "@db.Decimal(6, 4)"] },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "indices": [
+        { "fields": ["month"], "unique": true }
+      ]
+    },
+    "InvestmentNudgeConversion": {
+      "fields": {
+        "id": { "type": "String", "attributes": ["@id", "@default(cuid())"] },
+        "planId": { "type": "String" },
+        "userId": { "type": "String" },
+        "aiAnalysisId": { "type": "String" },
+        "targetAmount": { "type": "Decimal", "attributes": ["@db.Decimal(18, 4)"] },
+        "triggeredAt": { "type": "DateTime" },
+        "convertedAt": { "type": "DateTime", "optional": true },
+        "createdAt": { "type": "DateTime", "attributes": ["@default(now())"] }
+      },
+      "relations": {
+        "plan": { "type": "InvestmentPlan", "relation": { "fields": ["planId"], "references": ["id"], "onDelete": "Cascade" } },
+        "user": { "type": "User", "relation": { "fields": ["userId"], "references": ["id"], "onDelete": "Cascade" } },
+        "aiAnalysis": { "type": "AiAnalysis", "relation": { "fields": ["aiAnalysisId"], "references": ["id"], "onDelete": "Cascade" } }
       }
     }
   }

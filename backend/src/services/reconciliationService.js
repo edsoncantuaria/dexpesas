@@ -23,6 +23,36 @@ const findBestStringMatch =
 
 const prisma = new PrismaClient();
 
+const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
+const TIMEZONE_OFFSETS = {
+    UTC: 0,
+    'America/Sao_Paulo': -180,
+    'America/New_York': -300,
+    'Europe/London': 0,
+};
+const MATCH_VALUE_TOLERANCE = 0.05; // até 5 centavos
+export const BALANCE_TOLERANCE = 0.05;
+
+const getTimezoneOffsetMinutes = (timezone) => {
+    if (!timezone) return 0;
+    return TIMEZONE_OFFSETS[timezone] ?? 0;
+};
+
+const convertDateToUtc = (date, timezone) => {
+    if (!date || !(date instanceof Date) || !isValid(date)) return date;
+    const offsetMinutes = getTimezoneOffsetMinutes(timezone);
+    const base = Date.UTC(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate(),
+        date.getHours(),
+        date.getMinutes(),
+        date.getSeconds(),
+        date.getMilliseconds()
+    );
+    return new Date(base - offsetMinutes * 60 * 1000);
+};
+
 // Helper para converter stream em string
 async function streamToString(stream) {
     const chunks = [];
@@ -40,49 +70,80 @@ class ReconciliationService {
      * Ponto de entrada principal. Determina o tipo de arquivo e chama o parser apropriado.
      */
     static async processStatementFile(filePath, reconciliationId, userId, fileType, mapping) {
-        // Baixa o arquivo do MinIO
-        const fileStream = await minioClient.getObject(config.minio.bucketName, filePath);
-        const fileContent = await streamToString(fileStream);
-
-        if (fileType === 'CSV') {
-            return this.processCsvFile(fileContent, reconciliationId, mapping);
+        const reconciliation = await prisma.reconciliation.findUnique({ where: { id: reconciliationId } });
+        if (!reconciliation) {
+            throw new Error('Reconciliação não encontrada ao processar extrato.');
         }
-        return this.processOfxFile(fileContent, reconciliationId);
+
+        console.info(`[Reconciliation ${reconciliationId}] Iniciando processamento do arquivo ${fileType} (userId=${userId}).`);
+
+        try {
+            // Baixa o arquivo do MinIO
+            const fileStream = await minioClient.getObject(config.minio.bucketName, filePath);
+            const fileContent = await streamToString(fileStream);
+
+            if (fileType === 'CSV') {
+                return this.processCsvFile(fileContent, reconciliation, mapping || {});
+            }
+            return this.processOfxFile(fileContent, reconciliation);
+        } catch (error) {
+            console.error(
+                `[Reconciliation ${reconciliationId}] Falha ao processar arquivo ${fileType}.`,
+                {
+                    filePath,
+                    userId,
+                    message: error.message,
+                    stack: error.stack,
+                },
+            );
+            throw error;
+        }
     }
     
     /**
      * Processa um arquivo CSV, mapeia as colunas e importa as transações.
      */
-    static async processCsvFile(fileContent, reconciliationId, mapping) {
-        const records = await new Promise((resolve, reject) => {
-            parseCsv(fileContent, {
-                columns: true,
-                skip_empty_lines: true,
-                trim: true,
-            }, (err, records) => {
-                if (err) return reject(err);
-                resolve(records);
+    static async processCsvFile(fileContent, reconciliation, mapping = {}) {
+        let records;
+        try {
+            records = await new Promise((resolve, reject) => {
+                parseCsv(fileContent, {
+                    columns: true,
+                    skip_empty_lines: true,
+                    trim: true,
+                }, (err, parsedRecords) => {
+                    if (err) return reject(err);
+                    resolve(parsedRecords);
+                });
             });
-        });
+        } catch (error) {
+            console.error(`[Reconciliation ${reconciliation.id}] Erro ao analisar CSV.`, { message: error.message, stack: error.stack });
+            throw error;
+        }
+
+        console.info(`[Reconciliation ${reconciliation.id}] CSV processado com ${records.length} linhas.`);
+
+        const timezone = mapping.timezone || reconciliation.statementTimezone || DEFAULT_TIMEZONE;
 
         const importedTransactionsToCreate = records.map((r, index) => 
-            this.mapCsvTransaction(r, reconciliationId, mapping, index)
+            this.mapCsvTransaction(r, reconciliation.id, mapping, index, timezone)
         ).filter(Boolean);
 
         if (importedTransactionsToCreate.length === 0) {
-            await prisma.reconciliation.update({ where: { id: reconciliationId }, data: { status: 'FAILED' } });
+            console.warn(`[Reconciliation ${reconciliation.id}] Nenhuma transação válida encontrada nas linhas do CSV.`);
+            await prisma.reconciliation.update({ where: { id: reconciliation.id }, data: { status: 'FAILED' } });
             return { count: 0 };
         }
 
-        await this.saveAndMatchTransactions(reconciliationId, importedTransactionsToCreate);
+        await this.saveAndMatchTransactions(reconciliation.id, importedTransactionsToCreate, reconciliation);
         return { count: importedTransactionsToCreate.length };
     }
 
     /**
      * Mapeia uma única linha do CSV para o formato da nossa transação importada.
      */
-    static mapCsvTransaction(record, reconciliationId, mapping, index) {
-        const { date, description, amount, date_format } = mapping;
+    static mapCsvTransaction(record, reconciliationId, mapping, index, timezone) {
+        const { date, description, amount, date_format, type, credit_value, debit_value } = mapping;
         
         const dateStr = record[date];
         const amountStrInput = record[amount] || '0';
@@ -112,13 +173,25 @@ class ReconciliationService {
             return null;
         }
         
-        const type = parsedAmount >= 0 ? 'CREDIT' : 'DEBIT';
+        const normalizedDate = convertDateToUtc(parsedDate, timezone);
+
+        let resolvedType = parsedAmount >= 0 ? 'CREDIT' : 'DEBIT';
+        if (type && record[type]) {
+            const rawType = record[type].toString().trim().toUpperCase();
+            const creditToken = (credit_value || 'C').toString().trim().toUpperCase();
+            const debitToken = (debit_value || 'D').toString().trim().toUpperCase();
+            if (rawType === creditToken) {
+                resolvedType = 'CREDIT';
+            } else if (rawType === debitToken) {
+                resolvedType = 'DEBIT';
+            }
+        }
 
         return {
             reconciliationId,
-            date: parsedDate,
+            date: normalizedDate,
             amount: Math.abs(parsedAmount),
-            type: type,
+            type: resolvedType,
             description: record[description] || 'Descrição não encontrada',
             fitId: `csv-${reconciliationId}-${index}`,
         };
@@ -127,7 +200,7 @@ class ReconciliationService {
     /**
      * Processa um arquivo OFX, extrai os dados e importa as transações.
      */
-    static async processOfxFile(fileContent, reconciliationId) {
+    static async processOfxFile(fileContent, reconciliation) {
         // Pré-processamento do arquivo OFX para remover caracteres inválidos e cabeçalhos
         const ofxContent = fileContent
             .replace(/&/g, '&amp;') // Escapa o ampersand
@@ -135,8 +208,8 @@ class ReconciliationService {
             .split('<OFX>')[1]; // Remove o cabeçalho
         
         if (!ofxContent) {
-            console.warn(`Arquivo OFX vazio ou inválido para reconciliação ${reconciliationId}.`);
-            await prisma.reconciliation.update({ where: { id: reconciliationId }, data: { status: 'FAILED' } });
+            console.warn(`Arquivo OFX vazio ou inválido para reconciliação ${reconciliation.id}.`);
+            await prisma.reconciliation.update({ where: { id: reconciliation.id }, data: { status: 'FAILED' } });
             return { count: 0 };
         }
         
@@ -148,8 +221,8 @@ class ReconciliationService {
         const statement = bankStatement || creditCardStatement;
 
         if (!statement) {
-            console.warn(`Estrutura OFX inválida para reconciliação ${reconciliationId}. Nenhum extrato bancário ou de cartão encontrado.`);
-            await prisma.reconciliation.update({ where: { id: reconciliationId }, data: { status: 'FAILED' } });
+            console.warn(`Estrutura OFX inválida para reconciliação ${reconciliation.id}. Nenhum extrato bancário ou de cartão encontrado.`);
+            await prisma.reconciliation.update({ where: { id: reconciliation.id }, data: { status: 'FAILED' } });
             return { count: 0 };
         }
         
@@ -159,13 +232,33 @@ class ReconciliationService {
             : transactionList?.STMTTRN ? [transactionList.STMTTRN] : [];
 
         if (transactions.length === 0) {
-            await prisma.reconciliation.update({ where: { id: reconciliationId }, data: { status: 'PENDING_REVIEW' } });
+            console.warn(`Reconciliation ${reconciliation.id}: OFX sem transações dentro do período informado.`);
+            await prisma.reconciliation.update({ where: { id: reconciliation.id }, data: { status: 'PENDING_REVIEW' } });
             return { count: 0 };
         }
+        console.info(`[Reconciliation ${reconciliation.id}] OFX com ${transactions.length} transações detectadas.`);
 
-        const importedTransactionsToCreate = transactions.map(t => this.mapOfxTransaction(t, reconciliationId));
+        const timezone = reconciliation.statementTimezone || DEFAULT_TIMEZONE;
+        const importedTransactionsToCreate = transactions.map(t => this.mapOfxTransaction(t, reconciliation.id, timezone));
+
+        const closingBalance = statement?.LEDGERBAL?.BALAMT ? parseFloat(statement.LEDGERBAL.BALAMT) : null;
+        const currency = statement?.LEDGERBAL?.CURDEF || statement?.CURDEF || reconciliation.statementCurrency;
+        let openingBalance = reconciliation.statementOpeningBalance;
+        if (closingBalance !== null && !Number.isNaN(closingBalance)) {
+            const netChange = transactions.reduce((acc, tx) => acc + parseFloat(tx.TRNAMT || 0), 0);
+            openingBalance = closingBalance - netChange;
+        }
+
+        await prisma.reconciliation.update({
+            where: { id: reconciliation.id },
+            data: {
+                statementClosingBalance: closingBalance ?? reconciliation.statementClosingBalance,
+                statementOpeningBalance: openingBalance ?? reconciliation.statementOpeningBalance,
+                statementCurrency: currency || reconciliation.statementCurrency,
+            },
+        });
         
-        await this.saveAndMatchTransactions(reconciliationId, importedTransactionsToCreate);
+        await this.saveAndMatchTransactions(reconciliation.id, importedTransactionsToCreate, reconciliation);
 
         return { count: importedTransactionsToCreate.length };
     }
@@ -173,13 +266,13 @@ class ReconciliationService {
     /**
      * Mapeia uma transação do formato OFX para o nosso modelo Prisma.
      */
-    static mapOfxTransaction(t, reconciliationId) {
+    static mapOfxTransaction(t, reconciliationId, timezone) {
         const amount = parseFloat(t.TRNAMT);
         const dateString = t.DTPOSTED.substring(0, 8);
         const year = parseInt(dateString.substring(0, 4), 10);
         const month = parseInt(dateString.substring(4, 6), 10) - 1;
         const day = parseInt(dateString.substring(6, 8), 10);
-        const postDate = new Date(year, month, day);
+        const postDate = convertDateToUtc(new Date(year, month, day), timezone);
 
         return {
             reconciliationId,
@@ -194,9 +287,38 @@ class ReconciliationService {
     /**
      * Salva as transações importadas no banco e executa o algoritmo de matching.
      */
-    static async saveAndMatchTransactions(reconciliationId, transactionsToCreate) {
-        const reconciliation = await prisma.reconciliation.findUnique({ where: { id: reconciliationId } });
+    static async saveAndMatchTransactions(reconciliationId, transactionsToCreate, reconciliationRecord = null) {
+        const reconciliation = reconciliationRecord || await prisma.reconciliation.findUnique({ where: { id: reconciliationId } });
         if (!reconciliation) throw new Error("Registro de reconciliação não encontrado.");
+
+        const fitIds = transactionsToCreate.map((tx) => tx.fitId);
+        if (fitIds.length === 0) {
+            console.warn(`[Reconciliation ${reconciliationId}] Nenhuma transação mapeada para importação.`);
+            await prisma.reconciliation.update({
+                where: { id: reconciliationId },
+                data: { status: 'FAILED' },
+            });
+            return;
+        }
+
+        const existingTransactions = await prisma.importedTransaction.findMany({
+            where: { fitId: { in: fitIds } },
+            select: { fitId: true, reconciliationId: true },
+        });
+
+        if (existingTransactions.length === transactionsToCreate.length) {
+            console.warn(`[Reconciliation ${reconciliationId}] Todos os lançamentos do arquivo já foram reconciliados anteriormente.`, {
+                previousReconciliationId: existingTransactions[0]?.reconciliationId,
+            });
+            await prisma.reconciliation.update({
+                where: { id: reconciliationId },
+                data: { status: 'FAILED' },
+            });
+            const duplicateError = new Error('Este extrato já foi reconciliado anteriormente.');
+            duplicateError.code = 'EXTRACT_ALREADY_RECONCILED';
+            duplicateError.details = { previousReconciliationId: existingTransactions[0]?.reconciliationId };
+            throw duplicateError;
+        }
 
         const dates = transactionsToCreate.map(t => new Date(t.date));
         const startDate = startOfDay(new Date(Math.min.apply(null, dates)));
@@ -253,6 +375,10 @@ class ReconciliationService {
                 },
             });
         });
+
+        console.info(`[Reconciliation ${reconciliationId}] ${transactionsToCreate.length} transações importadas foram salvas.`);
+
+        await this.updateBalanceSnapshot(reconciliationId);
     }
 
     /**
@@ -268,7 +394,13 @@ class ReconciliationService {
             const manualIsCredit = manualTx.tipo === 'receita';
             if (importedIsCredit !== manualIsCredit) continue;
             
-            const valueScore = Math.abs(importedTx.amount) === parseFloat(manualTx.valor) ? 50 : 0;
+            const manualValue = parseFloat(manualTx.valor);
+            const valueDifference = Math.abs(Math.abs(importedTx.amount) - manualValue);
+            const valueScore = valueDifference <= MATCH_VALUE_TOLERANCE
+                ? 50
+                : valueDifference <= MATCH_VALUE_TOLERANCE * 3
+                    ? 20
+                    : 0;
             if (valueScore === 0) continue;
 
             const dateDifference = Math.abs(differenceInDays(new Date(importedTx.date), new Date(manualTx.date)));
@@ -288,6 +420,72 @@ class ReconciliationService {
             return { match: bestMatch, score: Math.round(highestScore) };
         }
         return null;
+    }
+
+    static async aggregateValue(whereClause) {
+        const result = await prisma.transaction.aggregate({
+            _sum: { valor: true },
+            where: whereClause,
+        });
+        return Number(result?._sum?.valor || 0);
+    }
+
+    static async calculateSystemBalances(reconciliation, startDate, endDate) {
+        if (!startDate || !endDate) {
+            return { systemOpeningBalance: null, systemClosingBalance: null };
+        }
+
+        if (reconciliation.accountId) {
+            const account = await prisma.account.findUnique({ where: { id: reconciliation.accountId } });
+            if (!account) return { systemOpeningBalance: null, systemClosingBalance: null };
+            const accountId = reconciliation.accountId;
+            const [receitasAntes, despesasAntes, receitasPeriodo, despesasPeriodo] = await Promise.all([
+                this.aggregateValue({ accountId, tipo: 'receita', data: { lt: startDate } }),
+                this.aggregateValue({ accountId, tipo: 'despesa', data: { lt: startDate } }),
+                this.aggregateValue({ accountId, tipo: 'receita', data: { gte: startDate, lte: endDate } }),
+                this.aggregateValue({ accountId, tipo: 'despesa', data: { gte: startDate, lte: endDate } }),
+            ]);
+            const saldoInicialConta = Number(account.saldoInicial || 0);
+            const opening = saldoInicialConta + receitasAntes - despesasAntes;
+            const closing = opening + receitasPeriodo - despesasPeriodo;
+            return { systemOpeningBalance: opening, systemClosingBalance: closing };
+        }
+
+        if (reconciliation.cardId) {
+            const cardId = reconciliation.cardId;
+            const [receitasAntes, despesasAntes, receitasPeriodo, despesasPeriodo] = await Promise.all([
+                this.aggregateValue({ cardId, tipo: 'receita', data: { lt: startDate } }),
+                this.aggregateValue({ cardId, tipo: 'despesa', data: { lt: startDate } }),
+                this.aggregateValue({ cardId, tipo: 'receita', data: { gte: startDate, lte: endDate } }),
+                this.aggregateValue({ cardId, tipo: 'despesa', data: { gte: startDate, lte: endDate } }),
+            ]);
+            const opening = receitasAntes - despesasAntes;
+            const closing = opening + receitasPeriodo - despesasPeriodo;
+            return { systemOpeningBalance: opening, systemClosingBalance: closing };
+        }
+
+        return { systemOpeningBalance: null, systemClosingBalance: null };
+    }
+
+    static async updateBalanceSnapshot(reconciliationId) {
+        const reconciliation = await prisma.reconciliation.findUnique({ where: { id: reconciliationId } });
+        if (!reconciliation || !reconciliation.startDate || !reconciliation.endDate) {
+            return;
+        }
+        const { systemOpeningBalance, systemClosingBalance } = await this.calculateSystemBalances(reconciliation, reconciliation.startDate, reconciliation.endDate);
+        let balanceDifference = reconciliation.balanceDifference;
+        if (reconciliation.statementClosingBalance !== null && reconciliation.statementClosingBalance !== undefined && systemClosingBalance !== null) {
+            balanceDifference = Number((systemClosingBalance - Number(reconciliation.statementClosingBalance)).toFixed(2));
+        }
+        await prisma.reconciliation.update({
+            where: { id: reconciliationId },
+            data: {
+                systemOpeningBalance,
+                systemClosingBalance,
+                balanceDifference,
+            },
+        });
+        console.info(`[Reconciliation ${reconciliationId}] Snapshot de saldo atualizado. Diferença atual: ${balanceDifference ?? 'N/A'}.`);
     }
 }
 

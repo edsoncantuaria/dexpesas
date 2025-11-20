@@ -71,6 +71,7 @@ const gamificationEvents = {
     GUILD_MISSION_COMPLETED: { xp: 100, description: 'Completou uma missão cooperativa.', limit: { period: 'weekly', max: 2 } },
     RECONCILIATION_STREAK: { xp: 40, description: 'Manteve a rotina de reconciliação.', limit: { period: 'daily', max: 1 } },
     DAILY_CHECKIN: { xp: 12, description: 'Realizou o check-in diário.', limit: { period: 'daily', max: 1 } },
+    INVESTMENT_PLAN_STREAK: { xp: 60, description: 'Manteve o plano de investimentos por 3 meses seguidos.', limit: { period: 'monthly', max: 1 } },
 };
 
 

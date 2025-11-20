@@ -39,9 +39,10 @@ type AddCardFormProps = {
     onSuccess: (card: Omit<Card, 'id' | 'userId' | 'bestDayToBuy' | 'currentInvoiceAmount' | 'availableLimit'> & { id?: string }) => void;
     onClose: () => void;
     isSubmitting: boolean;
+    cancelLabel?: string;
 };
 
-export function AddCardForm({ card, onSuccess, onClose, isSubmitting }: AddCardFormProps) {
+export function AddCardForm({ card, onSuccess, onClose, isSubmitting, cancelLabel = 'Cancelar' }: AddCardFormProps) {
   const isEditing = !!card;
   const [accounts, setAccounts] = useState<Account[]>([]);
 
@@ -232,7 +233,7 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting }: AddCardF
         </div>
         
         <div className="flex justify-end pt-4 gap-2">
-             <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>{cancelLabel}</Button>
              <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {isSubmitting ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Adicionar Cartão'}

@@ -53,14 +53,15 @@ const normalizeValue = (value) => {
 
 const serialize = (payload) => normalizeValue(payload);
 
-class CellController {
-  async syncCellBudgets(cellId) {
-    try {
-      await CellBudgetSyncService.resyncCellBudgets(cellId);
-    } catch (error) {
-      console.error('[CELL_SYNC] Falha ao sincronizar orçamentos da família', cellId, error);
-    }
+const syncCellBudgets = async (cellId) => {
+  try {
+    await CellBudgetSyncService.resyncCellBudgets(cellId);
+  } catch (error) {
+    console.error('[CELL_SYNC] Falha ao sincronizar orçamentos da família', cellId, error);
   }
+};
+
+class CellController {
 
   async listCells(req, res, next) {
     const userId = req.user.id;
@@ -196,7 +197,7 @@ class CellController {
   async listBudgets(req, res, next) {
     const { cellId } = req.params;
     try {
-      await applyCellPermissions(req.user.id, cellId, { manageBudgets: true });
+      await applyCellPermissions(req.user.id, cellId, {});
       const month = req.query.month || null;
       const budgets = await CellBudgetService.listBudgets(cellId, month);
       res.json(serialize(budgets));
@@ -267,7 +268,7 @@ class CellController {
   async listFunds(req, res, next) {
     const { cellId } = req.params;
     try {
-      await applyCellPermissions(req.user.id, cellId, { manageFunds: true });
+      await applyCellPermissions(req.user.id, cellId, {});
       const funds = await prisma.cellFund.findMany({
         where: { cellId },
         include: {
@@ -590,6 +591,11 @@ class CellController {
           createdAt: 'desc',
         },
       });
+      expenses.sort((a, b) => {
+        const dateA = new Date(a.expenseDate || a.createdAt).getTime();
+        const dateB = new Date(b.expenseDate || b.createdAt).getTime();
+        return dateB - dateA;
+      });
       res.json(serialize(expenses));
     } catch (error) {
       next(error);
@@ -606,10 +612,19 @@ class CellController {
         return res.status(400).json({ message: 'Informe um valor válido para o total.' });
       }
       const sanitizedSplits = Array.isArray(splits)
-        ? splits.map((entry) => ({
-            memberId: entry.memberId,
-            amount: Number(entry.amount),
-          }))
+        ? splits
+            .map((entry) => ({
+              memberId: entry.memberId,
+              amount: Number(entry.amount),
+              accountId: entry.accountId,
+            }))
+            .filter(
+              (entry) =>
+                entry.memberId &&
+                entry.accountId &&
+                Number.isFinite(entry.amount) &&
+                entry.amount > 0,
+            )
         : [];
       if (!sanitizedSplits.length) {
         return res.status(400).json({ message: 'Defina os participantes do rateio.' });
@@ -618,6 +633,52 @@ class CellController {
       if (Math.round(totalSplits * 100) !== Math.round(parsedTotal * 100)) {
         return res.status(400).json({ message: 'A soma dos rateios precisa bater com o total.' });
       }
+      const memberIds = sanitizedSplits.map((entry) => entry.memberId);
+      const memberRecords = await prisma.clanMember.findMany({
+        where: {
+          clanId: cellId,
+          userId: {
+            in: memberIds,
+          },
+        },
+        select: {
+          userId: true,
+        },
+      });
+      const allowedMembers = new Set(memberRecords.map((record) => record.userId));
+      for (const entry of sanitizedSplits) {
+        if (!allowedMembers.has(entry.memberId)) {
+          return res.status(400).json({ message: 'Inclua apenas integrantes da família no rateio.' });
+        }
+      }
+      const accountRecords = await prisma.cellSharedAccount.findMany({
+        where: {
+          cellId,
+          accountId: {
+            in: sanitizedSplits.map((entry) => entry.accountId),
+          },
+        },
+        include: {
+          account: {
+            select: {
+              id: true,
+              userId: true,
+              nome: true,
+            },
+          },
+        },
+      });
+      const accountMap = new Map(accountRecords.map((record) => [record.accountId, record]));
+      for (const entry of sanitizedSplits) {
+        const sharedAccount = accountMap.get(entry.accountId);
+        if (!sharedAccount) {
+          return res.status(400).json({ message: 'A conta selecionada não está compartilhada com a família.' });
+        }
+        if (sharedAccount.account?.userId !== entry.memberId) {
+          return res.status(400).json({ message: 'A conta precisa pertencer ao membro escolhido.' });
+        }
+      }
+      const expenseDate = req.body.expenseDate ? new Date(req.body.expenseDate) : new Date();
       const expense = await prisma.$transaction(async (tx) => {
         const createdExpense = await tx.sharedExpense.create({
           data: {
@@ -627,13 +688,14 @@ class CellController {
             totalAmount: parsedTotal,
             splitMethod: splitMethod || 'AMOUNT',
             categoryId,
+            expenseDate,
           },
         });
         for (const split of sanitizedSplits) {
           const transaction = await tx.transaction.create({
             data: {
               userId: split.memberId,
-              accountId: null,
+              accountId: split.accountId,
               descricao: `Despesa compartilhada: ${description}`,
               valor: split.amount,
               data: new Date(),
@@ -649,6 +711,7 @@ class CellController {
               sharedExpenseId: createdExpense.id,
               userId: split.memberId,
               amountOwed: split.amount,
+              defaultAccountId: split.accountId || null,
               createdTransactionId: transaction.id,
             },
           });
@@ -768,8 +831,11 @@ class CellController {
             transactionId: transaction.id,
           },
         });
-        return tx.sharedExpenseParticipant.findUnique({
+        return tx.sharedExpenseParticipant.update({
           where: { id: participantId },
+          data: {
+            defaultAccountId: accountId,
+          },
           include: {
             user: {
               select: {
@@ -811,13 +877,17 @@ class CellController {
       await prisma.$transaction(async (tx) => {
         const transactionIds = expense.participants.map((participant) => participant.createdTransactionId);
         if (transactionIds.length) {
-          await tx.transaction.deleteMany({
-            where: {
-              id: {
-                in: transactionIds,
+          try {
+            await tx.transaction.deleteMany({
+              where: {
+                id: {
+                  in: transactionIds,
+                },
               },
-            },
-          });
+            });
+          } catch (error) {
+            console.warn('[CELL_EXPENSE_DELETE] Falha ao remover transações do rateio', error);
+          }
         }
         await tx.sharedExpenseParticipant.deleteMany({
           where: { sharedExpenseId: expense.id },
@@ -962,7 +1032,7 @@ class CellController {
   async listSplitRules(req, res, next) {
     const { cellId } = req.params;
     try {
-      await applyCellPermissions(req.user.id, cellId, { manageBudgets: true });
+      await applyCellPermissions(req.user.id, cellId, {});
       const rules = await prisma.cellSplitRule.findMany({
         where: { cellId },
       });
@@ -1159,19 +1229,17 @@ class CellController {
       if (existingMember) {
         return res.status(400).json({ message: 'Usuário já participa da família.' });
       }
+      const normalizedVisibility = {
+        viewPersonalBudget: Boolean(requestedVisibility?.viewPersonalBudget),
+        viewAccounts: Boolean(requestedVisibility?.viewAccounts),
+        shareDebtSummary: Boolean(requestedVisibility?.shareDebtSummary),
+      };
       const invite = await prisma.clanInvite.create({
         data: {
           clanId: cellId,
           invitedUserId,
           inviterId,
           expiresAt: addDays(new Date(), 7),
-          metadata: {
-            requestedVisibility: {
-              viewPersonalBudget: Boolean(requestedVisibility?.viewPersonalBudget),
-              viewAccounts: Boolean(requestedVisibility?.viewAccounts),
-              shareDebtSummary: Boolean(requestedVisibility?.shareDebtSummary),
-            },
-          },
         },
       });
       await AuditService.log({
@@ -1179,7 +1247,7 @@ class CellController {
         action: 'CELL_INVITE_CREATED',
         entity: 'CELL_INVITE',
         entityId: invite.id,
-        details: { cellId, invitedUserId },
+        details: { cellId, invitedUserId, requestedVisibility: normalizedVisibility },
       });
       res.status(201).json(serialize(invite));
     } catch (error) {
@@ -1249,7 +1317,7 @@ class CellController {
         details: { sharePersonalBudget, shareAccounts, shareDebtSummary },
       });
       if (clanId) {
-        await this.syncCellBudgets(clanId);
+        await syncCellBudgets(clanId);
       }
       res.json({ message: 'Bem-vindo à família!' });
     } catch (error) {
@@ -1374,7 +1442,7 @@ class CellController {
         details: { memberId: membership.id },
       });
 
-      await this.syncCellBudgets(cellId);
+      await syncCellBudgets(cellId);
       res.json({ message: 'Você saiu da família.' });
     } catch (error) {
       next(error);
