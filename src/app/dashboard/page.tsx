@@ -18,12 +18,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useClassicModeNotice } from '@/hooks/use-classic-mode-notice';
 import { CellSummaryCard } from '@/components/dashboard/overview/cell-summary-card';
+import { SmartSummary } from '@/components/dashboard/smart-summary';
+import { QuickActions } from '@/components/dashboard/quick-actions';
 
 const cardComponents: { [key: string]: React.ComponentType<any> } = {
-    account_book: AccountBookCard,
-    journey_map: JourneyMapCard,
-    credit_pact: CreditPactCard,
-    challenge_tower: ChallengeTowerCard,
+  account_book: AccountBookCard,
+  journey_map: JourneyMapCard,
+  credit_pact: CreditPactCard,
+  challenge_tower: ChallengeTowerCard,
 };
 
 function DashboardPageContent() {
@@ -187,60 +189,60 @@ function DashboardPageContent() {
   const fetchData = useCallback(async () => {
     // Não reseta o loading em re-fetches para evitar piscar na tela
     try {
-        const currentMonth = format(new Date(), 'yyyy-MM');
-        const [
-            userData, 
-            accountsData,
-            cardsData,
-            goalsData,
-            budgetsData,
-            transactionsData,
-        ] = await Promise.all([
-            api.get('/user'),
-            api.get('/accounts'),
-            api.get('/cards'),
-            api.get('/goals'),
-            api.get(`/budgets?month=${currentMonth}`),
-            api.get(`/transactions?month=${currentMonth}&includePending=true`),
-        ]);
+      const currentMonth = format(new Date(), 'yyyy-MM');
+      const [
+        userData,
+        accountsData,
+        cardsData,
+        goalsData,
+        budgetsData,
+        transactionsData,
+      ] = await Promise.all([
+        api.get('/user'),
+        api.get('/accounts'),
+        api.get('/cards'),
+        api.get('/goals'),
+        api.get(`/budgets?month=${currentMonth}`),
+        api.get(`/transactions?month=${currentMonth}&includePending=true`),
+      ]);
 
-        const user = userData.data;
-        setUser(user);
-        setAccounts(accountsData.data);
-        setCards(cardsData.data);
-        setGoals(goalsData.data);
-        setBudgets(budgetsData.data);
-        setTransactions(transactionsData.data);
+      const user = userData.data;
+      setUser(user);
+      setAccounts(accountsData.data);
+      setCards(cardsData.data);
+      setGoals(goalsData.data);
+      setBudgets(budgetsData.data);
+      setTransactions(transactionsData.data);
 
-        const mode = user.gamificationMode ?? 'FULL';
-        const shouldEnable = mode !== 'OFF';
-        setIsGamificationEnabled(shouldEnable);
-        setIsLiteMode(mode === 'LITE');
-        fetchGamificationData(shouldEnable, user);
+      const mode = user.gamificationMode ?? 'FULL';
+      const shouldEnable = mode !== 'OFF';
+      setIsGamificationEnabled(shouldEnable);
+      setIsLiteMode(mode === 'LITE');
+      fetchGamificationData(shouldEnable, user);
 
-        let userLayout: string[] = [];
-        try {
-            if (typeof user.dashboardLayout === 'string' && user.dashboardLayout.startsWith('[')) {
-                userLayout = JSON.parse(user.dashboardLayout);
-            }
-        } catch (e) {
-            console.error("Erro ao parsear layout do dashboard:", e);
+      let userLayout: string[] = [];
+      try {
+        if (typeof user.dashboardLayout === 'string' && user.dashboardLayout.startsWith('[')) {
+          userLayout = JSON.parse(user.dashboardLayout);
         }
+      } catch (e) {
+        console.error("Erro ao parsear layout do dashboard:", e);
+      }
 
-        if (userLayout && userLayout.length > 0) {
-            setLayout(userLayout);
-        } else {
-             setLayout(Object.keys(cardComponents));
-        }
+      if (userLayout && userLayout.length > 0) {
+        setLayout(userLayout);
+      } else {
+        setLayout(Object.keys(cardComponents));
+      }
 
-    } catch(error) {
-        toast({
-            variant: 'destructive',
-            title: 'Erro ao carregar dashboard',
-            description: 'Não foi possível buscar as informações do servidor.'
-        });
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao carregar dashboard',
+        description: 'Não foi possível buscar as informações do servidor.'
+      });
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   }, [fetchGamificationData, toast]);
 
@@ -252,17 +254,17 @@ function DashboardPageContent() {
     window.addEventListener('accounts-updated', fetchData);
 
     return () => {
-        window.removeEventListener('transaction-updated', fetchData);
-        window.removeEventListener('accounts-updated', fetchData);
+      window.removeEventListener('transaction-updated', fetchData);
+      window.removeEventListener('accounts-updated', fetchData);
     }
   }, [fetchData]);
-  
+
   if (isLoading || !user) {
     return <LoadingScreen />;
   }
-  
+
   const cardDataProps: { [key: string]: any } = {
-    account_book: { accounts, transactions }, 
+    account_book: { accounts, transactions },
     journey_map: { budgets },
     credit_pact: { cards },
     challenge_tower: { goal: goals.find(g => g.status === 'IN_PROGRESS') },
@@ -274,14 +276,18 @@ function DashboardPageContent() {
   return (
     <div className="space-y-6">
       {isGamificationEnabled && profile && (
-        <HeroProfile 
-          user={user} 
-          profile={profile} 
+        <HeroProfile
+          user={user}
+          profile={profile}
           clan={clan}
           allAchievements={allAchievements}
           unlockedAchievements={unlockedAchievements}
         />
       )}
+
+      <SmartSummary accounts={accounts} transactions={transactions} budgets={budgets} cards={cards} />
+      <QuickActions />
+
       {clan && (
         <CellSummaryCard cell={clan} funds={cellFunds} budgets={cellBudgets} />
       )}
@@ -307,18 +313,18 @@ function DashboardPageContent() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-            {enabledCards.map((item) => {
-                const Component = item.component;
-                return (
-                    <div key={item.id}>
-                        <Component {...cardDataProps[item.id]} />
-                    </div>
-                )
-            })}
+          {enabledCards.map((item) => {
+            const Component = item.component;
+            return (
+              <div key={item.id}>
+                <Component {...cardDataProps[item.id]} />
+              </div>
+            )
+          })}
         </div>
         {isGamificationEnabled && !isLiteMode && (
           <div className="lg:col-span-1 space-y-6">
-              <TimelineCard logs={timelineLogs} />
+            <TimelineCard logs={timelineLogs} />
           </div>
         )}
       </div>
@@ -328,9 +334,9 @@ function DashboardPageContent() {
 
 
 export default function DashboardPage() {
-    return (
-        <Suspense fallback={<LoadingScreen />}>
-            <DashboardPageContent />
-        </Suspense>
-    )
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <DashboardPageContent />
+    </Suspense>
+  )
 }

@@ -15,137 +15,156 @@ import { useGamificationMode } from '@/hooks/use-gamification-mode';
 import { getGamificationCopy } from '@/lib/gamification-copy';
 
 interface HeroProfileProps {
-  user: User;
-  profile: GamificationProfile & { heroClass?: string };
-  clan: Clan | null;
-  allAchievements: Achievement[];
-  unlockedAchievements: UnlockedAchievement[];
-  familyBalance?: number | null;
+    user: User;
+    profile: GamificationProfile & { heroClass?: string };
+    clan: Clan | null;
+    allAchievements: Achievement[];
+    unlockedAchievements: UnlockedAchievement[];
+    familyBalance?: number | null;
 }
 
 const xpNeeded = (level: number) => Math.floor(100 * Math.pow(level, 1.15));
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchievements, familyBalance }: HeroProfileProps) {
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const { mode, isClassic } = useGamificationMode();
-  const heroCopy = getGamificationCopy('hero', mode);
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const { mode, isClassic } = useGamificationMode();
+    const heroCopy = getGamificationCopy('hero', mode);
 
-  useEffect(() => {
-    const fetchAvatar = async () => {
-        if (user.avatarUrl) {
-            try {
-                const res = await api.post('/storage/get-url', { objectName: user.avatarUrl });
-                setAvatarUrl(res.data.url);
-            } catch (error) {
-                console.error("Failed to fetch presigned URL for avatar");
+    useEffect(() => {
+        const fetchAvatar = async () => {
+            if (user.avatarUrl) {
+                try {
+                    const res = await api.post('/storage/get-url', { objectName: user.avatarUrl });
+                    setAvatarUrl(res.data.url);
+                } catch (error) {
+                    console.error("Failed to fetch presigned URL for avatar");
+                    setAvatarUrl(null);
+                }
+            } else {
                 setAvatarUrl(null);
             }
-        } else {
-            setAvatarUrl(null);
         }
-    }
-    fetchAvatar();
+        fetchAvatar();
 
-    const handleProfileUpdate = () => fetchAvatar();
-    window.addEventListener('profile-updated', handleProfileUpdate);
-    return () => window.removeEventListener('profile-updated', handleProfileUpdate);
-  }, [user.avatarUrl]);
+        const handleProfileUpdate = () => fetchAvatar();
+        window.addEventListener('profile-updated', handleProfileUpdate);
+        return () => window.removeEventListener('profile-updated', handleProfileUpdate);
+    }, [user.avatarUrl]);
 
-  const highlightedAchievements = useMemo(() => {
-      const allAchievementsMap = new Map(allAchievements.map(a => [a.id, a]));
-      return unlockedAchievements
-          .filter(ua => ua.destacada)
-          .map(ua => allAchievementsMap.get(ua.achievementId))
-          .filter((ach): ach is Achievement => !!ach);
-  }, [allAchievements, unlockedAchievements]);
+    const highlightedAchievements = useMemo(() => {
+        const allAchievementsMap = new Map(allAchievements.map(a => [a.id, a]));
+        return unlockedAchievements
+            .filter(ua => ua.destacada)
+            .map(ua => allAchievementsMap.get(ua.achievementId))
+            .filter((ach): ach is Achievement => !!ach);
+    }, [allAchievements, unlockedAchievements]);
 
 
-  const xpPercentage = (profile.xp / xpNeeded(profile.level)) * 100;
-  const showGlow = xpPercentage > 90;
-  const playerClass = profile.heroClass || 'Aventureiro';
-  const levelLabel = `${playerClass} - Nível ${profile.level}`;
-  const subtitle =
-    typeof heroCopy.subtitle === 'function'
-      ? heroCopy.subtitle(levelLabel)
-      : heroCopy.subtitle || levelLabel;
+    const xpPercentage = (profile.xp / xpNeeded(profile.level)) * 100;
+    const showGlow = xpPercentage > 90;
+    const playerClass = profile.heroClass || 'Aventureiro';
+    const levelLabel = `${playerClass} - Nível ${profile.level}`;
+    const subtitle =
+        typeof heroCopy.subtitle === 'function'
+            ? heroCopy.subtitle(levelLabel)
+            : heroCopy.subtitle || levelLabel;
 
-  return (
-    <div className="flex flex-col gap-4 rounded-2xl bg-card p-4 shadow-lg border">
-        {/* Seção de Identidade */}
-        <div className="flex flex-row items-center gap-4">
-             <Avatar className="h-16 w-16 sm:h-20 sm:w-20 border-4 border-primary/50">
-                <AvatarImage src={avatarUrl || undefined} alt={user.name} />
-                <AvatarFallback className="text-3xl bg-muted">{user.name.charAt(0)}</AvatarFallback>
-            </Avatar>
-             <div className="flex-1 w-full">
-                <div className="flex items-baseline gap-2">
-                    <h1 className="text-2xl font-bold font-headline">{user.name}</h1>
-                    {clan && (
-                        <Link href="/dashboard/cells" className="text-sm italic text-muted-foreground hover:underline flex items-center gap-1">
-                            <Users className="h-3 w-3"/>{clan.name}
-                        </Link>
+    return (
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-violet-600 to-indigo-600 p-6 text-white shadow-xl">
+            {/* Background Pattern */}
+            <div className="absolute inset-0 opacity-10">
+                <svg className="h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                    <path d="M0 100 C 20 0 50 0 100 100 Z" fill="white" />
+                </svg>
+            </div>
+
+            <div className="relative z-10 flex flex-col md:flex-row gap-6 items-center md:items-start">
+                <div className="relative">
+                    <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 opacity-75 blur-sm"></div>
+                    <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-4 border-white/20 relative">
+                        <AvatarImage src={avatarUrl || undefined} alt={user.name} />
+                        <AvatarFallback className="text-3xl bg-white/10 text-white">{user.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="absolute -bottom-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full border-2 border-white shadow-sm">
+                        Lvl {profile.level}
+                    </div>
+                </div>
+
+                <div className="flex-1 w-full text-center md:text-left space-y-2">
+                    <div>
+                        <h1 className="text-3xl font-bold font-headline tracking-tight">{user.name}</h1>
+                        <div className="flex items-center justify-center md:justify-start gap-2 text-indigo-100">
+                            <Crown className="h-4 w-4 text-yellow-300" />
+                            <span className="font-medium">{subtitle}</span>
+                            {clan && (
+                                <>
+                                    <span className="text-indigo-300">•</span>
+                                    <Link href="/dashboard/cells" className="hover:text-white transition-colors flex items-center gap-1">
+                                        <Users className="h-3 w-3" />
+                                        {clan?.name}
+                                    </Link>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {typeof familyBalance === 'number' && (
+                        <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-sm backdrop-blur-sm">
+                            <Banknote className="h-4 w-4 text-green-300" />
+                            <span>Saldo Familiar: <span className="font-bold text-green-300">{formatCurrency(familyBalance || 0)}</span></span>
+                        </div>
+                    )}
+
+                    {/* XP Bar */}
+                    {heroCopy.showXp && (
+                        <div className="max-w-md mx-auto md:mx-0 pt-2">
+                            <div className="flex justify-between text-xs text-indigo-200 mb-1">
+                                <span>XP Atual</span>
+                                <span>{profile.xp} / {xpNeeded(profile.level)}</span>
+                            </div>
+                            <div className="relative h-2.5 bg-black/20 rounded-full overflow-hidden">
+                                <div
+                                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all duration-500"
+                                    style={{ width: `${xpPercentage}%` }}
+                                />
+                                {showGlow && (
+                                    <motion.div
+                                        animate={{ opacity: [0, 1, 0] }}
+                                        transition={{ duration: 2, repeat: Infinity }}
+                                        className="absolute inset-0 bg-white/30"
+                                    />
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
-                <p className="font-semibold text-sm text-primary flex items-center gap-2 flex-wrap">
-                    <Crown className="h-4 w-4 text-yellow-500" />
-                    {subtitle}
-                </p>
-                {typeof familyBalance === 'number' && (
-                  <div className="text-xs flex items-center gap-2 text-muted-foreground">
-                    <Banknote className="h-3.5 w-3.5 text-green-500" />
-                    {heroCopy.familyLabel}: <span className="text-green-600 font-semibold">{formatCurrency(familyBalance)}</span>
-                  </div>
+
+                {/* Badges */}
+                {!isClassic && highlightedAchievements.length > 0 && (
+                    <div className="flex gap-2 bg-white/10 p-2 rounded-xl backdrop-blur-sm">
+                        <TooltipProvider>
+                            {highlightedAchievements.map(ach => {
+                                const Icon = iconMap[ach.icon] || Star;
+                                return (
+                                    <Tooltip key={ach.id}>
+                                        <TooltipTrigger asChild>
+                                            <div className="p-2 bg-gradient-to-br from-yellow-400/20 to-orange-500/20 rounded-lg border border-white/10 hover:bg-white/20 transition-colors">
+                                                <Icon className="h-5 w-5 text-yellow-300" />
+                                            </div>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" className="bg-slate-900 text-white border-slate-800">
+                                            <p className="font-semibold text-yellow-400">{ach.name}</p>
+                                            <p className="text-xs text-slate-300">{ach.description}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                )
+                            })}
+                        </TooltipProvider>
+                    </div>
                 )}
             </div>
         </div>
-
-        {/* Seção de Progresso */}
-        <div className="space-y-3">
-            {heroCopy.showXp && (
-            <div className="space-y-1">
-                <div className="relative w-full">
-                    <Progress value={xpPercentage} className="h-3" />
-                    {showGlow && (
-                        <motion.div
-                            animate={{ opacity: [0, 1, 0] }}
-                            transition={{ duration: 2, repeat: Infinity }}
-                            className="absolute inset-0 rounded-full"
-                            style={{
-                                boxShadow: `0 0 8px 2px hsl(var(--primary))`,
-                                filter: 'blur(3px)',
-                            }}
-                        />
-                    )}
-                </div>
-                <p className="text-xs text-muted-foreground text-right">{profile.xp} / {xpNeeded(profile.level)} XP</p>
-            </div>
-            )}
-            {!isClassic && highlightedAchievements.length > 0 && (
-                <div className="flex items-center gap-2 pt-2">
-                    <p className="text-xs font-semibold text-muted-foreground">{heroCopy.badgesLabel}:</p>
-                    <TooltipProvider>
-                    {highlightedAchievements.map(ach => {
-                        const Icon = iconMap[ach.icon] || Star;
-                        return (
-                        <Tooltip key={ach.id}>
-                            <TooltipTrigger asChild>
-                                <div className="p-1.5 bg-yellow-400/20 rounded-full">
-                                    <Icon className="h-4 w-4 text-yellow-500" />
-                                </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                            <p className="font-semibold">{ach.nome}</p>
-                            <p className="text-xs">{ach.description}</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        )
-                    })}
-                    </TooltipProvider>
-                </div>
-            )}
-        </div>
-    </div>
-  );
+    );
 }
