@@ -75,12 +75,12 @@ export default function OrcamentosPage() {
         const isEditing = !!editingBudget;
         const method = isEditing ? 'patch' : 'post';
         const url = isEditing ? `/budgets/${editingBudget.id}` : '/budgets';
-        
-        const dataToSend = isEditing 
-            ? { limit: budgetData.limit, rollover: budgetData.rollover } 
+
+        const dataToSend = isEditing
+            ? { limit: budgetData.limit, rollover: budgetData.rollover }
             : {
-                 ...budgetData, 
-                 month: format(selectedDate, 'yyyy-MM') 
+                ...budgetData,
+                month: format(selectedDate, 'yyyy-MM')
             };
 
         try {
@@ -128,7 +128,7 @@ export default function OrcamentosPage() {
         const budgetedIds = new Set(budgets.map(b => b.categoryId));
         return categories.filter(c => !budgetedIds.has(c.id));
     }, [categories, budgets]);
-    
+
     const personalBudgets = useMemo(() => budgets.filter((budget) => !budget.cellBudgetId), [budgets]);
     const familyBudgets = useMemo(() => budgets.filter((budget) => Boolean(budget.cellBudgetId)), [budgets]);
 
@@ -158,30 +158,38 @@ export default function OrcamentosPage() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    <Target className="h-8 w-8 text-primary" />
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10">
+                        <Target className="h-8 w-8 text-primary" />
+                    </div>
                     <div>
-                        <h1 className="text-3xl font-bold font-headline">Meus Orçamentos</h1>
-                        <p className="text-muted-foreground">Defina limites de gastos e acompanhe seu progresso.</p>
+                        <h1 className="text-4xl font-bold font-headline bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+                            Meus Orçamentos
+                        </h1>
+                        <p className="text-muted-foreground mt-1">Defina limites de gastos e acompanhe seu progresso.</p>
                     </div>
                 </div>
                 <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="outline" onClick={() => handleOpenForm()} className="w-full sm:w-auto">
+                        <Button
+                            variant="default"
+                            onClick={() => handleOpenForm()}
+                            className="w-full sm:w-auto shadow-lg shadow-primary/20"
+                        >
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Novo Orçamento
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-lg">
                         <DialogHeader>
-                            <DialogTitle>{editingBudget ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle>
+                            <DialogTitle className="text-2xl">{editingBudget ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle>
                             <DialogDescription>
                                 {editingBudget ? 'Atualize o limite para esta categoria.' : 'Defina um limite de gastos para uma categoria neste mês.'}
                             </DialogDescription>
                         </DialogHeader>
                         <AddBudgetForm
                             budget={editingBudget}
-                            categories={categories} // Passa a lista completa de categorias
-                            budgetsForMonth={budgets} // Passa os orçamentos do mês para lógica de desabilitar
+                            categories={categories}
+                            budgetsForMonth={budgets}
                             onSuccess={handleSaveBudget}
                             onClose={handleCloseForm}
                             isSubmitting={isSubmitting}
@@ -207,8 +215,8 @@ export default function OrcamentosPage() {
                     </Button>
                 ))}
             </div>
-            
-            <BudgetSummaryCard 
+
+            <BudgetSummaryCard
                 selectedMonth={selectedDate}
                 onMonthChange={setSelectedDate}
                 totalBudgeted={summary.totalBudgeted}
@@ -216,47 +224,53 @@ export default function OrcamentosPage() {
             />
 
             <div className="grid gap-4 md:grid-cols-2">
-                <Card>
+                <Card className="shadow-lg bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10">
                     <CardHeader>
-                        <CardTitle>Orçamentos pessoais</CardTitle>
+                        <CardTitle className="flex items-center gap-2">
+                            <PiggyBank className="h-5 w-5 text-primary" />
+                            Orçamentos pessoais
+                        </CardTitle>
                         <CardDescription>Valores sob seu controle direto.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                        <div className="flex items-center justify-between">
-                            <span>Total de categorias</span>
-                            <span className="font-semibold">{personalBudgets.length}</span>
+                    <CardContent className="space-y-3 text-sm">
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <span className="text-muted-foreground">Total de categorias</span>
+                            <span className="font-bold text-lg">{personalBudgets.length}</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span>Limite combinado</span>
-                            <span className="font-semibold">{summary.totalBudgeted.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <span className="text-muted-foreground">Limite combinado</span>
+                            <span className="font-bold text-lg">{summary.totalBudgeted.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
+                <Card className="shadow-lg bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10">
                     <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                         <div>
-                            <CardTitle>Modo Família</CardTitle>
+                            <CardTitle className="flex items-center gap-2">
+                                <Users className="h-5 w-5 text-primary" />
+                                Modo Família
+                            </CardTitle>
                             <CardDescription>Reflete o que foi configurado na família.</CardDescription>
                         </div>
-                        <Button variant="outline" asChild>
+                        <Button variant="outline" size="sm" asChild>
                             <Link href="/dashboard/cells">
                                 <Users className="h-4 w-4 mr-2" />
                                 Abrir painel
                             </Link>
                         </Button>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                        <div className="flex items-center justify-between">
-                            <span>Orçamentos sincronizados</span>
-                            <span className="font-semibold">{familyBudgets.length}</span>
+                    <CardContent className="space-y-3 text-sm">
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <span className="text-muted-foreground">Orçamentos sincronizados</span>
+                            <span className="font-bold text-lg">{familyBudgets.length}</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span>Limite combinado</span>
-                            <span className="font-semibold">{familyTotals.totalBudgeted.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <span className="text-muted-foreground">Limite combinado</span>
+                            <span className="font-bold text-lg">{familyTotals.totalBudgeted.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span>Gasto compartilhado</span>
-                            <span className="font-semibold">{familyTotals.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                            <span className="text-muted-foreground">Gasto compartilhado</span>
+                            <span className="font-bold text-lg">{familyTotals.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -267,14 +281,21 @@ export default function OrcamentosPage() {
                 onEdit={handleOpenForm}
                 onDelete={handleDeleteBudget}
             />
-            
-             {budgets.length === 0 && !isLoading && (
-                 <div className="flex flex-col items-center justify-center gap-4 py-16 text-center rounded-2xl border-2 border-dashed mt-6 bg-card">
-                    <PiggyBank className="h-16 w-16 text-muted-foreground" />
-                    <h3 className='text-lg font-semibold'>Nenhum Orçamento Definido</h3>
-                    <p className="text-muted-foreground">Você ainda não criou nenhum orçamento para {format(selectedDate, 'MMMM', { locale: ptBR })}. <br/> Comece a planejar seus gastos agora mesmo.</p>
-                    <Button variant="outline" size="sm" onClick={() => handleOpenForm()}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
+
+            {budgets.length === 0 && !isLoading && (
+                <div className="flex flex-col items-center justify-center gap-6 py-20 text-center rounded-3xl border-2 border-dashed mt-6 bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm">
+                    <div className="p-6 rounded-full bg-primary/10">
+                        <PiggyBank className="h-16 w-16 text-primary" />
+                    </div>
+                    <div className="space-y-2">
+                        <h3 className='text-2xl font-bold font-headline'>Nenhum Orçamento Definido</h3>
+                        <p className="text-muted-foreground max-w-md">
+                            Você ainda não criou nenhum orçamento para {format(selectedDate, 'MMMM', { locale: ptBR })}. <br />
+                            Comece a planejar seus gastos agora mesmo.
+                        </p>
+                    </div>
+                    <Button size="lg" onClick={() => handleOpenForm()} className="shadow-lg shadow-primary/20">
+                        <PlusCircle className="mr-2 h-5 w-5" />
                         Criar Primeiro Orçamento
                     </Button>
                 </div>

@@ -27,9 +27,9 @@ const METRIC_ENTRIES: Array<{ key: keyof InvestmentMetricSnapshot; label: string
 
 export function InvestmentMetricsCard({ metrics }: InvestmentMetricsCardProps) {
   return (
-    <Card>
+    <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle>Métricas de sucesso</CardTitle>
+        <CardTitle className="text-2xl">Métricas de sucesso</CardTitle>
         <CardDescription>
           Indicadores automáticos para acompanhar adoção, aderência e impacto das sugestões inteligentes.
         </CardDescription>
@@ -38,10 +38,10 @@ export function InvestmentMetricsCard({ metrics }: InvestmentMetricsCardProps) {
         {metrics ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {METRIC_ENTRIES.map((entry) => (
-              <div key={entry.key} className="rounded-lg border p-3">
-                <p className="text-sm font-medium">{entry.label}</p>
-                <p className="mt-1 text-2xl font-semibold">{ratioFormatter(metrics[entry.key])}</p>
-                <p className="text-xs text-muted-foreground">{entry.helper}</p>
+              <div key={entry.key} className="rounded-xl border bg-gradient-to-br from-primary/5 to-primary/0 p-4 hover:shadow-md transition-shadow">
+                <p className="text-sm font-semibold text-muted-foreground">{entry.label}</p>
+                <p className="mt-2 text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">{ratioFormatter(metrics[entry.key])}</p>
+                <p className="text-xs text-muted-foreground mt-1">{entry.helper}</p>
               </div>
             ))}
           </div>

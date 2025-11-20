@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addMonths, format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Loader2, PlusCircle, RefreshCcw, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, PlusCircle, RefreshCcw, AlertTriangle, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -318,6 +318,22 @@ export default function InvestimentosPage() {
     }
   };
 
+  const handleLinkGoal = async (holdingId: string, goalId: string | null) => {
+    try {
+      await api.patch(`/investments/holdings/${holdingId}`, { goalId });
+      toast({ title: 'Holding atualizado!', description: 'Meta vinculada com sucesso.' });
+      await fetchAll();
+    } catch (error) {
+      console.error(error);
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao vincular meta',
+        description: 'Não foi possível atualizar o holding. Tente novamente.',
+      });
+    }
+  };
+
+
   const contributions = performance?.contributions ?? [];
   const contributionsForSelectedMonth = useMemo(
     () => contributions.filter((contribution) => contribution.month === selectedMonth),
@@ -347,34 +363,40 @@ export default function InvestimentosPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold">Investimentos Inteligentes</h1>
-          <p className="text-muted-foreground">
-            Analise o excedente, acompanhe lazer x investimentos e mantenha as contas essenciais de Casa e Mercado sob
-            controle. Não movimentamos dinheiro real: você decide e nós guiamos.
-          </p>
-          <button
-            type="button"
-            className="text-xs font-medium text-primary underline-offset-4 hover:underline"
-            onClick={() => {
-              setHasDismissedOnboarding(false);
-              setIsOnboardingOpen(true);
-            }}
-          >
-            Repersonalizar meu plano
-          </button>
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10">
+            <TrendingUp className="h-8 w-8 text-primary" />
+          </div>
+          <div className="space-y-1">
+            <h1 className="text-4xl font-bold font-headline bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+              Investimentos Inteligentes
+            </h1>
+            <p className="text-muted-foreground">
+              Analise o excedente, acompanhe lazer x investimentos e mantenha as contas essenciais sob controle.
+            </p>
+            <button
+              type="button"
+              className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+              onClick={() => {
+                setHasDismissedOnboarding(false);
+                setIsOnboardingOpen(true);
+              }}
+            >
+              Repersonalizar meu plano
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => changeMonth(-1)}>
+          <Button variant="outline" size="icon" onClick={() => changeMonth(-1)} className="rounded-full">
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-[140px] text-center text-sm font-semibold uppercase text-muted-foreground">
             {monthLabel}
           </div>
-          <Button variant="outline" size="icon" onClick={() => changeMonth(1)}>
+          <Button variant="outline" size="icon" onClick={() => changeMonth(1)} className="rounded-full">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" onClick={() => fetchAll()} disabled={isRefreshing}>
+          <Button variant="outline" size="icon" onClick={() => fetchAll()} disabled={isRefreshing} className="rounded-full">
             {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
           </Button>
         </div>
@@ -647,17 +669,3 @@ export default function InvestimentosPage() {
     </div>
   );
 }
-  const handleLinkGoal = async (holdingId: string, goalId: string | null) => {
-    try {
-      await api.patch(`/investments/holdings/${holdingId}`, { goalId });
-      toast({ title: 'Holding atualizado!', description: 'Meta vinculada com sucesso.' });
-      await fetchAll();
-    } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao vincular meta',
-        description: 'Não foi possível atualizar o holding. Tente novamente.',
-      });
-    }
-  };

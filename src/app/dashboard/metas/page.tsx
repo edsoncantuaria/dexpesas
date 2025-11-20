@@ -117,11 +117,11 @@ export default function MetasPage() {
             setIsSubmitting(false);
         }
     };
-    
-    const handleAddContribution = async (data: { amount: number, fromAccountId: string}) => {
-         if (!contributingGoal) return;
-         setIsSubmitting(true);
-         try {
+
+    const handleAddContribution = async (data: { amount: number, fromAccountId: string }) => {
+        if (!contributingGoal) return;
+        setIsSubmitting(true);
+        try {
             await api.post(`/goals/${contributingGoal.id}/contributions`, data);
             await fetchData();
             toast({
@@ -129,18 +129,18 @@ export default function MetasPage() {
                 description: `Sua contribuição para "${contributingGoal.name}" foi registrada.`,
             });
             handleCloseContribution();
-         } catch (error: any) {
+        } catch (error: any) {
             const message = error.response?.data?.message || 'Não foi possível adicionar a contribuição.';
             toast({
                 variant: 'destructive',
                 title: `Erro ao contribuir`,
                 description: message,
             });
-         } finally {
+        } finally {
             setIsSubmitting(false);
-         }
+        }
     };
-    
+
     const handleFinalizeGoal = async (data: { amount: number, finalizationType: 'purchase' | 'account', destinationAccountId?: string, categoryId?: string, remainingAmountAction?: 'keep' | 'rescue' }) => {
         if (!finalizingGoal) return;
         setIsSubmitting(true);
@@ -153,7 +153,7 @@ export default function MetasPage() {
             });
             handleCloseFinalize();
         } catch (error: any) {
-             const message = error.response?.data?.message || 'Não foi possível finalizar a meta.';
+            const message = error.response?.data?.message || 'Não foi possível finalizar a meta.';
             toast({ variant: 'destructive', title: 'Erro ao Finalizar', description: message });
         } finally {
             setIsSubmitting(false);
@@ -202,20 +202,27 @@ export default function MetasPage() {
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                 <div>
-                    <h1 className="text-3xl font-bold font-headline">Seus Objetivos</h1>
-                    <p className="text-muted-foreground">Transforme seus sonhos em realidade, um passo de cada vez.</p>
+                <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10">
+                        <Target className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-4xl font-bold font-headline bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+                            Seus Objetivos
+                        </h1>
+                        <p className="text-muted-foreground mt-1">Transforme seus sonhos em realidade, um passo de cada vez.</p>
+                    </div>
                 </div>
                 <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="outline" onClick={() => handleOpenForm()} className="h-8 px-3">
+                        <Button onClick={() => handleOpenForm()} className="shadow-lg shadow-primary/20">
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Novo Objetivo
                         </Button>
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>{editingGoal ? 'Editar Objetivo' : 'Novo Objetivo Financeiro'}</DialogTitle>
+                            <DialogTitle className="text-2xl">{editingGoal ? 'Editar Objetivo' : 'Novo Objetivo Financeiro'}</DialogTitle>
                             <DialogDescription>
                                 {editingGoal ? 'Atualize os detalhes do seu objetivo.' : 'Defina uma meta clara e comece a poupar para alcançá-la.'}
                             </DialogDescription>
@@ -244,12 +251,18 @@ export default function MetasPage() {
                     />
 
                     {goals.length === 0 && !isLoading && (
-                        <div className="flex flex-col items-center justify-center gap-4 py-16 text-center rounded-2xl border-2 border-dashed mt-6 bg-muted/20">
-                            <Target className="h-16 w-16 text-muted-foreground" />
-                            <h3 className='text-xl font-semibold'>Qual é a sua próxima grande conquista?</h3>
-                            <p className="text-muted-foreground max-w-sm">Definir objetivos é o primeiro passo para transformar sonhos em realidade. Crie sua primeira meta agora mesmo.</p>
-                            <Button variant="outline" size="sm" onClick={() => handleOpenForm()}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
+                        <div className="flex flex-col items-center justify-center gap-6 py-20 text-center rounded-3xl border-2 border-dashed bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm mt-6">
+                            <div className="p-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/10">
+                                <Target className="h-16 w-16 text-primary" />
+                            </div>
+                            <div className="space-y-2">
+                                <h3 className='text-2xl font-bold font-headline'>Qual é a sua próxima grande conquista?</h3>
+                                <p className="text-muted-foreground max-w-md">
+                                    Definir objetivos é o primeiro passo para transformar sonhos em realidade. Crie sua primeira meta agora mesmo.
+                                </p>
+                            </div>
+                            <Button size="lg" onClick={() => handleOpenForm()} className="shadow-lg shadow-primary/20">
+                                <PlusCircle className="mr-2 h-5 w-5" />
                                 Criar Primeiro Objetivo
                             </Button>
                         </div>
@@ -260,22 +273,22 @@ export default function MetasPage() {
                     {user.enableGoalProjection && (
                         <Card>
                             <CardHeader className="flex flex-row items-center gap-3">
-                                <BrainCircuit className="h-6 w-6 text-primary"/>
+                                <BrainCircuit className="h-6 w-6 text-primary" />
                                 <div>
                                     <CardTitle>Simulação de Metas</CardTitle>
                                     <CardDescription>Projete cenários e acelere seus sonhos.</CardDescription>
                                 </div>
                             </CardHeader>
                             <CardContent>
-                            <GoalProjection goals={goals.filter(g => g.status === 'IN_PROGRESS')} />
+                                <GoalProjection goals={goals.filter(g => g.status === 'IN_PROGRESS')} />
                             </CardContent>
                         </Card>
                     )}
                 </div>
             </div>
-            
+
             {contributingGoal && (
-                 <Dialog open={!!contributingGoal} onOpenChange={(isOpen) => !isOpen && handleCloseContribution()}>
+                <Dialog open={!!contributingGoal} onOpenChange={(isOpen) => !isOpen && handleCloseContribution()}>
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>Contribuir para "{contributingGoal.name}"</DialogTitle>
@@ -284,11 +297,11 @@ export default function MetasPage() {
                             </DialogDescription>
                         </DialogHeader>
                         <AddContributionForm
-                           goal={contributingGoal}
-                           accounts={accounts.filter(a => a.tipo === 'corrente' || a.tipo === 'poupanca')}
-                           onSuccess={handleAddContribution}
-                           onClose={handleCloseContribution}
-                           isSubmitting={isSubmitting}
+                            goal={contributingGoal}
+                            accounts={accounts.filter(a => a.tipo === 'corrente' || a.tipo === 'poupanca')}
+                            onSuccess={handleAddContribution}
+                            onClose={handleCloseContribution}
+                            isSubmitting={isSubmitting}
                         />
                     </DialogContent>
                 </Dialog>
@@ -306,7 +319,7 @@ export default function MetasPage() {
                 />
             )}
 
-             {rescuingGoal && (
+            {rescuingGoal && (
                 <RescueGoalDialog
                     isOpen={!!rescuingGoal}
                     onClose={handleCloseRescue}

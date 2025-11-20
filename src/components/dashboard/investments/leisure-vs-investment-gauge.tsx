@@ -44,9 +44,9 @@ export function LeisureVsInvestmentGauge({
   const leisureProgress = leisureSuggested > 0 ? Math.min(100, (leisureSpent / leisureSuggested) * 100) : 0;
 
   return (
-    <Card className="h-full">
+    <Card className="h-full shadow-lg">
       <CardHeader>
-        <CardTitle>Lazer vs. Investimentos</CardTitle>
+        <CardTitle className="text-2xl">Lazer vs. Investimentos</CardTitle>
         <CardDescription>Compare o que foi investido e gasto em lazer com o plano sugerido.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -72,7 +72,7 @@ export function LeisureVsInvestmentGauge({
           </Progress>
         </div>
 
-        <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-3">
+        <div className="rounded-xl border bg-gradient-to-br from-primary/5 to-primary/0 p-4 text-sm space-y-3">
           {analysis ? (
             <p>
               Disponível após reservas: <strong>{currencyFormatter.format(analysis.available)}</strong>. A inteligência

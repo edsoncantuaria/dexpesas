@@ -16,6 +16,7 @@ import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import type { InvestmentPriority } from '@/lib/definitions';
 
 type OnboardingPayload = {
@@ -143,7 +144,7 @@ export function InvestmentOnboardingDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Personalize seu plano</DialogTitle>
+          <DialogTitle className="text-2xl">Personalize seu plano</DialogTitle>
           <DialogDescription>
             Usamos esses dados para sugerir quanto investir, quanto reservar para lazer e quais alertas inteligentes
             enviar. Não movimentamos dinheiro real por você.
@@ -184,22 +185,29 @@ export function InvestmentOnboardingDialog({
 
           <div className="space-y-2">
             <Label>Preset rápido</Label>
-            <div className="grid gap-2 sm:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-4">
               {(Object.keys(PRESETS) as Array<'conservador' | 'balanceado' | 'agressivo'>).map((key) => (
                 <Button
                   key={key}
                   type="button"
                   variant={selectedPreset === key ? 'default' : 'outline'}
-                  className="flex flex-col items-start gap-1 text-left"
+                  className={cn(
+                    "flex flex-col items-start gap-1 text-left h-auto py-3",
+                    selectedPreset === key && "shadow-lg shadow-primary/20"
+                  )}
                   onClick={() => setSelectedPreset(key)}
                 >
                   <span className="font-semibold">{PRESETS[key].label}</span>
-                  <span className="text-xs text-muted-foreground">{PRESETS[key].description}</span>
+                  <span className="text-xs text-muted-foreground line-clamp-2">{PRESETS[key].description}</span>
                 </Button>
               ))}
               <Button
                 type="button"
                 variant={selectedPreset === 'custom' ? 'default' : 'outline'}
+                className={cn(
+                  "h-auto py-3",
+                  selectedPreset === 'custom' && "shadow-lg shadow-primary/20"
+                )}
                 onClick={() => setSelectedPreset('custom')}
               >
                 Personalizar
@@ -283,7 +291,7 @@ export function InvestmentOnboardingDialog({
             />
           </div>
 
-          <div className="rounded-lg bg-muted/40 p-3 text-sm">
+          <div className="rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-4 text-sm">
             {monthlyIncomeNumber > 0 ? (
               <p>
                 Com essa configuração, o planner vai buscar <strong>{currencyFormatter.format(projectedInvestment)}</strong> por mês

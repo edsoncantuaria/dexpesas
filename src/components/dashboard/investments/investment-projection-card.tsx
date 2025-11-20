@@ -30,10 +30,10 @@ export function InvestmentProjectionCard({ analysis }: InvestmentProjectionCardP
   const projectedLeisure = Math.max(0, suggestedLeisure - hypothetical);
 
   return (
-    <Card>
+    <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle>Modo Projeção</CardTitle>
-        <CardDescription>Responda rapidamente “E se eu ajustar o lazer este mês?”</CardDescription>
+        <CardTitle className="text-2xl">Modo Projeção</CardTitle>
+        <CardDescription>Responda rapidamente "E se eu ajustar o lazer este mês?"</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -54,17 +54,17 @@ export function InvestmentProjectionCard({ analysis }: InvestmentProjectionCardP
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border p-3">
-            <p className="text-xs uppercase text-muted-foreground">Investimento projetado</p>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(projectedInvestment)}</p>
-            <p className="text-xs text-muted-foreground">
+          <div className="rounded-xl border bg-gradient-to-br from-blue-500/10 to-cyan-500/5 border-blue-500/20 p-4">
+            <p className="text-xs uppercase font-semibold text-muted-foreground">Investimento projetado</p>
+            <p className="text-3xl font-bold mt-2 bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{currencyFormatter.format(projectedInvestment)}</p>
+            <p className="text-xs text-muted-foreground mt-1">
               Base atual: {currencyFormatter.format(suggestedInvestment)}
             </p>
           </div>
-          <div className="rounded-lg border p-3">
-            <p className="text-xs uppercase text-muted-foreground">Lazer restante</p>
-            <p className="text-2xl font-semibold">{currencyFormatter.format(projectedLeisure)}</p>
-            <p className="text-xs text-muted-foreground">Base atual: {currencyFormatter.format(suggestedLeisure)}</p>
+          <div className="rounded-xl border bg-gradient-to-br from-amber-500/10 to-yellow-500/5 border-amber-500/20 p-4">
+            <p className="text-xs uppercase font-semibold text-muted-foreground">Lazer restante</p>
+            <p className="text-3xl font-bold mt-2 bg-gradient-to-r from-amber-600 to-yellow-600 bg-clip-text text-transparent">{currencyFormatter.format(projectedLeisure)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Base atual: {currencyFormatter.format(suggestedLeisure)}</p>
           </div>
         </div>
       </CardContent>

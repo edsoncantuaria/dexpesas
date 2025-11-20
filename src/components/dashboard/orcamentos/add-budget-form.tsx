@@ -17,15 +17,16 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { motion } from 'framer-motion';
 
 type AddBudgetFormProps = {
-    budget?: Budget | null;
-    categories: Category[];
-    budgetsForMonth: Budget[];
-    onSuccess: (budget: Omit<Budget, 'id' | 'userId' | 'month' | 'spent' | 'category' | 'originalLimit' | 'rolloverAmount'> & { id?: string }) => void;
-    onClose: () => void;
-    isSubmitting: boolean;
-    user: User | null;
+  budget?: Budget | null;
+  categories: Category[];
+  budgetsForMonth: Budget[];
+  onSuccess: (budget: Omit<Budget, 'id' | 'userId' | 'month' | 'spent' | 'category' | 'originalLimit' | 'rolloverAmount'> & { id?: string }) => void;
+  onClose: () => void;
+  isSubmitting: boolean;
+  user: User | null;
 };
 
 export function AddBudgetForm({ budget, categories, budgetsForMonth, onSuccess, onClose, isSubmitting, user }: AddBudgetFormProps) {
@@ -50,7 +51,6 @@ export function AddBudgetForm({ budget, categories, budgetsForMonth, onSuccess, 
   });
 
   useEffect(() => {
-    // Popula o formulário quando os dados necessários estiverem disponíveis.
     if (isEditing && budget) {
       form.reset({
         limit: budget.originalLimit,
@@ -58,94 +58,94 @@ export function AddBudgetForm({ budget, categories, budgetsForMonth, onSuccess, 
         rollover: budget.rollover,
       });
     } else {
-        form.reset({
-            limit: 0,
-            categoryId: '',
-            rollover: false,
-        })
+      form.reset({
+        limit: 0,
+        categoryId: '',
+        rollover: false,
+      })
     }
   }, [budget, isEditing, form]);
 
   const handleSuggestBudget = async () => {
     const categoryId = form.getValues('categoryId');
     if (!categoryId) {
-        toast({ variant: 'destructive', title: 'Selecione uma categoria primeiro.' });
-        return;
+      toast({ variant: 'destructive', title: 'Selecione uma categoria primeiro.' });
+      return;
     }
-    
+
     setIsSuggesting(true);
     setSuggestion(null);
     try {
-        const categoryName = categories.find(c => c.id === categoryId)?.nome;
-        const response = await api.post('/ai/suggest-budget', { categoryId, categoryName });
-        const { suggestedAmount, justification } = response.data;
-        
-        form.setValue('limit', suggestedAmount, { shouldValidate: true, shouldDirty: true });
-        setSuggestion({ amount: suggestedAmount, justification });
-        
-        toast({ title: "Sugestão da IA aplicada!", description: `Valor de ${suggestedAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} sugerido.` });
+      const categoryName = categories.find(c => c.id === categoryId)?.nome;
+      const response = await api.post('/ai/suggest-budget', { categoryId, categoryName });
+      const { suggestedAmount, justification } = response.data;
+
+      form.setValue('limit', suggestedAmount, { shouldValidate: true, shouldDirty: true });
+      setSuggestion({ amount: suggestedAmount, justification });
+
+      toast({ title: "Sugestão da IA aplicada!", description: `Valor de ${suggestedAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} sugerido.` });
 
     } catch (error) {
-        toast({ variant: "destructive", title: "Erro na IA", description: "Não foi possível gerar uma sugestão." });
+      toast({ variant: "destructive", title: "Erro na IA", description: "Não foi possível gerar uma sugestão." });
     } finally {
-        setIsSuggesting(false);
+      setIsSuggesting(false);
     }
   };
 
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     if (!isEditing) {
-        const isDuplicate = budgetsForMonth.some(b => b.categoryId === values.categoryId);
-        if (isDuplicate) {
-            form.setError('categoryId', { message: 'Já existe um orçamento para esta categoria neste mês.'});
-            return;
-        }
+      const isDuplicate = budgetsForMonth.some(b => b.categoryId === values.categoryId);
+      if (isDuplicate) {
+        form.setError('categoryId', { message: 'Já existe um orçamento para esta categoria neste mês.' });
+        return;
+      }
     }
     const budgetData = isEditing ? { ...values, id: budget.id } : values;
     onSuccess(budgetData);
   }
-  
+
   const categoryLabel = isEditing ? budget?.category?.label || budget?.category?.nome : '';
 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        
+
         {isEditing ? (
-            <FormItem>
-              <FormLabel>Categoria</FormLabel>
-              <FormControl>
-                 <Input value={categoryLabel} disabled />
-              </FormControl>
-            </FormItem>
+          <FormItem>
+            <FormLabel className="text-sm font-medium text-muted-foreground">Categoria</FormLabel>
+            <FormControl>
+              <Input value={categoryLabel} disabled className="bg-muted/50" />
+            </FormControl>
+          </FormItem>
         ) : (
-            <FormField
-                control={form.control}
-                name="categoryId"
-                render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Categoria</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Selecione uma categoria para orçar" />
-                        </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                        {categories.filter(c => !budgetsForMonth.some(b => b.categoryId === c.id)).map((cat) => (
-                            <SelectItem 
-                            key={cat.id} 
-                            value={cat.id}
-                            >
-                            {cat.nome}
-                            </SelectItem>
-                        ))}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                </FormItem>
-                )}
-            />
+          <FormField
+            control={form.control}
+            name="categoryId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-sm font-medium text-muted-foreground">Categoria</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="h-12 text-base">
+                      <SelectValue placeholder="Selecione uma categoria para orçar" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {categories.filter(c => !budgetsForMonth.some(b => b.categoryId === c.id)).map((cat) => (
+                      <SelectItem
+                        key={cat.id}
+                        value={cat.id}
+                      >
+                        {cat.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         )}
 
 
@@ -154,17 +154,36 @@ export function AddBudgetForm({ budget, categories, budgetsForMonth, onSuccess, 
           name="limit"
           render={({ field }) => (
             <FormItem>
-                <div className="flex justify-between items-center">
-                    <FormLabel>Limite de Gasto Mensal</FormLabel>
-                    {user?.enableBudgetSuggestion && !isEditing && (
-                        <Button type="button" variant="link" size="sm" onClick={handleSuggestBudget} disabled={isSuggesting || !form.watch('categoryId')}>
-                           {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4"/>}
-                            Sugerir com IA
-                        </Button>
-                    )}
-                </div>
+              <div className="flex justify-between items-center mb-2">
+                <FormLabel className="text-sm font-medium text-muted-foreground">Limite de Gasto Mensal</FormLabel>
+                {user?.enableBudgetSuggestion && !isEditing && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleSuggestBudget}
+                    disabled={isSuggesting || !form.watch('categoryId')}
+                    className="h-8 text-xs"
+                  >
+                    {isSuggesting ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                    Sugerir com IA
+                  </Button>
+                )}
+              </div>
               <FormControl>
-                <CurrencyInput value={field.value} onValueChange={field.onChange} />
+                <div className="relative">
+                  <motion.div
+                    initial={{ scale: 0.95 }}
+                    animate={{ scale: 1 }}
+                    className="text-center py-6 px-4 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border-2 border-primary/20"
+                  >
+                    <CurrencyInput
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      className="text-4xl font-bold text-center bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                    />
+                  </motion.div>
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -172,48 +191,53 @@ export function AddBudgetForm({ budget, categories, budgetsForMonth, onSuccess, 
         />
 
         {suggestion && (
-            <Alert>
-                <Sparkles className="h-4 w-4"/>
-                <AlertDescription>
-                   {suggestion.justification}
-                </AlertDescription>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <Alert className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
+              <Sparkles className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                {suggestion.justification}
+              </AlertDescription>
             </Alert>
+          </motion.div>
         )}
-        
+
         <FormField
-            control={form.control}
-            name="rollover"
-            render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                    <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                             <FormLabel>Acumular saldo para o próximo mês?</FormLabel>
-                             <TooltipProvider>
-                                <Tooltip>
-                                    <TooltipTrigger asChild><button type="button"><Info className="h-4 w-4 text-muted-foreground"/></button></TooltipTrigger>
-                                    <TooltipContent>
-                                        <p className="max-w-xs">Se ativado, o valor que sobrar (ou faltar) <br />deste orçamento será somado ao do próximo mês.</p>
-                                    </TooltipContent>
-                                </Tooltip>
-                             </TooltipProvider>
-                        </div>
-                    </div>
-                    <FormControl>
-                        <Switch
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                        />
-                    </FormControl>
-                </FormItem>
-            )}
+          control={form.control}
+          name="rollover"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center justify-between rounded-xl border bg-card/50 p-4 shadow-sm">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <FormLabel className="text-sm font-medium">Acumular saldo para o próximo mês?</FormLabel>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild><button type="button"><Info className="h-4 w-4 text-muted-foreground" /></button></TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">Se ativado, o valor que sobrar (ou faltar) <br />deste orçamento será somado ao do próximo mês.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+            </FormItem>
+          )}
         />
 
 
-        <div className="flex justify-end pt-4 gap-2">
+        <div className="flex justify-end pt-4 gap-3">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" disabled={isSubmitting} className="min-w-[140px]">
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSubmitting ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Criar Orçamento'}
           </Button>

@@ -11,8 +11,12 @@ type LoadingScreenProps = {
 
 export function LoadingScreen({ className, message }: LoadingScreenProps) {
   return (
-    <div className={cn('flex flex-1 items-center justify-center p-8', className)}>
-      <CloudiveLoading message={message ?? 'Preparando sua jornada…'} />
+    <div className={cn('flex flex-1 items-center justify-center', className)}>
+      <CloudiveLoading
+        message={message ?? 'Organizando suas finanças…'}
+        withSkeleton={true}
+        fullscreen={false}
+      />
     </div>
   );
 }

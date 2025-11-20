@@ -27,19 +27,19 @@ const classes = [
 
 export function InvestmentEducationCard() {
   return (
-    <Card>
+    <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle>Classes de ativos</CardTitle>
+        <CardTitle className="text-2xl">Classes de ativos</CardTitle>
         <CardDescription>Conteúdo rápido para validar se o rendimento faz sentido.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {classes.map((item) => (
-          <div key={item.key} className="rounded-lg border p-3">
+          <div key={item.key} className="rounded-xl border bg-gradient-to-br from-primary/5 to-primary/0 p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between gap-2">
-              <p className="font-semibold">{item.label}</p>
-              <Badge variant="outline">{item.badge}</Badge>
+              <p className="font-semibold text-lg">{item.label}</p>
+              <Badge variant="secondary" className="bg-gradient-to-r from-primary/20 to-primary/10">{item.badge}</Badge>
             </div>
-            <p className="text-sm text-muted-foreground">{item.description}</p>
+            <p className="text-sm text-muted-foreground mt-2">{item.description}</p>
           </div>
         ))}
         <p className="text-xs text-muted-foreground">

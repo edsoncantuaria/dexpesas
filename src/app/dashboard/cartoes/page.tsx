@@ -84,7 +84,7 @@ export default function CartoesPage() {
             setIsSubmitting(false);
         }
     };
-    
+
     const handleDeleteCard = async (cardId: string) => {
         const cardToDelete = cards.find(c => c.id === cardId);
         if (cardToDelete) {
@@ -109,25 +109,35 @@ export default function CartoesPage() {
     if (isLoading) {
         return <LoadingScreen />
     }
-    
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold font-headline">Cartões</h1>
-                    <p className="text-muted-foreground">Adicione, edite e visualize seus cartões de crédito.</p>
+                <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10">
+                        <CreditCard className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-4xl font-bold font-headline bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+                            Cartões
+                        </h1>
+                        <p className="text-muted-foreground mt-1">Gerencie seus cartões de crédito e acompanhe faturas.</p>
+                    </div>
                 </div>
                 {isMobile ? (
                     <Sheet open={isFormOpen} onOpenChange={handleFormOpenChange}>
                         <SheetTrigger asChild>
-                            <Button onClick={() => handleOpenForm()} className="w-full sm:w-auto">
+                            <Button
+                                onClick={() => handleOpenForm()}
+                                className="w-full sm:w-auto shadow-lg shadow-primary/20"
+                            >
                                 <PlusCircle className="mr-2 h-4 w-4" />
                                 Novo Cartão
                             </Button>
                         </SheetTrigger>
                         <SheetContent side="bottom" className="h-[90vh] overflow-y-auto sm:max-w-lg">
                             <SheetHeader className="pb-4">
-                                <SheetTitle>{editingCard ? 'Editar Cartão' : 'Adicionar Novo Cartão'}</SheetTitle>
+                                <SheetTitle className="text-2xl">{editingCard ? 'Editar Cartão' : 'Adicionar Novo Cartão'}</SheetTitle>
                                 <SheetDescription>
                                     {editingCard ? 'Atualize as informações do seu cartão.' : 'Preencha as informações para adicionar um novo cartão.'}
                                 </SheetDescription>
@@ -145,14 +155,17 @@ export default function CartoesPage() {
                 ) : (
                     <Dialog open={isFormOpen} onOpenChange={handleFormOpenChange}>
                         <DialogTrigger asChild>
-                            <Button onClick={() => handleOpenForm()} className="w-full sm:w-auto">
+                            <Button
+                                onClick={() => handleOpenForm()}
+                                className="w-full sm:w-auto shadow-lg shadow-primary/20"
+                            >
                                 <PlusCircle className="mr-2 h-4 w-4" />
                                 Novo Cartão
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-lg">
                             <DialogHeader>
-                                <DialogTitle>{editingCard ? 'Editar Cartão' : 'Adicionar Novo Cartão'}</DialogTitle>
+                                <DialogTitle className="text-2xl">{editingCard ? 'Editar Cartão' : 'Adicionar Novo Cartão'}</DialogTitle>
                                 <DialogDescription>
                                     {editingCard ? 'Atualize as informações do seu cartão.' : 'Preencha as informações para adicionar um novo cartão.'}
                                 </DialogDescription>
@@ -168,7 +181,7 @@ export default function CartoesPage() {
                 )}
             </div>
 
-            <CardList 
+            <CardList
                 cards={cards}
                 onEdit={handleOpenForm}
                 onDelete={handleDeleteCard}

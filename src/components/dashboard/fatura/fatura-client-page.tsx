@@ -28,7 +28,7 @@ interface FaturaClientPageProps {
 export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
   const router = useRouter();
   const { openForm, setEditingTransaction } = useTransactionForm();
-  
+
   const [card, setCard] = useState<CardType | undefined>();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [futureInstallments, setFutureInstallments] = useState<Transaction[]>([]);
@@ -38,39 +38,39 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
-  
+
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
-    text: '', categories: [], accounts: [], cards: [], methods: [], type: 'despesa',
+    text: '', categories: [], accounts: [], cards: [], methods: [], tags: [], type: 'despesa',
   });
 
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
     try {
-        const [cardRes, transRes, futureRes, accRes, catRes] = await Promise.all([
-            api.get(`/cards/${cardId}`),
-            api.get(`/transactions?cardId=${cardId}&includePending=true`), // Sempre busca todas
-            api.get(`/cards/${cardId}/future-installments`),
-            api.get('/accounts'),
-            api.get('/categories'),
-        ]);
+      const [cardRes, transRes, futureRes, accRes, catRes] = await Promise.all([
+        api.get(`/cards/${cardId}`),
+        api.get(`/transactions?cardId=${cardId}&includePending=true`), // Sempre busca todas
+        api.get(`/cards/${cardId}/future-installments`),
+        api.get('/accounts'),
+        api.get('/categories'),
+      ]);
 
-        if (cardRes.data) {
-            setCard(cardRes.data);
-            setTransactions(transRes.data);
-            setFutureInstallments(futureRes.data);
-            setAccounts(accRes.data);
-            setCategories(catRes.data);
-        } else {
-             toast({ variant: 'destructive', title: 'Cartão não encontrado'});
-             router.push('/dashboard/cartoes');
-        }
-    } catch (error) {
-        toast({ variant: 'destructive', title: 'Erro ao carregar dados da fatura' });
+      if (cardRes.data) {
+        setCard(cardRes.data);
+        setTransactions(transRes.data);
+        setFutureInstallments(futureRes.data);
+        setAccounts(accRes.data);
+        setCategories(catRes.data);
+      } else {
+        toast({ variant: 'destructive', title: 'Cartão não encontrado' });
         router.push('/dashboard/cartoes');
+      }
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro ao carregar dados da fatura' });
+      router.push('/dashboard/cartoes');
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   }, [cardId, router, toast]);
 
@@ -79,14 +79,14 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
   }, [fetchData]);
 
   useEffect(() => {
-      const handleTransactionUpdate = () => fetchData();
-      window.addEventListener('transaction-updated', handleTransactionUpdate);
-      return () => {
-          window.removeEventListener('transaction-updated', handleTransactionUpdate);
-      };
+    const handleTransactionUpdate = () => fetchData();
+    window.addEventListener('transaction-updated', handleTransactionUpdate);
+    return () => {
+      window.removeEventListener('transaction-updated', handleTransactionUpdate);
+    };
   }, [fetchData]);
 
-    const { invoiceTransactions } = useMemo(() => {
+  const { invoiceTransactions } = useMemo(() => {
     if (!card) return { invoiceTransactions: [] };
 
     // A data de referência para a fatura é sempre o mês selecionado pelo usuário.
@@ -98,35 +98,35 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
 
     const creditTransactions = filtered.filter(t => t.metodoPagamento === 'credito' || t.isInvoicePayment);
 
-    return { 
-        invoiceTransactions: creditTransactions.sort((a,b) => new Date(b.data).getTime() - new Date(a.data).getTime()),
+    return {
+      invoiceTransactions: creditTransactions.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()),
     };
   }, [transactions, card, selectedMonth]);
-  
+
   const { faturaTotal, valorPago, saldoDevedor } = useMemo(() => {
-     const total = invoiceTransactions.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + Number(t.valor), 0);
-     const pago = invoiceTransactions.filter(t => t.isInvoicePayment).reduce((acc, t) => acc + Number(t.valor), 0);
-     return { faturaTotal: total, valorPago: pago, saldoDevedor: total - pago };
+    const total = invoiceTransactions.filter(t => t.tipo === 'despesa').reduce((acc, t) => acc + Number(t.valor), 0);
+    const pago = invoiceTransactions.filter(t => t.isInvoicePayment).reduce((acc, t) => acc + Number(t.valor), 0);
+    return { faturaTotal: total, valorPago: pago, saldoDevedor: total - pago };
   }, [invoiceTransactions]);
-  
-   const limiteDisponivel = card ? Number(card.availableLimit ?? (Number(card.limite) - Number(card.currentInvoiceAmount ?? 0))) : 0;
+
+  const limiteDisponivel = card ? Number(card.availableLimit ?? (Number(card.limite) - Number(card.currentInvoiceAmount ?? 0))) : 0;
 
 
   const handleOpenForm = (transaction?: Transaction) => {
     setEditingTransaction(transaction || null);
     openForm();
   };
-  
+
   const handleDeleteTransaction = async (transactionId: string) => {
     try {
-        await api.delete(`/transactions/${transactionId}`);
-        await fetchData();
-        toast({ title: 'Transação excluída!', variant: 'destructive' });
-    } catch(error) {
-        toast({ variant: 'destructive', title: 'Erro ao excluir transação' });
+      await api.delete(`/transactions/${transactionId}`);
+      await fetchData();
+      toast({ title: 'Transação excluída!', variant: 'destructive' });
+    } catch (error) {
+      toast({ variant: 'destructive', title: 'Erro ao excluir transação' });
     }
   };
-  
+
   const handlePayment = async (amount: number, accountId: string, paymentDate: Date) => {
     if (!card) return;
     try {
@@ -134,9 +134,9 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
       await fetchData();
       toast({ title: 'Pagamento Registrado!', description: `O pagamento da fatura do cartão ${card.nome} foi registrado.` });
       setIsPayDialogOpen(false);
-    } catch(error: any) {
-       const message = error.response?.data?.message || 'Não foi possível registrar o pagamento.';
-       toast({ variant: 'destructive', title: 'Erro ao registrar pagamento', description: message });
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Não foi possível registrar o pagamento.';
+      toast({ variant: 'destructive', title: 'Erro ao registrar pagamento', description: message });
     }
   };
 
@@ -155,115 +155,134 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => router.back()}>
-               <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold font-headline">{card.nome}</h1>
-              <p className="text-muted-foreground">Fatura e transações do cartão.</p>
-            </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.back()}
+            className="rounded-full hover:bg-primary/10 transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-4xl font-bold font-headline bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+              {card.nome}
+            </h1>
+            <p className="text-muted-foreground mt-1">Fatura e transações do cartão.</p>
+          </div>
         </div>
         <div className="flex w-full sm:w-auto items-center gap-2">
-            <Button onClick={() => openForm()} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Adicionar Despesa
-            </Button>
+          <Button
+            onClick={() => openForm()}
+            className="w-full sm:w-auto shadow-lg shadow-primary/20"
+          >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Adicionar Despesa
+          </Button>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
-            <FaturaSummaryCard
-                card={card}
-                selectedMonth={selectedMonth}
-                onMonthChange={setSelectedMonth}
-                faturaTotal={faturaTotal}
-                valorPago={valorPago}
-                saldoDevedor={saldoDevedor}
-                onPayBill={() => setIsPayDialogOpen(true)}
-            />
+          <FaturaSummaryCard
+            card={card}
+            selectedMonth={selectedMonth}
+            onMonthChange={setSelectedMonth}
+            faturaTotal={faturaTotal}
+            valorPago={valorPago}
+            saldoDevedor={saldoDevedor}
+            onPayBill={() => setIsPayDialogOpen(true)}
+          />
         </div>
-         <div className="lg:col-span-1">
-            <CardLimitStatus
-                totalLimit={Number(card.limite)}
-                availableLimit={limiteDisponivel}
-                bestDayToBuy={card.bestDayToBuy}
-            />
+        <div className="lg:col-span-1">
+          <CardLimitStatus
+            totalLimit={Number(card.limite)}
+            availableLimit={limiteDisponivel}
+            bestDayToBuy={card.bestDayToBuy}
+          />
         </div>
       </div>
-      
-      
+
+
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold font-headline">Transações da Fatura</h2>
-             <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-                <SheetTrigger asChild>
-                    <Button variant="outline" size="sm">
-                        <Filter className="mr-2 h-4 w-4" />
-                        Filtrar
-                    </Button>
-                </SheetTrigger>
-                <SheetContent className="w-full sm:max-w-sm">
-                    <TransactionFilters 
-                        accounts={[]} cards={[]} categories={categories} tags={[]}
-                        currentFilters={filters} onFilterChange={setFilters}
-                    />
-                </SheetContent>
-            </Sheet>
+          <h2 className="text-2xl font-bold font-headline">Transações da Fatura</h2>
+          <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Filter className="mr-2 h-4 w-4" />
+                Filtrar
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-full sm:max-w-sm">
+              <TransactionFilters
+                accounts={[]} cards={[]} categories={categories} tags={[]}
+                currentFilters={filters} onFilterChange={setFilters}
+              />
+            </SheetContent>
+          </Sheet>
         </div>
-         {filteredTransactions.filter(t => t.tipo === 'despesa').length === 0 ? (
-             <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-                <Receipt className="h-16 w-16 text-muted-foreground" />
-                <h3 className='text-lg font-semibold'>Nenhuma despesa nesta fatura</h3>
-                <p className="text-muted-foreground">Não há transações de despesa para este mês. <br/> Que tal adicionar uma agora?</p>
-                <Button variant="outline" size="sm" onClick={() => openForm()}>
-                    Adicionar Despesa
-                </Button>
+        {filteredTransactions.filter(t => t.tipo === 'despesa').length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-6 py-20 text-center rounded-3xl border-2 border-dashed bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm">
+            <div className="p-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/10">
+              <Receipt className="h-16 w-16 text-primary" />
             </div>
-         ) : (
-            <>
-                <div className="block md:hidden">
-                    <TransactionMobileList
-                        data={filteredTransactions.filter(t => t.tipo === 'despesa')} 
-                        onEdit={handleOpenForm}
-                        onDelete={handleDeleteTransaction}
-                        onTogglePaidStatus={() => {}}
-                        accounts={accounts}
-                        cards={[card]}
-                    />
-                </div>
-                <div className="hidden md:block">
-                    <TransactionsTable 
-                        data={filteredTransactions.filter(t => t.tipo === 'despesa')} 
-                        onEdit={handleOpenForm}
-                        onDelete={handleDeleteTransaction}
-                        onTogglePaidStatus={() => {}}
-                        accounts={accounts}
-                        cards={[card]}
-                    />
-                </div>
-            </>
-         )}
+            <div className="space-y-2">
+              <h3 className='text-2xl font-bold font-headline'>Nenhuma despesa nesta fatura</h3>
+              <p className="text-muted-foreground max-w-md">
+                Não há transações de despesa para este mês. <br /> Que tal adicionar uma agora?
+              </p>
+            </div>
+            <Button size="lg" onClick={() => openForm()} className="shadow-lg shadow-primary/20">
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Adicionar Despesa
+            </Button>
+          </div>
+        ) : (
+          <>
+            <div className="block md:hidden">
+              <TransactionMobileList
+                data={filteredTransactions.filter(t => t.tipo === 'despesa')}
+                onEdit={handleOpenForm}
+                onDelete={handleDeleteTransaction}
+                onTogglePaidStatus={() => { }}
+                accounts={accounts}
+                cards={[card]}
+              />
+            </div>
+            <div className="hidden md:block">
+              <TransactionsTable
+                data={filteredTransactions.filter(t => t.tipo === 'despesa')}
+                onEdit={handleOpenForm}
+                onDelete={handleDeleteTransaction}
+                onTogglePaidStatus={() => { }}
+                accounts={accounts}
+                cards={[card]}
+              />
+            </div>
+          </>
+        )}
       </div>
 
-        {futureInstallments.length > 0 && (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Lançamentos Futuros</CardTitle>
-                    <CardDescription>Estas são as parcelas que entrarão nas próximas faturas.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <div className="block md:hidden">
-                        <TransactionMobileList data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => {}} accounts={accounts} cards={[card]} />
-                    </div>
-                    <div className="hidden md:block">
-                        <TransactionsTable data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => {}} accounts={accounts} cards={[card]} />
-                    </div>
-                </CardContent>
-            </Card>
-        )}
+      {futureInstallments.length > 0 && (
+        <Card className="shadow-xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10">
+          <CardHeader>
+            <CardTitle className="text-xl bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+              Lançamentos Futuros
+            </CardTitle>
+            <CardDescription>Estas são as parcelas que entrarão nas próximas faturas.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="block md:hidden">
+              <TransactionMobileList data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => { }} accounts={accounts} cards={[card]} />
+            </div>
+            <div className="hidden md:block">
+              <TransactionsTable data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => { }} accounts={accounts} cards={[card]} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-       <PayBillDialog
+      <PayBillDialog
         isOpen={isPayDialogOpen}
         onClose={() => setIsPayDialogOpen(false)}
         onConfirm={handlePayment}

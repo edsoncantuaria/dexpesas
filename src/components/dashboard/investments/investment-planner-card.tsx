@@ -123,9 +123,9 @@ export function InvestmentPlannerCard({
   ];
 
   return (
-    <Card>
+    <Card className="shadow-lg">
       <CardHeader>
-        <CardTitle>Planejamento Pessoal</CardTitle>
+        <CardTitle className="text-2xl">Planejamento Pessoal</CardTitle>
         <CardDescription>
           Ajuste percentuais e limites para o planner inteligente distribuir o excedente do mês.
         </CardDescription>
@@ -133,10 +133,10 @@ export function InvestmentPlannerCard({
       <CardContent className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {insights.map((insight) => (
-            <div key={insight.label} className="rounded-lg border p-3">
-              <p className="text-sm font-medium text-muted-foreground">{insight.label}</p>
-              <p className="mt-1 text-2xl font-semibold">{insight.value}</p>
-              <p className="text-xs text-muted-foreground">{insight.description}</p>
+            <div key={insight.label} className="rounded-xl border bg-gradient-to-br from-primary/5 to-primary/0 p-4 hover:shadow-md transition-shadow">
+              <p className="text-sm font-semibold text-muted-foreground">{insight.label}</p>
+              <p className="mt-2 text-3xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">{insight.value}</p>
+              <p className="text-xs text-muted-foreground mt-1">{insight.description}</p>
             </div>
           ))}
         </div>
@@ -155,8 +155,8 @@ export function InvestmentPlannerCard({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-4 rounded-lg border p-4">
-              <Label className="text-sm font-semibold">Prioridade do plano</Label>
+            <div className="space-y-4 rounded-xl border bg-gradient-to-br from-primary/5 to-primary/0 p-5">
+              <Label className="text-base font-semibold">Prioridade do plano</Label>
               <Select
                 value={formState.priority}
                 onValueChange={(value: InvestmentPriority) =>
@@ -217,7 +217,7 @@ export function InvestmentPlannerCard({
               </div>
             </div>
 
-            <div className="space-y-4 rounded-lg border p-4">
+            <div className="space-y-4 rounded-xl border bg-gradient-to-br from-primary/5 to-primary/0 p-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="targetAmountMin">Meta mínima mensal (R$)</Label>

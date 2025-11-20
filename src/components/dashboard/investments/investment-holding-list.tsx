@@ -17,6 +17,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { TrendingUp } from 'lucide-react';
 import type { Account, Goal, InvestmentHolding } from '@/lib/definitions';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -139,25 +140,33 @@ export function InvestmentHoldingList({
   }
 
   return (
-    <Card className="h-full">
+    <Card className="h-full shadow-lg">
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
-          <CardTitle>Carteiras de Investimento</CardTitle>
+          <CardTitle className="text-2xl">Carteiras de Investimento</CardTitle>
           <CardDescription>Contas de investimento e seus objetivos vinculados.</CardDescription>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="secondary" className="text-xs bg-gradient-to-r from-primary/20 to-primary/10">
             {holdings.length} holdings
           </Badge>
-          <Button size="sm" onClick={() => openFormDialog()}>
+          <Button size="sm" onClick={() => openFormDialog()} className="shadow-md shadow-primary/20">
             Adicionar holding
           </Button>
         </div>
       </CardHeader>
       <CardContent>
         {holdings.length === 0 ? (
-          <div className="text-sm text-muted-foreground">
-            Ainda não identificamos holdings vinculadas ao seu plano. Crie uma conta do tipo investimento para começar.
+          <div className="flex flex-col items-center justify-center gap-4 py-12 text-center rounded-2xl border-2 border-dashed bg-gradient-to-br from-card/50 to-card/30">
+            <div className="p-4 rounded-full bg-gradient-to-br from-primary/20 to-primary/10">
+              <TrendingUp className="h-12 w-12 text-primary" />
+            </div>
+            <div className="space-y-1">
+              <p className="font-semibold">Nenhuma carteira cadastrada</p>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Crie uma conta do tipo investimento para começar a mapear seus holdings.
+              </p>
+            </div>
           </div>
         ) : (
           <>
@@ -215,9 +224,9 @@ export function InvestmentHoldingList({
               </TableBody>
             </Table>
 
-            <div className="mt-4 flex items-center justify-between rounded-lg border bg-muted/30 p-3 text-sm">
-              <span className="font-medium">Total mapeado</span>
-              <span className="text-lg font-semibold">{currencyFormatter.format(total)}</span>
+            <div className="mt-4 flex items-center justify-between rounded-xl border bg-gradient-to-r from-emerald-500/10 to-green-500/5 border-emerald-500/20 p-4 text-sm">
+              <span className="font-semibold">Total mapeado</span>
+              <span className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-green-600 bg-clip-text text-transparent">{currencyFormatter.format(total)}</span>
             </div>
           </>
         )}
@@ -240,12 +249,12 @@ export function InvestmentHoldingList({
             </div>
             <div className="space-y-2">
               <Label htmlFor="goalSelect">Meta</Label>
-              <Select value={selectedGoalId || ''} onValueChange={(value) => setSelectedGoalId(value || null)}>
+              <Select value={selectedGoalId || 'none'} onValueChange={(value) => setSelectedGoalId(value === 'none' ? null : value)}>
                 <SelectTrigger id="goalSelect">
                   <SelectValue placeholder="Selecione uma meta (ou deixe vazio para remover)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem meta</SelectItem>
+                  <SelectItem value="none">Sem meta</SelectItem>
                   {goals.map((goal) => (
                     <SelectItem key={goal.id} value={goal.id}>
                       {goal.name} — {currencyFormatter.format(goal.currentAmount)} /{' '}
@@ -256,7 +265,7 @@ export function InvestmentHoldingList({
               </Select>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => setIsGoalDialogOpen(false)}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={!selectedHoldingId || isSubmitting}>
@@ -328,14 +337,14 @@ export function InvestmentHoldingList({
               <div className="space-y-2">
                 <Label htmlFor="goalLink">Meta vinculada</Label>
                 <Select
-                  value={formState.goalId}
-                  onValueChange={(value) => setFormState((prev) => ({ ...prev, goalId: value }))}
+                  value={formState.goalId || 'none'}
+                  onValueChange={(value) => setFormState((prev) => ({ ...prev, goalId: value === 'none' ? '' : value }))}
                 >
                   <SelectTrigger id="goalLink">
                     <SelectValue placeholder="Sem meta" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sem meta</SelectItem>
+                    <SelectItem value="none">Sem meta</SelectItem>
                     {goals.map((goal) => (
                       <SelectItem key={goal.id} value={goal.id}>
                         {goal.name}

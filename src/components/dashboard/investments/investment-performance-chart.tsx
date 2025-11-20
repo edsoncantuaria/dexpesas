@@ -58,9 +58,9 @@ export function InvestmentPerformanceChart({ snapshots, monthlyTotals }: Investm
   const chartData = buildChartData(snapshots, monthlyTotals);
 
   return (
-    <Card className="h-full">
+    <Card className="h-full shadow-lg">
       <CardHeader>
-        <CardTitle>Rentabilidade</CardTitle>
+        <CardTitle className="text-2xl">Rentabilidade</CardTitle>
         <CardDescription>Evolução dos aportes e do total investido por mês.</CardDescription>
       </CardHeader>
       <CardContent className="h-[360px]">

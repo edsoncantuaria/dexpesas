@@ -1,15 +1,15 @@
 // src/components/dashboard/notifications/notification-item.tsx
 'use client';
 
-import { 
-    AlertCircle, 
-    Bell, 
+import {
+    AlertCircle,
+    Bell,
     CalendarClock,
-    CheckCircle2, 
-    CreditCard, 
-    DollarSign, 
-    ShieldAlert, 
-    Trophy, 
+    CheckCircle2,
+    CreditCard,
+    DollarSign,
+    ShieldAlert,
+    Trophy,
     type LucideIcon
 } from 'lucide-react';
 import type { Notification } from '@/lib/definitions';
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { motion } from 'framer-motion';
 
 const notificationIcons: Record<string, LucideIcon> = {
     TRANSACTION_CREATED: DollarSign,
@@ -28,13 +29,23 @@ const notificationIcons: Record<string, LucideIcon> = {
     DEFAULT: Bell,
 };
 
-const notificationColors: Record<string, string> = {
-    TRANSACTION_CREATED: 'text-green-500',
-    PAYMENT_DUE: 'text-destructive',
-    LIMIT_ALERT: 'text-amber-500',
-    BUDGET_ALERT: 'text-orange-500',
-    ACHIEVEMENT_UNLOCKED: 'text-yellow-500',
-    UPCOMING_PAYMENT: 'text-blue-500',
+const notificationGradients: Record<string, string> = {
+    TRANSACTION_CREATED: 'from-emerald-500/20 to-green-500/20',
+    PAYMENT_DUE: 'from-red-500/20 to-destructive/20',
+    LIMIT_ALERT: 'from-amber-500/20 to-yellow-500/20',
+    BUDGET_ALERT: 'from-orange-500/20 to-amber-500/20',
+    ACHIEVEMENT_UNLOCKED: 'from-yellow-500/20 to-amber-500/20',
+    UPCOMING_PAYMENT: 'from-blue-500/20 to-cyan-500/20',
+    DEFAULT: 'from-muted/20 to-muted/10',
+}
+
+const notificationIconColors: Record<string, string> = {
+    TRANSACTION_CREATED: 'text-emerald-600 dark:text-emerald-400',
+    PAYMENT_DUE: 'text-red-600 dark:text-red-400',
+    LIMIT_ALERT: 'text-amber-600 dark:text-amber-400',
+    BUDGET_ALERT: 'text-orange-600 dark:text-orange-400',
+    ACHIEVEMENT_UNLOCKED: 'text-yellow-600 dark:text-yellow-400',
+    UPCOMING_PAYMENT: 'text-blue-600 dark:text-blue-400',
     DEFAULT: 'text-muted-foreground',
 }
 
@@ -46,7 +57,8 @@ type NotificationItemProps = {
 
 export function NotificationItem({ notification, onAction, onMarkAsRead }: NotificationItemProps) {
     const Icon = notificationIcons[notification.type] || notificationIcons.DEFAULT;
-    const iconColor = notificationColors[notification.type] || notificationColors.DEFAULT;
+    const iconGradient = notificationGradients[notification.type] || notificationGradients.DEFAULT;
+    const iconColor = notificationIconColors[notification.type] || notificationIconColors.DEFAULT;
     const timeAgo = formatDistanceToNow(new Date(notification.createdAt), {
         addSuffix: true,
         locale: ptBR
@@ -59,10 +71,15 @@ export function NotificationItem({ notification, onAction, onMarkAsRead }: Notif
     };
 
     return (
-        <div 
+        <motion.div
+            whileHover={{ scale: 1.02 }}
+            transition={{ duration: 0.2 }}
             className={cn(
-                "p-3 rounded-lg transition-colors hover:bg-muted/50 cursor-pointer",
-                !notification.read && 'bg-primary/5'
+                "p-4 rounded-xl transition-all cursor-pointer border",
+                "bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm",
+                !notification.read
+                    ? 'border-primary/30 shadow-md shadow-primary/10'
+                    : 'border-border/50 opacity-75 hover:opacity-100'
             )}
             onClick={handleItemClick}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleItemClick()}
@@ -70,15 +87,24 @@ export function NotificationItem({ notification, onAction, onMarkAsRead }: Notif
             tabIndex={0}
         >
             <div className="flex items-start gap-3">
-                <div className={cn("mt-1", iconColor)}>
-                    <Icon className="h-5 w-5" />
+                <div className={cn(
+                    "p-2.5 rounded-xl bg-gradient-to-br shrink-0",
+                    iconGradient
+                )}>
+                    <Icon className={cn("h-5 w-5", iconColor)} />
                 </div>
-                <div className="flex-1 space-y-2">
-                    <div className="flex justify-between items-start">
-                        <p className="font-semibold text-sm">{notification.title}</p>
-                        {!notification.read && <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0 ml-2 mt-1.5" />}
+                <div className="flex-1 space-y-2 min-w-0">
+                    <div className="flex justify-between items-start gap-2">
+                        <p className="font-semibold text-sm leading-tight">{notification.title}</p>
+                        {!notification.read && (
+                            <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="h-2 w-2 rounded-full bg-gradient-to-br from-primary to-primary/80 flex-shrink-0 mt-1.5 shadow-sm shadow-primary/50"
+                            />
+                        )}
                     </div>
-                    <p className="text-sm text-muted-foreground">{notification.message}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{notification.message}</p>
                     {notification.actions && notification.actions.length > 0 && (
                         <div className="flex items-center gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
                             {notification.actions.map((action) => (
@@ -87,16 +113,16 @@ export function NotificationItem({ notification, onAction, onMarkAsRead }: Notif
                                     size="sm"
                                     variant={action.variant || 'secondary'}
                                     onClick={() => onAction(notification.id, action.action)}
-                                    className="h-8 transition-all"
+                                    className="h-8 text-xs transition-all hover:scale-105"
                                 >
                                     {action.label}
                                 </Button>
                             ))}
                         </div>
                     )}
-                    <p className="text-xs text-muted-foreground pt-1">{timeAgo}</p>
+                    <p className="text-xs text-muted-foreground/70 pt-1">{timeAgo}</p>
                 </div>
             </div>
-        </div>
+        </motion.div>
     )
 }

@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { BellRing, Check, Loader2, Trash2 } from 'lucide-react';
+import { BellRing, Check, Loader2, Trash2, Sparkles } from 'lucide-react';
 import { NotificationItem } from './notification-item';
 import type { Notification } from '@/lib/definitions';
 import api from '@/lib/api';
@@ -17,9 +17,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 type NotificationPanelProps = {
     onClose: () => void;
+    onCountChange?: (count: number) => void;
 };
 
-export function NotificationPanel({ onClose }: NotificationPanelProps) {
+export function NotificationPanel({ onClose, onCountChange }: NotificationPanelProps) {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isClearing, setIsClearing] = useState(false);
@@ -34,22 +35,23 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
         try {
             const response = await api.get('/notifications');
             setNotifications(response.data);
+            const unreadCount = response.data.filter((n: Notification) => !n.read).length;
+            onCountChange?.(unreadCount);
         } catch (error) {
             toast({ variant: 'destructive', title: 'Erro ao buscar notificações' });
         } finally {
             setIsLoading(false);
         }
-    }, [toast]);
+    }, [toast, onCountChange]);
 
     useEffect(() => {
         fetchNotifications();
-        // Adiciona um listener para o evento de recebimento de notificação
         window.addEventListener('notification-received', fetchNotifications);
         return () => {
             window.removeEventListener('notification-received', fetchNotifications);
         };
     }, [fetchNotifications]);
-    
+
     const handleAction = async (notificationId: string, action: string) => {
         if (action === 'REMOVE_RECURRENCE') {
             const notificationToConfirm = notifications.find(n => n.id === notificationId);
@@ -59,33 +61,31 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
             return;
         }
 
-         try {
+        try {
             await api.post('/notifications/handle-action', { notificationId, action });
-            toast({ title: 'Ação executada com sucesso!'});
-            // Refetch para atualizar a lista, pois outras notificações podem ser afetadas.
+            toast({ title: 'Ação executada com sucesso!' });
             fetchNotifications();
-            // Dispara evento para outras partes da UI, como a lista de transações
             window.dispatchEvent(new Event('transaction-updated'));
         } catch (error: any) {
-            toast({ 
-                variant: 'destructive', 
+            toast({
+                variant: 'destructive',
                 title: 'Erro ao executar ação',
                 description: error.response?.data?.message || 'Tente novamente mais tarde.'
             });
         }
     };
-    
+
     const handleConfirmRemoveRecurrence = async () => {
         if (!removingRecurrence) return;
-        
+
         try {
             await api.post('/notifications/handle-action', { notificationId: removingRecurrence.id, action: 'REMOVE_RECURRENCE' });
             toast({ title: 'Recorrência removida com sucesso!', variant: 'destructive' });
             fetchNotifications();
             window.dispatchEvent(new Event('transaction-updated'));
-        } catch(error: any) {
-            toast({ 
-                variant: 'destructive', 
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
                 title: 'Erro ao remover recorrência',
                 description: error.response?.data?.message || 'Tente novamente.'
             });
@@ -93,7 +93,7 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
             setRemovingRecurrence(null);
         }
     };
-    
+
     const handleClearAll = async () => {
         setIsClearing(true);
         try {
@@ -101,21 +101,21 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
             toast({ title: 'Notificações limpas!', description: 'Ações em lote foram aplicadas às pendências.' });
             fetchNotifications();
             setIsClearDialogOpen(false);
-        } catch(error) {
+        } catch (error) {
             toast({ variant: 'destructive', title: 'Erro ao limpar notificações' });
         } finally {
             setIsClearing(false);
         }
     };
-    
+
     const handleMarkAsRead = async (notificationId: string) => {
         const originalNotifications = [...notifications];
-        // Optimistic update
-        setNotifications(prev => prev.map(n => n.id === notificationId ? {...n, read: true} : n));
+        setNotifications(prev => prev.map(n => n.id === notificationId ? { ...n, read: true } : n));
         try {
             await api.post('/notifications/read-one', { notificationId });
+            window.dispatchEvent(new Event('notification-read'));
         } catch (error) {
-            setNotifications(originalNotifications); // Revert on error
+            setNotifications(originalNotifications);
             toast({ variant: 'destructive', title: 'Erro ao marcar como lida' });
         }
     };
@@ -124,23 +124,30 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
         setIsMarking(true);
         try {
             await api.post('/notifications/read-all');
-            // Optimistic update
-            setNotifications(notifications.map(n => ({...n, read: true})));
-        } catch(error) {
+            setNotifications(notifications.map(n => ({ ...n, read: true })));
+            window.dispatchEvent(new Event('notification-read'));
+        } catch (error) {
             toast({ variant: 'destructive', title: 'Erro ao marcar como lidas' });
         } finally {
             setIsMarking(false);
         }
     };
-    
+
     const unreadCount = notifications.filter(n => !n.read).length;
 
     return (
         <>
-            <div className="flex items-center justify-between p-4">
-                <h3 className="font-semibold">Notificações ({unreadCount})</h3>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsClearDialogOpen(true)}>
-                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center justify-between p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10">
+                <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-lg">Notificações</h3>
+                    {unreadCount > 0 && (
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-xs font-bold text-primary-foreground shadow-sm">
+                            {unreadCount}
+                        </span>
+                    )}
+                </div>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-colors" onClick={() => setIsClearDialogOpen(true)}>
+                    <Trash2 className="h-4 w-4" />
                 </Button>
             </div>
             <Separator />
@@ -151,14 +158,18 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
                         <Loader2 className="h-6 w-6 animate-spin text-primary" />
                     </div>
                 ) : notifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-8 h-full">
-                        <BellRing className="h-10 w-10 mb-4" />
-                        <p className="font-semibold">Tudo em dia!</p>
-                        <p className="text-sm">Você não tem nenhuma notificação.</p>
+                    <div className="flex flex-col items-center justify-center text-center p-8 h-full space-y-4">
+                        <div className="p-4 rounded-full bg-gradient-to-br from-primary/20 to-primary/10">
+                            <BellRing className="h-12 w-12 text-primary" />
+                        </div>
+                        <div className="space-y-1">
+                            <p className="font-bold text-lg">Tudo em dia!</p>
+                            <p className="text-sm text-muted-foreground">Você não tem nenhuma notificação.</p>
+                        </div>
                     </div>
                 ) : (
-                    <div className="p-2">
-                         <AnimatePresence>
+                    <div className="p-3 space-y-2">
+                        <AnimatePresence>
                             {notifications.map((notification, index) => (
                                 <motion.div
                                     key={notification.id}
@@ -168,7 +179,7 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
                                     exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
                                     transition={{ duration: 0.3, delay: index * 0.05 }}
                                 >
-                                    <NotificationItem 
+                                    <NotificationItem
                                         notification={notification}
                                         onAction={handleAction}
                                         onMarkAsRead={handleMarkAsRead}
@@ -181,8 +192,13 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
             </ScrollArea>
 
             <Separator />
-            <div className="p-2">
-                <Button variant="outline" className="w-full" onClick={handleMarkAllAsRead} disabled={isMarking || unreadCount === 0}>
+            <div className="p-3">
+                <Button
+                    variant="outline"
+                    className="w-full hover:bg-primary/10 transition-colors"
+                    onClick={handleMarkAllAsRead}
+                    disabled={isMarking || unreadCount === 0}
+                >
                     {isMarking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
                     Marcar todas como lidas
                 </Button>
@@ -194,7 +210,7 @@ export function NotificationPanel({ onClose }: NotificationPanelProps) {
                 onConfirm={handleClearAll}
                 isClearing={isClearing}
             />
-            
+
             {removingRecurrence && (
                 <RemoveRecurrenceDialog
                     isOpen={!!removingRecurrence}

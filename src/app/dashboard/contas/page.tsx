@@ -5,12 +5,12 @@ import { Landmark, ArrowRightLeft, PlusCircle } from "lucide-react";
 import { AccountList } from "@/components/dashboard/contas/account-list";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog";
 import { useState, useEffect, useCallback } from "react";
 import type { Account } from "@/lib/definitions";
@@ -118,16 +118,25 @@ export default function ContasPage() {
         return <LoadingScreen />
     }
 
+    const totalBalance = accounts.reduce((sum, acc) => sum + Number(acc.saldoPago ?? acc.saldo ?? 0), 0);
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold font-headline">Contas</h1>
-                    <p className="text-muted-foreground">Adicione, edite e transfira valores entre suas contas.</p>
+                <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10">
+                        <Landmark className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                        <h1 className="text-4xl font-bold font-headline bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+                            Contas
+                        </h1>
+                        <p className="text-muted-foreground mt-1">Gerencie suas contas e transfira valores.</p>
+                    </div>
                 </div>
                 <div className="flex w-full sm:w-auto items-center gap-2">
                     {accounts.length > 1 && (
-                         <Dialog open={isTransferFormOpen} onOpenChange={setIsTransferFormOpen}>
+                        <Dialog open={isTransferFormOpen} onOpenChange={setIsTransferFormOpen}>
                             <DialogTrigger asChild>
                                 <Button variant="outline" className="w-full sm:w-auto">
                                     <ArrowRightLeft className="mr-2 h-4 w-4" />
@@ -136,7 +145,7 @@ export default function ContasPage() {
                             </DialogTrigger>
                             <DialogContent>
                                 <DialogHeader>
-                                    <DialogTitle>Transferir entre Contas</DialogTitle>
+                                    <DialogTitle className="text-2xl">Transferir entre Contas</DialogTitle>
                                     <DialogDescription>Mova dinheiro de uma conta para outra.</DialogDescription>
                                 </DialogHeader>
                                 <TransferForm
@@ -150,20 +159,20 @@ export default function ContasPage() {
                     )}
                     <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                         <DialogTrigger asChild>
-                            <Button className="w-full sm:w-auto" onClick={() => handleOpenForm()}>
+                            <Button className="w-full sm:w-auto shadow-lg shadow-primary/20" onClick={() => handleOpenForm()}>
                                 <PlusCircle className="mr-2 h-4 w-4" />
                                 Nova Conta
                             </Button>
                         </DialogTrigger>
                         <DialogContent>
                             <DialogHeader>
-                                <DialogTitle>{editingAccount ? 'Editar Conta' : 'Adicionar Nova Conta'}</DialogTitle>
+                                <DialogTitle className="text-2xl">{editingAccount ? 'Editar Conta' : 'Adicionar Nova Conta'}</DialogTitle>
                                 <DialogDescription>
                                     {editingAccount ? 'Atualize as informações da sua conta.' : 'Preencha as informações para adicionar uma nova conta.'}
                                 </DialogDescription>
                             </DialogHeader>
-                            <AddAccountForm 
-                                account={editingAccount} 
+                            <AddAccountForm
+                                account={editingAccount}
                                 onSuccess={handleSaveAccount}
                                 onClose={handleCloseForm}
                                 isSubmitting={isSubmitting}
@@ -173,7 +182,23 @@ export default function ContasPage() {
                 </div>
             </div>
 
-            <AccountList 
+            {accounts.length > 0 && (
+                <div className="p-6 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-green-500/5 border border-emerald-500/20 shadow-lg">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-muted-foreground mb-1">Saldo Total Disponível</p>
+                            <p className="text-4xl font-bold bg-gradient-to-br from-emerald-600 to-green-600 bg-clip-text text-transparent">
+                                {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </p>
+                        </div>
+                        <div className="p-4 rounded-full bg-gradient-to-br from-emerald-500/20 to-green-500/10">
+                            <Landmark className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <AccountList
                 accounts={accounts}
                 onEdit={handleOpenForm}
                 onDelete={handleDeleteAccount}
