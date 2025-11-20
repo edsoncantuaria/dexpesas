@@ -1,4 +1,3 @@
-// src/app/dashboard/transacoes/page.tsx
 'use client';
 
 import { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
@@ -7,7 +6,7 @@ import type { Transaction, Account, Card as CardType, Category, Tag } from '@/li
 import { Button } from '@/components/ui/button';
 import { TransactionMobileList } from '@/components/dashboard/transacoes/transaction-mobile-list';
 import { useToast } from '@/hooks/use-toast';
-import { Filter, Search, X } from 'lucide-react';
+import { Filter, Search, X, Plus } from 'lucide-react';
 import { MonthlySummary } from '@/components/dashboard/transacoes/monthly-summary';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import type { FilterState } from '@/components/dashboard/transacoes/transaction-filters';
@@ -20,6 +19,8 @@ import { useTransactionForm } from '@/contexts/TransactionFormContext';
 import { TransactionsTable } from '@/components/dashboard/transacoes/transactions-table';
 import { format, parseISO } from 'date-fns';
 import { FilteredSummary } from '@/components/dashboard/transacoes/filtered-summary';
+import { motion, AnimatePresence } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 
 function TransactionsPageContent() {
@@ -32,11 +33,11 @@ function TransactionsPageContent() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [cards, setCards] = useState<CardType[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [tags, setTags] = useState<Tag[]>([]); 
-  
+  const [tags, setTags] = useState<Tag[]>([]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
-  
+
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
@@ -77,10 +78,10 @@ function TransactionsPageContent() {
       setCategories(catRes.data);
       setTags(tagsRes.data);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao buscar dados de suporte'});
+      toast({ variant: 'destructive', title: 'Erro ao buscar dados de suporte' });
     }
   }, [toast]);
-  
+
   const fetchTransactionsForMonth = useCallback(async (date: Date, options?: { silent?: boolean; replaceVisible?: boolean }) => {
     const { silent = false, replaceVisible = true } = options || {};
     if (!silent) {
@@ -94,7 +95,7 @@ function TransactionsPageContent() {
         setTransactions(response.data);
       }
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao buscar transações'});
+      toast({ variant: 'destructive', title: 'Erro ao buscar transações' });
     } finally {
       if (!silent) {
         setIsLoadingTransactions(false);
@@ -127,7 +128,7 @@ function TransactionsPageContent() {
     let isMounted = true;
     setIsLoading(true);
     fetchInitialData()
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => {
         if (isMounted) {
           setIsLoading(false);
@@ -155,7 +156,7 @@ function TransactionsPageContent() {
       window.removeEventListener('transaction-updated', handleTransactionUpdate);
     };
   }, [selectedDate, fetchTransactionsForMonth, fetchInitialData, fetchTransactionsForRange, filters.dateRange, hasCustomRange]);
-  
+
   const isFilterActive = useMemo(() => {
     return filters.text || filters.accounts.length > 0 || filters.cards.length > 0 || filters.categories.length > 0 || filters.methods.length > 0 || filters.tags.length > 0 || filters.type || filters.dateRange?.from;
   }, [filters]);
@@ -164,9 +165,9 @@ function TransactionsPageContent() {
     let results = transactions;
 
     if (searchQuery) {
-        results = results.filter(t => t.descricao.toLowerCase().includes(searchQuery.toLowerCase()));
+      results = results.filter(t => t.descricao.toLowerCase().includes(searchQuery.toLowerCase()));
     }
-    
+
     if (filters.dateRange?.from) {
       results = results.filter(t => {
         const transactionDate = parseISO(t.data);
@@ -183,10 +184,10 @@ function TransactionsPageContent() {
     if (filters.value_greater_than) results = results.filter(t => t.valor > filters.value_greater_than!);
     if (filters.value_less_than) results = results.filter(t => t.valor < filters.value_less_than!);
     if (filters.tags.length > 0) {
-        results = results.filter(t => {
-            const transactionTagIds = t.tags.map(tag => tag.id);
-            return filters.tags.every(filterTagId => transactionTagIds.includes(filterTagId));
-        });
+      results = results.filter(t => {
+        const transactionTagIds = t.tags.map(tag => tag.id);
+        return filters.tags.every(filterTagId => transactionTagIds.includes(filterTagId));
+      });
     }
 
     return results;
@@ -232,7 +233,7 @@ function TransactionsPageContent() {
       setIsSearchVisible(false);
     }
   };
-  
+
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters);
     setIsFilterSheetOpen(false);
@@ -249,96 +250,127 @@ function TransactionsPageContent() {
 
   const renderContent = () => {
     if (isLoadingTransactions) {
-      return <LoadingScreen />
+      return (
+        <div className="flex items-center justify-center py-20">
+          <LoadingScreen />
+        </div>
+      )
     }
 
     if (filteredTransactions.length === 0) {
-        return (
-            <div className="flex flex-col items-center justify-center gap-4 py-16 text-center rounded-2xl border-2 border-dashed mt-6">
-                <Search className="h-16 w-16 text-muted-foreground" />
-                <h3 className='text-lg font-semibold'>Nenhuma Transação Encontrada</h3>
-                <p className="text-muted-foreground">Não há transações para este período com os filtros atuais. <br/> Tente limpar os filtros ou adicionar uma nova transação.</p>
-                <Button variant="outline" size="sm" onClick={() => handleOpenForm()}>
-                    Adicionar Transação
-                </Button>
-            </div>
-        )
+      return (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center justify-center gap-4 py-20 text-center rounded-3xl border-2 border-dashed border-muted mt-6 bg-muted/10"
+        >
+          <div className="p-4 bg-muted rounded-full">
+            <Search className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <div className="space-y-1">
+            <h3 className='text-lg font-semibold'>Nenhuma Transação Encontrada</h3>
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+              Não encontramos nada com os filtros atuais. Tente buscar por outra coisa ou adicione uma nova transação.
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => handleOpenForm()} className="mt-2 rounded-full">
+            <Plus className="mr-2 h-4 w-4" />
+            Adicionar Transação
+          </Button>
+        </motion.div>
+      )
     }
 
     if (isMobile) {
-        return (
-            <TransactionMobileList 
-                data={filteredTransactions}
-                onEdit={handleOpenForm}
-                onDelete={handleDeleteTransaction}
-                onTogglePaidStatus={handleTogglePaidStatus}
-                accounts={accounts}
-                cards={cards}
-            />
-        );
+      return (
+        <TransactionMobileList
+          data={filteredTransactions}
+          onEdit={handleOpenForm}
+          onDelete={handleDeleteTransaction}
+          onTogglePaidStatus={handleTogglePaidStatus}
+          accounts={accounts}
+          cards={cards}
+        />
+      );
     }
     return (
-        <TransactionsTable
-            data={filteredTransactions}
-            onEdit={handleOpenForm}
-            onDelete={handleDeleteTransaction}
-            onTogglePaidStatus={handleTogglePaidStatus}
-            accounts={accounts}
-            cards={cards}
-        />
+      <TransactionsTable
+        data={filteredTransactions}
+        onEdit={handleOpenForm}
+        onDelete={handleDeleteTransaction}
+        onTogglePaidStatus={handleTogglePaidStatus}
+        accounts={accounts}
+        cards={cards}
+      />
     )
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 pb-20 md:pb-0">
       {isFilterActive && filters.dateRange?.from ? (
-        <FilteredSummary transactions={filteredTransactions} dateRange={filters.dateRange}/>
+        <FilteredSummary transactions={filteredTransactions} dateRange={filters.dateRange} />
       ) : (
         <MonthlySummary
-            transactionsForMonth={monthlyTransactions}
-            selectedDate={selectedDate}
-            onDateChange={setSelectedDate}
+          transactionsForMonth={monthlyTransactions}
+          selectedDate={selectedDate}
+          onDateChange={setSelectedDate}
         />
       )}
 
-      <div className="px-1 md:px-0 flex items-center gap-2">
-        <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Filter className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-full max-w-sm p-0">
-            <TransactionFilters
-              accounts={accounts}
-              cards={cards}
-              categories={categories}
-              tags={tags}
-              currentFilters={filters}
-              onFilterChange={handleFilterChange}
-            />
-          </SheetContent>
-        </Sheet>
-        
-        <div className="relative flex-1">
-          <Button variant="ghost" size="icon" onClick={() => setIsSearchVisible(!isSearchVisible)}>
-            <Search className="h-5 w-5" />
-          </Button>
-          {isSearchVisible && (
-            <div className="absolute top-1/2 -translate-y-1/2 left-12 w-[calc(100%-4rem)] md:w-1/2 flex items-center gap-2">
+      <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md py-2 -mx-4 px-4 md:static md:bg-transparent md:p-0 md:mx-0">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <div className={cn(
+              "flex items-center h-12 w-full rounded-2xl bg-muted/50 border border-transparent focus-within:border-primary/50 focus-within:bg-background focus-within:shadow-sm transition-all duration-300 px-3 gap-2",
+              isSearchVisible ? "ring-2 ring-primary/20" : ""
+            )}>
+              <Search className="h-5 w-5 text-muted-foreground" />
               <Input
-                autoFocus
-                placeholder="Buscar por descrição..."
+                placeholder="Buscar transações..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={handleSearchKeyDown}
-                className="h-9"
+                className="border-0 bg-transparent p-0 h-full focus-visible:ring-0 placeholder:text-muted-foreground/70"
               />
-               <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => { setIsSearchVisible(false); setSearchQuery(''); }}>
-                  <X className="h-5 w-5" />
-              </Button>
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-full hover:bg-muted-foreground/20"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
             </div>
-          )}
+          </div>
+
+          <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn(
+                  "h-12 w-12 rounded-2xl border-muted-foreground/20 hover:border-primary/50 hover:bg-muted/50 transition-all relative",
+                  isFilterActive && "border-primary text-primary bg-primary/5"
+                )}
+              >
+                <Filter className="h-5 w-5" />
+                {isFilterActive && (
+                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary animate-pulse" />
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-full max-w-sm p-0 border-r-0">
+              <TransactionFilters
+                accounts={accounts}
+                cards={cards}
+                categories={categories}
+                tags={tags}
+                currentFilters={filters}
+                onFilterChange={handleFilterChange}
+              />
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
 

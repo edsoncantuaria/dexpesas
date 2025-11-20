@@ -9,6 +9,23 @@ import { scheduleDefaultCellJobs } from './src/queues/cellJobsQueue.js';
 
 const prisma = new PrismaClient();
 
+// Garante que o banco tenha a coluna usada para armazenar o comprovante das transações.
+const ensureAttachmentColumn = async () => {
+    const columnCheck = await prisma.$queryRaw`
+        SELECT COUNT(*) as count
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'Transaction'
+          AND COLUMN_NAME = 'attachmentUrl';
+    `;
+    const count = Number(columnCheck?.[0]?.count || 0);
+    if (count === 0) {
+        console.warn('⚠️  Coluna attachmentUrl não encontrada na tabela Transaction. Criando...');
+        await prisma.$executeRaw`ALTER TABLE \`Transaction\` ADD COLUMN \`attachmentUrl\` VARCHAR(191) NULL;`;
+        console.log('✅ [OK] Coluna attachmentUrl criada.');
+    }
+};
+
 const startServer = async () => {
     console.log('🌱 Iniciando servidor...');
     try {
@@ -16,6 +33,7 @@ const startServer = async () => {
         console.log('Validando conexão com o Banco de Dados (Prisma)...');
         await prisma.$connect();
         console.log('✅ [OK] Conectado ao banco de dados com sucesso.');
+        await ensureAttachmentColumn();
 
         // 2. Testa a conexão com o Redis
         console.log('Validando conexão com o Redis...');

@@ -267,7 +267,7 @@ function DashboardPageContent() {
     account_book: { accounts, transactions },
     journey_map: { budgets },
     credit_pact: { cards },
-    challenge_tower: { goal: goals.find(g => g.status === 'IN_PROGRESS') },
+    challenge_tower: { goals: goals.filter(g => g.status === 'IN_PROGRESS') },
   };
 
   const enabledCards = layout.map(id => ({ id, component: cardComponents[id] })).filter(item => item.component);

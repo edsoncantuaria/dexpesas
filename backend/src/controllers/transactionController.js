@@ -321,17 +321,47 @@ class TransactionController {
             const isBecomingComplex = req.body.entryType === 'recurring' || req.body.entryType === 'installment';
 
             if (isSimpleTransaction && !isBecomingComplex) {
-                const { contaCartaoId, ...dataToUpdate } = req.body;
+                const { contaCartaoId, categoryId, entryType, ...dataToUpdate } = req.body;
                 if (dataToUpdate.valor) dataToUpdate.valor = parseFloat(dataToUpdate.valor);
                 dataToUpdate.accountId = ['debito', 'pix', 'dinheiro'].includes(dataToUpdate.metodoPagamento) ? contaCartaoId : (dataToUpdate.tipo === 'receita' ? contaCartaoId : null);
                 dataToUpdate.cardId = dataToUpdate.metodoPagamento === 'credito' ? contaCartaoId : null;
                 if (dataToUpdate.accountId) dataToUpdate.cardId = null;
                 else if (dataToUpdate.cardId) dataToUpdate.accountId = null;
 
+                if (!dataToUpdate.recurrenceType || dataToUpdate.recurrenceType === 'NONE') {
+                    dataToUpdate.recurrenceType = null;
+                }
+
+                const accountUpdate = Object.prototype.hasOwnProperty.call(dataToUpdate, 'accountId')
+                    ? (
+                        dataToUpdate.accountId
+                            ? { account: { connect: { id: dataToUpdate.accountId } } }
+                            : { account: { disconnect: true } }
+                      )
+                    : {};
+
+                const cardUpdate = Object.prototype.hasOwnProperty.call(dataToUpdate, 'cardId')
+                    ? (
+                        dataToUpdate.cardId
+                            ? { card: { connect: { id: dataToUpdate.cardId } } }
+                            : { card: { disconnect: true } }
+                      )
+                    : {};
+
+                delete dataToUpdate.accountId;
+                delete dataToUpdate.cardId;
+
+                const categoryUpdate = typeof categoryId !== 'undefined'
+                    ? (categoryId ? { category: { connect: { id: categoryId } } } : { category: { disconnect: true } })
+                    : {};
+
                 const updatedTransaction = await prisma.transaction.update({
                     where: { id: id },
                     data: {
-                        ...dataToUpdate,
+                        ...dataToUpdate, // já sem entryType/contaCartaoId
+                        ...accountUpdate,
+                        ...cardUpdate,
+                        ...categoryUpdate,
                         tags: dataToUpdate.tags ? { set: dataToUpdate.tags.map((tagId) => ({ id: tagId })) } : { set: [] }
                     }
                 });

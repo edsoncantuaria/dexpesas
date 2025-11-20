@@ -2,7 +2,7 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Map } from "lucide-react";
+import { Map, TrendingUp, AlertTriangle, ArrowRight } from "lucide-react";
 import type { Budget } from "@/lib/definitions";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -11,77 +11,139 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { useGamificationMode } from "@/hooks/use-gamification-mode";
 import { getGamificationCopy } from "@/lib/gamification-copy";
+import { motion } from "framer-motion";
 
 interface JourneyMapCardProps {
     budgets: Budget[];
 }
 
 const getProgressColor = (percentage: number) => {
-    if (percentage > 90) return "bg-destructive";
+    if (percentage > 100) return "bg-destructive";
+    if (percentage > 90) return "bg-orange-500";
     if (percentage > 70) return "bg-yellow-500";
     return "bg-primary";
 };
 
 export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
     const router = useRouter();
-    const foodBudget = budgets.find(b => b.category?.nome === 'Alimentacao');
-    const leisureBudget = budgets.find(b => b.category?.nome === 'Lazer');
-
-    const budgetsToShow = [foodBudget, leisureBudget].filter(Boolean) as Budget[];
-    const { mode } = useGamificationMode();
+    const { mode, isClassic } = useGamificationMode();
     const copy = getGamificationCopy('journeyMap', mode);
 
+    // Ordena orçamentos por percentual de uso (decrescente) e pega os top 3
+    const criticalBudgets = [...budgets]
+        .map(b => ({
+            ...b,
+            percentage: Number(b.limit) > 0 ? (Number(b.spent) / Number(b.limit)) * 100 : 0
+        }))
+        .sort((a, b) => b.percentage - a.percentage)
+        .slice(0, 3);
+
     return (
-         <Link href="/dashboard/orcamentos" className="group">
-        <Card className="shadow-md h-full transition-all group-hover:shadow-xl group-hover:border-primary/50">
-                 <CardHeader>
-                    <div className="flex items-center gap-3">
-                       <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-lg">
-                         <Map className="h-6 w-6 text-green-600 dark:text-green-400" />
-                       </div>
+        <Link href="/dashboard/orcamentos" className="group block h-full">
+            <Card className={cn(
+                "h-full transition-all duration-300 flex flex-col overflow-hidden border-0 ring-1 ring-border/50",
+                "hover:shadow-xl hover:ring-primary/20 hover:scale-[1.01]",
+                !isClassic ? "bg-gradient-to-br from-emerald-50/50 to-teal-50/30 dark:from-emerald-950/30 dark:to-teal-900/10" : "bg-card"
+            )}>
+                <CardHeader className="pb-2">
+                    <div className="flex items-center gap-4">
+                        <div className={cn(
+                            "p-3.5 rounded-xl shadow-sm transition-colors",
+                            isClassic
+                                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300"
+                                : "bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-emerald-500/20"
+                        )}>
+                            <Map className="h-6 w-6" />
+                        </div>
                         <div>
-                            <CardTitle className="font-headline text-xl">{copy.title}</CardTitle>
-                            <CardDescription>{copy.description}</CardDescription>
+                            <CardTitle className="font-headline text-lg tracking-tight">{copy.title}</CardTitle>
+                            <CardDescription className="text-xs font-medium opacity-80">{copy.description}</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                    {budgetsToShow.length > 0 ? (
-                        budgetsToShow.map(budget => {
-                            const spent = Number(budget.spent);
-                            const limit = Number(budget.limit);
-                            const percentage = limit > 0 ? (spent / limit) * 100 : 0;
-                            return (
-                                <div key={budget.id} className="space-y-2">
-                                    <div className="flex justify-between items-baseline">
-                                        <p className="font-semibold">{budget.category?.label || budget.category?.nome}</p>
-                                        <p className="text-sm text-muted-foreground">
-                                           {spent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} / {limit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                        </p>
-                                    </div>
-                                    <Progress value={percentage} indicatorClassName={getProgressColor(percentage)} />
-                                </div>
-                            )
-                        })
+                <CardContent className="space-y-6 flex-grow pt-4">
+                    {criticalBudgets.length > 0 ? (
+                        <div className="space-y-5">
+                            {criticalBudgets.map((budget, index) => {
+                                const spent = Number(budget.spent);
+                                const limit = Number(budget.limit);
+                                const isOverLimit = spent > limit;
+
+                                return (
+                                    <motion.div
+                                        key={budget.id}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.1 }}
+                                        className="space-y-2 group/item"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                {isOverLimit && (
+                                                    <motion.div
+                                                        animate={{ scale: [1, 1.2, 1] }}
+                                                        transition={{ repeat: Infinity, duration: 2 }}
+                                                    >
+                                                        <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
+                                                    </motion.div>
+                                                )}
+                                                <p className="font-semibold text-sm text-foreground/90 group-hover/item:text-primary transition-colors">
+                                                    {budget.category?.label || budget.category?.nome}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className={cn(
+                                                    "text-xs font-bold px-2 py-0.5 rounded-full",
+                                                    isOverLimit ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
+                                                )}>
+                                                    {percentageFormat(budget.percentage)}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="relative h-2.5 bg-muted/50 rounded-full overflow-hidden">
+                                            <motion.div
+                                                className={cn("h-full rounded-full", getProgressColor(budget.percentage))}
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${Math.min(budget.percentage, 100)}%` }}
+                                                transition={{ duration: 1, ease: "easeOut" }}
+                                            />
+                                        </div>
+
+                                        <div className="flex justify-between text-[10px] font-medium text-muted-foreground/80">
+                                            <span>{formatMoney(spent)}</span>
+                                            <span>de {formatMoney(limit)}</span>
+                                        </div>
+                                    </motion.div>
+                                )
+                            })}
+                        </div>
                     ) : (
-                         <div className="text-center text-muted-foreground pt-8">
-                            <p>{copy.emptyState}</p>
+                        <div className="text-center text-muted-foreground pt-8 flex flex-col items-center gap-3">
+                            <div className="p-4 rounded-full bg-muted/50">
+                                <TrendingUp className="h-6 w-6 opacity-40" />
+                            </div>
+                            <p className="text-sm">{copy.emptyState}</p>
                         </div>
                     )}
                 </CardContent>
-                <div className="px-6 pb-6">
+                <div className="p-5 pt-0 mt-auto">
                     <Button
-                        variant="secondary"
-                        className="w-full"
+                        variant="ghost"
+                        className="w-full justify-between group/btn hover:bg-primary/5 hover:text-primary"
                         onClick={(e) => {
                             e.preventDefault();
                             router.push('/dashboard/orcamentos?create=true');
                         }}
                     >
-                        {copy.buttonLabel}
+                        <span className="font-semibold">{copy.buttonLabel}</span>
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
                     </Button>
                 </div>
             </Card>
         </Link>
     );
 }
+
+const formatMoney = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const percentageFormat = (value: number) => `${value.toFixed(0)}%`;

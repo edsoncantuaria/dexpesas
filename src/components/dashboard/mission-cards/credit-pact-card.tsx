@@ -2,7 +2,8 @@
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldHalf } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ShieldHalf, CreditCard, AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
 import type { Card as CardType } from "@/lib/definitions";
 import { useMemo } from 'react';
 import Link from 'next/link';
@@ -10,6 +11,9 @@ import { setDate, isBefore, differenceInDays } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { useGamificationMode } from "@/hooks/use-gamification-mode";
 import { getGamificationCopy } from "@/lib/gamification-copy";
+import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
+import { motion } from "framer-motion";
 
 interface CreditPactCardProps {
     cards: CardType[];
@@ -18,82 +22,147 @@ interface CreditPactCardProps {
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 export function CreditPactCard({ cards }: CreditPactCardProps) {
-    
-    const cardToDisplay = useMemo(() => {
-        if (cards.length === 0) return null;
+    const { mode, isClassic } = useGamificationMode();
+    const copy = getGamificationCopy('creditPact', mode);
 
-        // Encontra o cartão com a data de vencimento mais próxima no futuro
+    const processedCards = useMemo(() => {
+        if (cards.length === 0) return [];
+
         const now = new Date();
         return cards.map(card => {
             let dueDate = setDate(now, card.diaVencimento);
-            // Se a data de vencimento deste mês já passou, pegue a do próximo mês
             if (isBefore(dueDate, now)) {
                 dueDate = setDate(new Date(now.getFullYear(), now.getMonth() + 1, 1), card.diaVencimento);
             }
             const daysUntilDue = differenceInDays(dueDate, now);
-            return { ...card, dueDate, daysUntilDue };
-        }).sort((a, b) => a.daysUntilDue - b.daysUntilDue)[0];
+            const limit = Number(card.limite || 0);
+            const current = Number(card.currentInvoiceAmount || 0);
+            const available = limit - current;
+            const percentage = limit > 0 ? (current / limit) * 100 : 0;
+
+            return {
+                ...card,
+                dueDate,
+                daysUntilDue,
+                availableLimit: available,
+                percentage
+            };
+        }).sort((a, b) => a.daysUntilDue - b.daysUntilDue).slice(0, 3);
 
     }, [cards]);
 
-    const availableLimit = cardToDisplay
-        ? Number(cardToDisplay.availableLimit ?? (Number(cardToDisplay.limite) - Number(cardToDisplay.currentInvoiceAmount ?? 0)))
-        : 0;
-    const usagePercentage = cardToDisplay
-        ? (Number(cardToDisplay.currentInvoiceAmount ?? 0) / Number(cardToDisplay.limite || 1)) * 100
-        : 0;
-
-    const { mode } = useGamificationMode();
-    const copy = getGamificationCopy('creditPact', mode);
-
     return (
-        <Link href="/dashboard/cartoes" className="group">
-            <Card className="shadow-md h-full transition-all group-hover:shadow-xl group-hover:border-primary/50">
-                 <CardHeader>
-                    <div className="flex items-center gap-3">
-                       <div className="p-3 bg-red-100 dark:bg-red-900/50 rounded-lg">
-                         <ShieldHalf className="h-6 w-6 text-red-600 dark:text-red-400" />
-                       </div>
+        <Link href="/dashboard/cartoes" className="group block h-full">
+            <Card className={cn(
+                "h-full transition-all duration-300 flex flex-col overflow-hidden border-0 ring-1 ring-border/50",
+                "hover:shadow-xl hover:ring-primary/20 hover:scale-[1.01]",
+                !isClassic ? "bg-gradient-to-br from-rose-50/50 to-orange-50/30 dark:from-rose-950/30 dark:to-orange-900/10" : "bg-card"
+            )}>
+                <CardHeader className="pb-2">
+                    <div className="flex items-center gap-4">
+                        <div className={cn(
+                            "p-3.5 rounded-xl shadow-sm transition-colors",
+                            isClassic
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
+                                : "bg-gradient-to-br from-rose-500 to-red-600 text-white shadow-rose-500/20"
+                        )}>
+                            {isClassic ? <CreditCard className="h-6 w-6" /> : <ShieldHalf className="h-6 w-6" />}
+                        </div>
                         <div>
-                            <CardTitle className="font-headline text-xl">{copy.title}</CardTitle>
-                            <CardDescription>{copy.description}</CardDescription>
-                            {usagePercentage > 85 && (
-                                <Badge variant="destructive" className="mt-1">
-                                    Limite crítico
-                                </Badge>
-                            )}
+                            <CardTitle className="font-headline text-lg tracking-tight">{copy.title}</CardTitle>
+                            <CardDescription className="text-xs font-medium opacity-80">{copy.description}</CardDescription>
                         </div>
                     </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    {cardToDisplay ? (
-                        <>
-                            <div className="flex justify-between items-baseline border-b pb-3">
-                                <h4 className="font-semibold">{cardToDisplay.nome}</h4>
-                                {cardToDisplay.dueDate && (
-                                    <p className="text-sm text-muted-foreground">Vence em {cardToDisplay.daysUntilDue} dias</p>
+                <CardContent className="space-y-5 flex-grow pt-4">
+                    {processedCards.length > 0 ? (
+                        processedCards.map((card, index) => (
+                            <motion.div
+                                key={card.id}
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.1 }}
+                                className={cn(
+                                    "space-y-3 group/item",
+                                    index !== processedCards.length - 1 && "border-b border-border/50 pb-4"
                                 )}
-                            </div>
-                            <div className="flex justify-between items-center text-sm">
-                                <div>
-                                    <p className="text-muted-foreground">Fatura Atual</p>
-                                    <p className="font-bold text-destructive text-lg">{formatCurrency(cardToDisplay.currentInvoiceAmount ?? 0)}</p>
-                                    {usagePercentage > 85 && (
-                                        <p className="text-xs text-destructive">Você já usou {usagePercentage.toFixed(0)}% do limite.</p>
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h4 className="font-semibold text-sm text-foreground/90 group-hover/item:text-primary transition-colors">
+                                                {card.nome}
+                                            </h4>
+                                            {card.daysUntilDue <= 5 && (
+                                                <Badge variant="destructive" className="h-4 px-1 text-[9px] uppercase tracking-wider">
+                                                    {card.daysUntilDue} dias
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Fatura: <span className="font-medium text-foreground">{formatCurrency(card.currentInvoiceAmount)}</span>
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Disponível</p>
+                                        <p className={cn(
+                                            "text-sm font-bold",
+                                            card.availableLimit < 0 ? "text-destructive" : "text-emerald-600"
+                                        )}>
+                                            {formatCurrency(card.availableLimit)}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <div className="relative h-1.5 bg-muted/50 rounded-full overflow-hidden">
+                                        <motion.div
+                                            className={cn(
+                                                "h-full rounded-full",
+                                                card.percentage > 90 ? "bg-destructive" :
+                                                    card.percentage > 70 ? "bg-orange-500" : "bg-blue-500"
+                                            )}
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${Math.min(card.percentage, 100)}%` }}
+                                            transition={{ duration: 1, ease: "easeOut" }}
+                                        />
+                                    </div>
+                                    {card.percentage > 90 ? (
+                                        <p className="text-[10px] text-destructive flex items-center gap-1 font-medium animate-pulse">
+                                            <AlertCircle className="h-3 w-3" />
+                                            Limite crítico
+                                        </p>
+                                    ) : (
+                                        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                                            Situação controlada
+                                        </p>
                                     )}
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-muted-foreground">Limite Disponível</p>
-                                    <p className="font-bold text-green-500 text-lg">{formatCurrency(availableLimit)}</p>
-                                </div>
-                            </div>
-                        </>
+                            </motion.div>
+                        ))
                     ) : (
-                         <div className="text-center text-muted-foreground pt-8">
-                            <p>{copy.emptyState}</p>
+                        <div className="text-center text-muted-foreground pt-8 flex flex-col items-center gap-3">
+                            <div className="p-4 rounded-full bg-muted/50">
+                                <CreditCard className="h-6 w-6 opacity-40" />
+                            </div>
+                            <p className="text-sm">{copy.emptyState}</p>
                         </div>
                     )}
                 </CardContent>
+                <div className="p-5 pt-0 mt-auto">
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-between group/btn hover:bg-primary/5 hover:text-primary"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            // TODO: Implementar navegação para criação de cartão se necessário
+                        }}
+                    >
+                        <span className="font-semibold">{copy.buttonLabel}</span>
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover/btn:translate-x-1" />
+                    </Button>
+                </div>
             </Card>
         </Link>
     );
