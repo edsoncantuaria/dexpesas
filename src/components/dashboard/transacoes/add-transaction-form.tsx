@@ -1,4 +1,3 @@
-// src/components/dashboard/transacoes/add-transaction-form.tsx
 'use client';
 
 import { useForm } from 'react-hook-form';
@@ -26,14 +25,13 @@ import { Calendar } from '@/components/ui/calendar';
 import type { Account, Card, Transaction, Category, OcrData, User, Tag } from '@/lib/definitions';
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarIcon, Loader2, Camera, Repeat, Repeat1, Layers, PencilLine, CircleDollarSign, Shapes, Wallet, Landmark, ChevronDown } from 'lucide-react';
+import { CalendarIcon, Loader2, Camera, Repeat, Repeat1, Layers, PencilLine, CircleDollarSign, Shapes, Wallet, Landmark, ChevronDown, CreditCard, Banknote, QrCode, ArrowRightLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO, addYears, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Switch } from '@/components/ui/switch';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileUpload } from '@/components/ui/file-upload';
 import { AttachmentPreviewer } from '@/components/ui/attachment-previewer';
 import { CurrencyInput } from '@/components/ui/currency-input';
@@ -52,9 +50,9 @@ const ENTRY_TYPE_OPTIONS = [
 ];
 
 const TRANSACTION_TYPE_OPTIONS = [
-  { value: 'despesa', label: 'Despesa' },
-  { value: 'receita', label: 'Receita' },
-  { value: 'transferencia', label: 'Transferência' },
+  { value: 'despesa', label: 'Despesa', icon: TrendingDown },
+  { value: 'receita', label: 'Receita', icon: TrendingUp },
+  { value: 'transferencia', label: 'Transferência', icon: ArrowRightLeft },
 ] as const;
 
 type OptionalSectionProps = {
@@ -66,7 +64,7 @@ type OptionalSectionProps = {
 };
 
 const OptionalSection = ({ title, description, isOpen, onToggle, children }: OptionalSectionProps) => (
-  <div className="rounded-2xl border bg-card/60 px-4 py-3 shadow-sm">
+  <div className="rounded-2xl border bg-card/40 px-4 py-3 shadow-sm transition-all duration-200 hover:bg-card/60">
     <button
       type="button"
       onClick={onToggle}
@@ -77,7 +75,7 @@ const OptionalSection = ({ title, description, isOpen, onToggle, children }: Opt
         <p className="text-sm font-semibold leading-tight">{title}</p>
         {description && <p className="text-xs text-muted-foreground">{description}</p>}
       </div>
-      <ChevronDown className={cn('h-4 w-4 transition-transform', isOpen && 'rotate-180')} />
+      <ChevronDown className={cn('h-4 w-4 transition-transform duration-300', isOpen && 'rotate-180')} />
     </button>
     <AnimatePresence initial={false}>
       {isOpen && (
@@ -85,9 +83,10 @@ const OptionalSection = ({ title, description, isOpen, onToggle, children }: Opt
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
           className="overflow-hidden"
         >
-          <div className="pt-3">
+          <div className="pt-4 pb-2">
             <div className="space-y-4 text-sm text-foreground">{children}</div>
           </div>
         </motion.div>
@@ -98,9 +97,9 @@ const OptionalSection = ({ title, description, isOpen, onToggle, children }: Opt
 
 const formSchema = z.object({
   tipo: z.enum(['despesa', 'receita', 'transferencia']),
-  descricao: z.string().optional(), 
+  descricao: z.string().optional(),
   valor: z.coerce.number().positive({ message: 'O valor deve ser positivo.' }),
-  data: z.date({ required_error: "A data é obrigatória."}),
+  data: z.date({ required_error: "A data é obrigatória." }),
   pago: z.boolean().optional(),
   categoryId: z.string().optional(),
   attachmentUrl: z.string().nullable().optional(),
@@ -117,62 +116,62 @@ const formSchema = z.object({
   fromAccountId: z.string().optional(),
   toAccountId: z.string().optional(),
 })
-.refine(data => {
+  .refine(data => {
     if (data.tipo === 'transferencia') {
-        if (!data.fromAccountId || data.fromAccountId.length < 1) return false;
-        if (!data.toAccountId || data.toAccountId.length < 1) return false;
-        if (data.fromAccountId === data.toAccountId) return false;
+      if (!data.fromAccountId || data.fromAccountId.length < 1) return false;
+      if (!data.toAccountId || data.toAccountId.length < 1) return false;
+      if (data.fromAccountId === data.toAccountId) return false;
     }
     return true;
-}, {
+  }, {
     message: "Contas de origem e destino são obrigatórias e devem ser diferentes.",
     path: ['toAccountId'],
-})
-.refine(data => {
+  })
+  .refine(data => {
     if (data.tipo === 'despesa' || data.tipo === 'receita') {
-        return !!data.descricao && data.descricao.length >= 2;
+      return !!data.descricao && data.descricao.length >= 2;
     }
     return true;
-}, {
+  }, {
     message: "O título é obrigatório.",
     path: ['descricao'],
-})
-.refine(data => {
+  })
+  .refine(data => {
     if ((data.tipo === 'despesa' || data.tipo === 'receita') && data.metodoPagamento !== 'dinheiro') {
-        return !!data.contaCartaoId && data.contaCartaoId.length > 0;
+      return !!data.contaCartaoId && data.contaCartaoId.length > 0;
     }
     return true;
-}, {
+  }, {
     message: "Selecione uma conta ou cartão.",
     path: ['contaCartaoId'],
-})
-.refine(data => {
+  })
+  .refine(data => {
     if (data.entryType === 'installment') {
-        if (!data.totalInstallments || data.totalInstallments < 2) return false;
+      if (!data.totalInstallments || data.totalInstallments < 2) return false;
     }
     return true;
-}, {
+  }, {
     message: "O número de parcelas deve ser no mínimo 2.",
     path: ['totalInstallments']
-})
-.refine(data => {
+  })
+  .refine(data => {
     if (data.entryType === 'recurring') {
-        if (!data.recurrenceType || data.recurrenceType === 'NONE') return false;
+      if (!data.recurrenceType || data.recurrenceType === 'NONE') return false;
     }
     return true;
-}, {
+  }, {
     message: "Selecione uma frequência para a recorrência.",
     path: ['recurrenceType']
-})
-.refine(data => {
+  })
+  .refine(data => {
     const selectedDate = data.data;
     const minDate = subYears(new Date(), 5);
     const maxDate = addYears(new Date(), 2);
     return selectedDate >= minDate && selectedDate <= maxDate;
-}, {
+  }, {
     message: "Escolha uma data dentro de um intervalo válido.",
     path: ['data'],
-});
+  });
 
 
 
@@ -230,21 +229,21 @@ export function AddTransactionForm({
   const [user, setUser] = useState<User | null>(null);
   const defaultValues: Partial<FormValues> = {
     tipo: 'despesa',
-    descricao: '', 
-    valor: 0, 
-    data: new Date(), 
+    descricao: '',
+    valor: 0,
+    data: new Date(),
     categoryId: '',
-    metodoPagamento: 'credito', 
-    contaCartaoId: '', 
-    pago: true, 
+    metodoPagamento: 'credito',
+    contaCartaoId: '',
+    pago: true,
     entryType: 'single',
-    recurrenceType: 'NONE', 
-    attachmentUrl: null, 
-    tags: [], 
+    recurrenceType: 'NONE',
+    attachmentUrl: null,
+    tags: [],
     notes: '',
-    installment: false, 
-    totalInstallments: 2, 
-    withInterest: false, 
+    installment: false,
+    totalInstallments: 2,
+    withInterest: false,
     interestRate: 0,
   };
   const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
@@ -268,17 +267,17 @@ export function AddTransactionForm({
     if (!targetSection) return;
     setOptionalSections((prev) => (prev[targetSection] ? prev : { ...prev, [targetSection]: true }));
   }, []);
-  
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: defaultValues as FormValues,
   });
-  
+
   const resetFormToDefault = () => {
     const currentTipo = form.getValues('tipo');
     const nextValues = {
-        ...(defaultValues as FormValues),
-        tipo: currentTipo,
+      ...(defaultValues as FormValues),
+      tipo: currentTipo,
     };
     form.reset(nextValues);
     setOptionalSections(computeOptionalSectionState(nextValues));
@@ -302,39 +301,39 @@ export function AddTransactionForm({
   useEffect(() => {
     fetchInitialData();
   }, [fetchInitialData]);
-  
+
   useEffect(() => {
     if (transaction && categories.length > 0) {
-        const category = categories.find(c => c.id === transaction.categoryId);
-        let entryType: 'single' | 'installment' | 'recurring' = 'single';
-        if (transaction.installment) entryType = 'installment';
-        else if (transaction.recurrenceType && transaction.recurrenceType !== 'NONE') entryType = 'recurring';
+      const category = categories.find(c => c.id === transaction.categoryId);
+      let entryType: 'single' | 'installment' | 'recurring' = 'single';
+      if (transaction.installment) entryType = 'installment';
+      else if (transaction.recurrenceType && transaction.recurrenceType !== 'NONE') entryType = 'recurring';
 
-        const valuesToReset: Partial<FormValues> = {
-            tipo: transaction.tipo,
-            descricao: transaction.installment ? transaction.descricao.replace(/\s\(\d+\/\d+\)$/, '') : transaction.descricao,
-            valor: transaction.installment ? (Number(transaction.valorTotal) ?? Number(transaction.valor)) : Number(transaction.valor),
-            data: new Date(transaction.data),
-            pago: transaction.pago,
-            categoryId: category?.id || '',
-            attachmentUrl: transaction.attachmentUrl,
-            tags: transaction.tags?.map(t => t.id) || [],
-            notes: transaction.notes || '',
-            metodoPagamento: transaction.metodoPagamento,
-            contaCartaoId: transaction.accountId || transaction.cardId || '',
-            entryType: entryType,
-            recurrenceType: transaction.recurrenceType || 'NONE',
-            installment: !!transaction.installment,
-            totalInstallments: transaction.totalInstallments || 2,
-            withInterest: !!transaction.withInterest,
-            interestRate: transaction.interestRate || 0,
-        };
-        const mergedValues = { ...(defaultValues as FormValues), ...valuesToReset };
-        form.reset(mergedValues as FormValues);
-        setOptionalSections(computeOptionalSectionState(mergedValues));
+      const valuesToReset: Partial<FormValues> = {
+        tipo: transaction.tipo,
+        descricao: transaction.installment ? transaction.descricao.replace(/\s\(\d+\/\d+\)$/, '') : transaction.descricao,
+        valor: transaction.installment ? (Number(transaction.valorTotal) ?? Number(transaction.valor)) : Number(transaction.valor),
+        data: new Date(transaction.data),
+        pago: transaction.pago,
+        categoryId: category?.id || '',
+        attachmentUrl: transaction.attachmentUrl,
+        tags: transaction.tags?.map(t => t.id) || [],
+        notes: transaction.notes || '',
+        metodoPagamento: transaction.metodoPagamento,
+        contaCartaoId: transaction.accountId || transaction.cardId || '',
+        entryType: entryType,
+        recurrenceType: transaction.recurrenceType || 'NONE',
+        installment: !!transaction.installment,
+        totalInstallments: transaction.totalInstallments || 2,
+        withInterest: !!transaction.withInterest,
+        interestRate: transaction.interestRate || 0,
+      };
+      const mergedValues = { ...(defaultValues as FormValues), ...valuesToReset };
+      form.reset(mergedValues as FormValues);
+      setOptionalSections(computeOptionalSectionState(mergedValues));
     } else if (!transaction) {
-         form.reset(defaultValues as FormValues);
-         setOptionalSections(computeOptionalSectionState(defaultValues as FormValues));
+      form.reset(defaultValues as FormValues);
+      setOptionalSections(computeOptionalSectionState(defaultValues as FormValues));
     }
   }, [transaction, form, categories]);
 
@@ -343,17 +342,17 @@ export function AddTransactionForm({
     if (data.valor) form.setValue('valor', data.valor, { shouldValidate: true, shouldDirty: true });
     if (data.data) form.setValue('data', parseISO(data.data), { shouldValidate: true, shouldDirty: true });
   };
-  
+
   const handleSuggestionSelected = (sugestao: SugestaoTransacao) => {
     const currentValues = form.getValues();
     if (currentValues.tipo !== 'transferencia') {
-        if (!form.formState.dirtyFields.categoryId) form.setValue('categoryId', sugestao.categoriaId);
-        if (currentValues.tipo === 'despesa' && !form.formState.dirtyFields.metodoPagamento) form.setValue('metodoPagamento', sugestao.metodoPagamento);
-        if (!form.formState.dirtyFields.contaCartaoId) form.setValue('contaCartaoId', sugestao.contaId || sugestao.cartaoId || '');
+      if (!form.formState.dirtyFields.categoryId) form.setValue('categoryId', sugestao.categoriaId);
+      if (currentValues.tipo === 'despesa' && !form.formState.dirtyFields.metodoPagamento) form.setValue('metodoPagamento', sugestao.metodoPagamento);
+      if (!form.formState.dirtyFields.contaCartaoId) form.setValue('contaCartaoId', sugestao.contaId || sugestao.cartaoId || '');
     }
     if (!form.formState.dirtyFields.tags) {
-        const tagIds = sugestao.tags.map(tagName => userTags.find(t => t.name === tagName)?.id).filter((id): id is string => !!id);
-        form.setValue('tags', tagIds);
+      const tagIds = sugestao.tags.map(tagName => userTags.find(t => t.name === tagName)?.id).filter((id): id is string => !!id);
+      form.setValue('tags', tagIds);
     }
     toast({ title: "Campos preenchidos!", description: `Sugestão "${sugestao.descricao}" aplicada.` });
   };
@@ -397,35 +396,35 @@ export function AddTransactionForm({
       }
     };
   }, [form.formState.errors, form.formState.submitCount, openSectionForField]);
-  
+
   useEffect(() => {
     if (!isEditing) {
-        const currentValues = form.getValues();
-        form.reset({ ...defaultValues, tipo: currentValues.tipo } as FormValues);
+      const currentValues = form.getValues();
+      form.reset({ ...defaultValues, tipo: currentValues.tipo } as FormValues);
 
-        if (watchTipo === 'receita') {
-            form.setValue('metodoPagamento', 'pix');
-        } else if (watchTipo === 'despesa') {
-             form.setValue('metodoPagamento', 'credito');
-        }
+      if (watchTipo === 'receita') {
+        form.setValue('metodoPagamento', 'pix');
+      } else if (watchTipo === 'despesa') {
+        form.setValue('metodoPagamento', 'credito');
+      }
     }
   }, [watchTipo, form, isEditing]);
-  
+
   async function onSubmit(values: FormValues, shouldClose: boolean) {
-    const dataToSend = { 
-        ...values,
-        installment: values.entryType === 'installment',
-        recurrenceType: values.entryType === 'recurring' ? values.recurrenceType : 'NONE',
-     };
+    const dataToSend = {
+      ...values,
+      installment: values.entryType === 'installment',
+      recurrenceType: values.entryType === 'recurring' ? values.recurrenceType : 'NONE',
+    };
 
     await onSave(dataToSend, shouldClose);
     if (!shouldClose && !isEditing) {
-        resetFormToDefault();
+      resetFormToDefault();
     }
   }
 
   const paymentSources = (watchTipo === 'despesa' && watchMetodo === 'credito') ? cards : accounts;
-  
+
   const filteredCategories = useMemo(() => {
     return categories.filter(c => c.type === watchTipo);
   }, [categories, watchTipo]);
@@ -434,12 +433,12 @@ export function AddTransactionForm({
     if (!user?.favoriteCategories) return [];
     if (Array.isArray(user.favoriteCategories)) return user.favoriteCategories;
     if (typeof user.favoriteCategories === 'string') {
-        try {
-            const parsed = JSON.parse(user.favoriteCategories);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch (error) {
-            return [];
-        }
+      try {
+        const parsed = JSON.parse(user.favoriteCategories);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
     }
     return [];
   }, [user]);
@@ -453,245 +452,261 @@ export function AddTransactionForm({
 
   return (
     <>
-    <Form {...form}>
-        <form className={cn("w-full max-w-full space-y-4", className)}>
-        {/* Bloco Principal */}
-        <div className="flex w-full flex-wrap items-center justify-between gap-4">
-          <div className="flex-1 min-w-[220px] scroll-mt-28" ref={registerFieldRef('tipo')}>
-            <FormField
-              control={form.control}
-              name="tipo"
-              render={({ field }) => (
-                <FormItem className="space-y-2">
-                  <FormLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Tipo de operação
-                  </FormLabel>
-                  <FormControl>
-                    <div className="inline-flex w-full max-w-md items-center rounded-full border bg-card/70 p-1 shadow-sm">
-                      {TRANSACTION_TYPE_OPTIONS.map((option) => {
-                        const isActive = field.value === option.value;
-                        return (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => field.onChange(option.value)}
-                            className={cn(
-                              'flex-1 rounded-full px-4 py-2 text-sm font-semibold transition',
-                              isActive
-                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                : 'text-muted-foreground hover:text-foreground'
-                            )}
-                          >
-                            {option.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+      <Form {...form}>
+        <form className={cn("w-full max-w-full space-y-6", className)}>
+
+          {/* 1. Animated Segmented Control for Type */}
+          <div className="flex justify-center pb-2" ref={registerFieldRef('tipo')}>
+            <div className="relative flex p-1 bg-muted/50 rounded-full">
+              {TRANSACTION_TYPE_OPTIONS.map((option) => {
+                const isActive = watchTipo === option.value;
+                const Icon = option.icon;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => form.setValue('tipo', option.value)}
+                    className={cn(
+                      "relative z-10 flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors duration-200 rounded-full",
+                      isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {isActive && (
+                      <motion.div
+                        layoutId="activeType"
+                        className={cn(
+                          "absolute inset-0 rounded-full shadow-sm",
+                          option.value === 'despesa' ? "bg-rose-500" :
+                            option.value === 'receita' ? "bg-emerald-500" : "bg-primary"
+                        )}
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                      />
+                    )}
+                    <span className="relative z-20 flex items-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      {option.label}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
-          {user?.enableOcr && watchTipo !== 'transferencia' && (
-            <Button type="button" variant="outline" size="sm" onClick={() => setIsOcrDialogOpen(true)}>
-              <Camera className="mr-2 h-4 w-4" />
-              Digitalizar
-            </Button>
-          )}
-        </div>
-        
-        <div className="scroll-mt-28" ref={registerFieldRef('descricao')}>
-          <FormField
-            control={form.control}
-            name="descricao"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel className="flex items-center gap-2">
-                  <PencilLine className="h-4 w-4" />
-                  Título
-                </FormLabel>
-                <FormControl>
-                  {user?.habilitarDescricaoInteligente && watchTipo !== 'transferencia' ? (
-                    <DescricaoInteligente
-                      valor={field.value || ''}
-                      onChange={field.onChange}
-                      tipoTransacao={watchTipo}
-                      onSugestaoSelecionada={handleSuggestionSelected}
-                      valorTransacao={form.watch('valor')}
-                    />
-                  ) : (
-                    <Input
-                      placeholder={
-                        watchTipo === 'transferencia'
-                          ? 'Ex: Dinheiro para emergências'
-                          : 'Ex: Almoço no restaurante'
-                      }
-                      {...field}
-                    />
-                  )}
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
-        
-        <div className="flex w-full flex-col gap-4 sm:flex-row">
-          <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('valor')}>
+
+          {/* 2. Hero Amount Input */}
+          <div className="flex flex-col items-center justify-center py-2" ref={registerFieldRef('valor')}>
             <FormField
               control={form.control}
               name="valor"
               render={({ field }) => (
-                <FormItem className="w-full flex-1">
-                  <FormLabel className="flex items-center gap-2">
-                    <CircleDollarSign className="h-4 w-4" />
-                    Valor
-                  </FormLabel>
+                <FormItem className="w-full text-center">
                   <FormControl>
-                    <CurrencyInput value={field.value || 0} onValueChange={field.onChange} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
-          <div className="flex w-full flex-1 flex-col scroll-mt-28" ref={registerFieldRef('data')}>
-            <FormField
-              control={form.control}
-              name="data"
-              render={({ field }) => (
-                <FormItem className="flex w-full flex-1 flex-col">
-                  <FormLabel className="flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4" />
-                    Data
-                  </FormLabel>
-                  <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={'outline'}
-                          className={cn('w-full pl-3 text-left font-normal h-10', !field.value && 'text-muted-foreground')}
-                        >
-                          {field.value ? (
-                            format(field.value, 'PPP', { locale: ptBR })
-                          ) : (
-                            <span>Escolha uma data</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={(date) => {
-                          if (date) field.onChange(date);
-                          setIsCalendarOpen(false);
-                        }}
-                        initialFocus
+                    <div className="relative flex items-center justify-center">
+                      <span className="text-4xl font-bold text-muted-foreground mr-2">R$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0,00"
+                        className="bg-transparent text-6xl font-bold text-center w-full max-w-[300px] outline-none placeholder:text-muted-foreground/30"
+                        value={field.value || ''}
+                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                        autoFocus
                       />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
+                    </div>
+                  </FormControl>
+                  <FormMessage className="text-center" />
                 </FormItem>
               )}
             />
           </div>
-        </div>
 
-        {watchTipo === 'transferencia' && (
-          <div className="flex w-full flex-col gap-4 sm:flex-row">
-            <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('fromAccountId')}>
+          {/* 3. Description & Date Row */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4">
+            <div className="scroll-mt-28" ref={registerFieldRef('descricao')}>
               <FormField
                 control={form.control}
-                name="fromAccountId"
+                name="descricao"
                 render={({ field }) => (
-                  <FormItem className="w-full flex-1">
-                    <FormLabel className="flex items-center gap-2">
-                      <Landmark className="h-4 w-4" />
-                      Conta de Origem
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="De onde sairá o dinheiro?" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {accounts
-                          .filter((acc) => acc.id !== form.watch('toAccountId'))
-                          .map((acc) => (
-                            <SelectItem key={acc.id} value={acc.id}>
-                              {acc.nome}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                  <FormItem>
+                    <FormControl>
+                      {user?.habilitarDescricaoInteligente && watchTipo !== 'transferencia' ? (
+                        <DescricaoInteligente
+                          valor={field.value || ''}
+                          onChange={field.onChange}
+                          tipoTransacao={watchTipo}
+                          onSugestaoSelecionada={handleSuggestionSelected}
+                          valorTransacao={form.watch('valor')}
+                        />
+                      ) : (
+                        <div className="relative">
+                          <PencilLine className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+                          <Input
+                            placeholder={
+                              watchTipo === 'transferencia'
+                                ? 'Ex: Dinheiro para emergências'
+                                : 'Ex: Almoço no restaurante'
+                            }
+                            className="pl-10 h-12 text-lg bg-card/50 border-muted-foreground/20 focus-visible:ring-primary/50"
+                            {...field}
+                          />
+                        </div>
+                      )}
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-            <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('toAccountId')}>
+
+            <div className="scroll-mt-28 min-w-[160px]" ref={registerFieldRef('data')}>
               <FormField
                 control={form.control}
-                name="toAccountId"
+                name="data"
                 render={({ field }) => (
-                  <FormItem className="w-full flex-1">
-                    <FormLabel className="flex items-center gap-2">
-                      <Landmark className="h-4 w-4" />
-                      Conta de Destino
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Para onde vai o dinheiro?" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {accounts
-                          .filter((acc) => acc.id !== form.watch('fromAccountId'))
-                          .map((acc) => (
-                            <SelectItem key={acc.id} value={acc.id}>
-                              {acc.nome}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                  <FormItem>
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={'outline'}
+                            className={cn('w-full pl-3 text-left font-normal h-12 bg-card/50 border-muted-foreground/20 hover:bg-card/80', !field.value && 'text-muted-foreground')}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
+                            {field.value ? (
+                              format(field.value, 'dd/MM/yyyy')
+                            ) : (
+                              <span>Data</span>
+                            )}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={(date) => {
+                            if (date) field.onChange(date);
+                            setIsCalendarOpen(false);
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
           </div>
-        )}
-        
-        {watchTipo !== 'transferencia' && (
-          <div className="space-y-4">
+
+          {/* 4. Quick Payment Methods (Horizontal Scroll) */}
+          {watchTipo !== 'transferencia' && (
+            <div className="space-y-2" ref={registerFieldRef('metodoPagamento')}>
+              <FormField
+                control={form.control}
+                name="metodoPagamento"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                        {[
+                          { value: 'credito', label: 'Crédito', icon: CreditCard },
+                          { value: 'debito', label: 'Débito', icon: CreditCard },
+                          { value: 'pix', label: 'PIX', icon: QrCode },
+                          { value: 'dinheiro', label: 'Dinheiro', icon: Banknote },
+                        ].map((method) => {
+                          if (watchTipo === 'despesa' && method.value === 'credito') {
+                            // Show Credit
+                          } else if (watchTipo === 'receita' && method.value === 'credito') {
+                            return null; // Hide Credit for Income
+                          }
+
+                          const isActive = field.value === method.value;
+                          const Icon = method.icon;
+                          return (
+                            <button
+                              key={method.value}
+                              type="button"
+                              onClick={() => field.onChange(method.value)}
+                              className={cn(
+                                "flex flex-col items-center justify-center min-w-[80px] h-20 rounded-xl border-2 transition-all duration-200 gap-2",
+                                isActive
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-muted bg-card/30 text-muted-foreground hover:bg-card/60 hover:border-muted-foreground/50"
+                              )}
+                            >
+                              <Icon className="h-6 w-6" />
+                              <span className="text-xs font-medium">{method.label}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
+
+          {/* Account/Card Selection */}
+          {watchTipo !== 'transferencia' && watchMetodo !== 'dinheiro' && (
+            <div className="scroll-mt-28" ref={registerFieldRef('contaCartaoId')}>
+              <FormField
+                control={form.control}
+                name="contaCartaoId"
+                render={({ field }) => (
+                  <FormItem>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-12 bg-card/50 border-muted-foreground/20">
+                          <div className="flex items-center gap-2">
+                            <Landmark className="h-4 w-4 text-muted-foreground" />
+                            <SelectValue placeholder={`Selecione ${watchMetodo === 'credito' ? 'o cartão' : 'a conta'}`} />
+                          </div>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {paymentSources.map((source) => (
+                          <SelectItem key={source.id} value={source.id}>
+                            {source.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          )}
+
+
+          {watchTipo === 'transferencia' && (
             <div className="flex w-full flex-col gap-4 sm:flex-row">
-              <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('metodoPagamento')}>
+              <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('fromAccountId')}>
                 <FormField
                   control={form.control}
-                  name="metodoPagamento"
+                  name="fromAccountId"
                   render={({ field }) => (
                     <FormItem className="w-full flex-1">
                       <FormLabel className="flex items-center gap-2">
-                        <Wallet className="h-4 w-4" />
-                        Pagamento
+                        <Landmark className="h-4 w-4" />
+                        Conta de Origem
                       </FormLabel>
-                      <Select onValueChange={field.onChange as (value: string) => void} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione o método" />
+                          <SelectTrigger className="h-11 bg-card/50">
+                            <SelectValue placeholder="De onde sairá o dinheiro?" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {watchTipo === 'despesa' && <SelectItem value="credito">Cartão de Crédito</SelectItem>}
-                          <SelectItem value="debito">Débito</SelectItem>
-                          <SelectItem value="pix">PIX</SelectItem>
-                          <SelectItem value="dinheiro">Dinheiro</SelectItem>
+                          {accounts
+                            .filter((acc) => acc.id !== form.watch('toAccountId'))
+                            .map((acc) => (
+                              <SelectItem key={acc.id} value={acc.id}>
+                                {acc.nome}
+                              </SelectItem>
+                            ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -699,39 +714,42 @@ export function AddTransactionForm({
                   )}
                 />
               </div>
-              {watchMetodo !== 'dinheiro' && (
-                <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('contaCartaoId')}>
-                  <FormField
-                    control={form.control}
-                    name="contaCartaoId"
-                    render={({ field }) => (
-                      <FormItem className="w-full flex-1">
-                        <FormLabel className="flex items-center gap-2">
-                          <Landmark className="h-4 w-4" />
-                          {watchMetodo === 'credito' ? 'Cartão' : 'Conta'}
-                        </FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder={`Selecione`} />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {paymentSources.map((source) => (
-                              <SelectItem key={source.id} value={source.id}>
-                                {source.nome}
+              <div className="w-full flex-1 scroll-mt-28" ref={registerFieldRef('toAccountId')}>
+                <FormField
+                  control={form.control}
+                  name="toAccountId"
+                  render={({ field }) => (
+                    <FormItem className="w-full flex-1">
+                      <FormLabel className="flex items-center gap-2">
+                        <Landmark className="h-4 w-4" />
+                        Conta de Destino
+                      </FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="h-11 bg-card/50">
+                            <SelectValue placeholder="Para onde vai o dinheiro?" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {accounts
+                            .filter((acc) => acc.id !== form.watch('fromAccountId'))
+                            .map((acc) => (
+                              <SelectItem key={acc.id} value={acc.id}>
+                                {acc.nome}
                               </SelectItem>
                             ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
+          )}
 
+          {/* Optional Sections */}
+          <div className="space-y-3 pt-2">
             <OptionalSection
               title="Status do pagamento"
               description="Atualize quando a operação já foi concluída."
@@ -743,7 +761,7 @@ export function AddTransactionForm({
                   control={form.control}
                   name="pago"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm bg-card/50">
                       <div className="space-y-0.5">
                         <FormLabel>{field.value ? 'Operação Efetuada' : 'Operação Pendente'}</FormLabel>
                       </div>
@@ -786,8 +804,8 @@ export function AddTransactionForm({
                               disabled={disabled}
                               onClick={() => field.onChange(option.value)}
                               className={cn(
-                                'rounded-md border-2 p-3 text-left text-sm transition',
-                                isActive ? 'border-primary/60 bg-primary/5' : 'border-muted',
+                                'rounded-xl border-2 p-3 text-left text-sm transition-all duration-200',
+                                isActive ? 'border-primary bg-primary/5 shadow-sm' : 'border-muted bg-card/30 hover:bg-card/60',
                                 disabled && 'pointer-events-none opacity-40'
                               )}
                             >
@@ -805,7 +823,7 @@ export function AddTransactionForm({
                   )}
                 />
               </div>
-              
+
               <AnimatePresence>
                 {watchEntryType === 'installment' && (
                   <motion.div
@@ -814,7 +832,7 @@ export function AddTransactionForm({
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="mt-2 space-y-4 rounded-lg border p-3">
+                    <div className="mt-2 space-y-4 rounded-lg border p-3 bg-card/50">
                       <div className="scroll-mt-28" ref={registerFieldRef('totalInstallments')}>
                         <FormField
                           control={form.control}
@@ -891,7 +909,7 @@ export function AddTransactionForm({
                     exit={{ height: 0, opacity: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="mt-2 space-y-4 rounded-lg border p-3">
+                    <div className="mt-2 space-y-4 rounded-lg border p-3 bg-card/50">
                       <div className="scroll-mt-28" ref={registerFieldRef('recurrenceType')}>
                         <FormField
                           control={form.control}
@@ -943,7 +961,7 @@ export function AddTransactionForm({
                           <FormLabel>Categoria</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className="bg-card/50 border-muted-foreground/20">
                                 <SelectValue placeholder="Selecione a categoria" />
                               </SelectTrigger>
                             </FormControl>
@@ -1030,7 +1048,7 @@ export function AddTransactionForm({
                         <FormItem>
                           <FormLabel>Observações</FormLabel>
                           <FormControl>
-                            <Textarea placeholder="Detalhes adicionais..." {...field} />
+                            <Textarea placeholder="Detalhes adicionais..." {...field} className="bg-card/50 border-muted-foreground/20" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1041,24 +1059,23 @@ export function AddTransactionForm({
               </div>
             </OptionalSection>
           </div>
-        )}
 
-        <div className="flex flex-col-reverse sm:flex-row sm:justify-end pt-6 gap-2">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} className="w-full sm:w-auto">Cancelar</Button>
-          {!isEditing && watchTipo !== 'transferencia' && (
-            <Button type="button" onClick={() => onSubmit(form.getValues(), false)} disabled={isSubmitting} className="w-full sm:w-auto">
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-              Salvar e Criar Nova
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end pt-6 gap-2">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} className="w-full sm:w-auto">Cancelar</Button>
+            {!isEditing && watchTipo !== 'transferencia' && (
+              <Button type="button" variant="outline" onClick={() => onSubmit(form.getValues(), false)} disabled={isSubmitting} className="w-full sm:w-auto">
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Salvar e Criar Nova
+              </Button>
+            )}
+            <Button type="button" onClick={() => onSubmit(form.getValues(), true)} disabled={isSubmitting} className="w-full sm:w-auto shadow-lg shadow-primary/20">
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isEditing ? 'Salvar Alterações' : 'Salvar Transação'}
             </Button>
-          )}
-          <Button type="button" onClick={() => onSubmit(form.getValues(), true)} disabled={isSubmitting} className="w-full sm:w-auto">
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-            {isEditing ? 'Salvar Alterações' : 'Salvar e Fechar'}
-          </Button>
-        </div>
+          </div>
         </form>
-    </Form>
-    <OcrUploadDialog isOpen={isOcrDialogOpen} onClose={() => setIsOcrDialogOpen(false)} onOcrComplete={handleOcrComplete}/>
+      </Form>
+      <OcrUploadDialog isOpen={isOcrDialogOpen} onClose={() => setIsOcrDialogOpen(false)} onOcrComplete={handleOcrComplete} />
     </>
   );
 }
