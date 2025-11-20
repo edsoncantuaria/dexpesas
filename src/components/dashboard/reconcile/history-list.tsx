@@ -24,7 +24,7 @@ type ReconciliationHistory = Reconciliation & {
     targetName: string; // Adicionado para simplificar
 }
 
-const statusConfig = {
+const statusConfig: Record<string, { text: string; icon: any; color: string; isSpinning?: boolean }> = {
     PROCESSING: { text: 'Processando', icon: Loader2, color: 'text-blue-500', isSpinning: true },
     PENDING_REVIEW: { text: 'Pendente', icon: AlertCircle, color: 'text-yellow-500' },
     COMPLETED: { text: 'Concluída', icon: CheckCircle2, color: 'text-green-500' },
@@ -67,7 +67,7 @@ export function ReconciliationHistoryList({ onResume, onFinalize }: HistoryListP
             </div>
         );
     }
-    
+
     if (history.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center gap-4 py-16 text-center text-muted-foreground">
@@ -92,7 +92,7 @@ export function ReconciliationHistoryList({ onResume, onFinalize }: HistoryListP
                             <CardContent className="p-3 space-y-2">
                                 <div className="flex justify-between items-start">
                                     <div className='flex items-center gap-2'>
-                                        <TargetIcon className='h-4 w-4 text-muted-foreground'/>
+                                        <TargetIcon className='h-4 w-4 text-muted-foreground' />
                                         <span className="font-semibold">{rec.targetName}</span>
                                     </div>
                                     <Badge variant={isPending ? 'default' : 'secondary'} className={cn(config.color, !isPending && 'border-transparent')}>
@@ -109,7 +109,7 @@ export function ReconciliationHistoryList({ onResume, onFinalize }: HistoryListP
                                         <Button size="sm" className="flex-1" onClick={() => onResume({ reconciliationId: rec.id })}>
                                             <Play className="mr-2 h-4 w-4" /> Retomar
                                         </Button>
-                                         <Button size="sm" variant="secondary" className="flex-1" onClick={() => onFinalize(rec.id)}>
+                                        <Button size="sm" variant="secondary" className="flex-1" onClick={() => onFinalize(rec.id)}>
                                             <SquareCheckBig className="mr-2 h-4 w-4" /> Finalizar
                                         </Button>
                                     </div>
@@ -141,13 +141,13 @@ export function ReconciliationHistoryList({ onResume, onFinalize }: HistoryListP
                         const Icon = config.icon;
                         const TargetIcon = rec.accountId ? Landmark : CreditCard;
                         const isPending = rec.status === 'PENDING_REVIEW';
-                        
+
                         return (
                             <TableRow key={rec.id} className={cn("transition-colors", !isPending && 'opacity-70')}>
                                 <TableCell>{format(new Date(rec.createdAt), 'dd/MM/yyyy HH:mm', { locale: ptBR })}</TableCell>
                                 <TableCell>
                                     <div className='flex items-center gap-2'>
-                                        <TargetIcon className='h-4 w-4 text-muted-foreground'/>
+                                        <TargetIcon className='h-4 w-4 text-muted-foreground' />
                                         <span>{rec.targetName}</span>
                                     </div>
                                 </TableCell>
@@ -161,16 +161,16 @@ export function ReconciliationHistoryList({ onResume, onFinalize }: HistoryListP
                                     </div>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                     {isPending && (
+                                    {isPending && (
                                         <div className="flex gap-2 justify-end">
                                             <Button size="sm" variant="outline" onClick={() => onResume({ reconciliationId: rec.id })}>
                                                 Retomar
                                             </Button>
-                                             <Button size="sm" onClick={() => onFinalize(rec.id)}>
+                                            <Button size="sm" onClick={() => onFinalize(rec.id)}>
                                                 Finalizar
                                             </Button>
                                         </div>
-                                     )}
+                                    )}
                                 </TableCell>
                             </TableRow>
                         )

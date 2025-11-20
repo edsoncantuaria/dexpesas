@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { GitCompareArrows, Loader2, HelpCircle } from 'lucide-react';
+import { Loader2, HelpCircle, History, ArrowRightLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import api from '@/lib/api';
@@ -15,6 +15,8 @@ import { ReconciliationHistoryList } from '@/components/dashboard/reconcile/hist
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { ReconcileHero } from './reconcile-hero';
+import { motion } from 'framer-motion';
 
 type Target = (Account | CardType) & { type: 'account' | 'card' };
 
@@ -61,7 +63,7 @@ export function ReconcilePageClient() {
         bufferedStartDate.setDate(startDate.getDate() - 7);
         const bufferedEndDate = new Date(endDate);
         bufferedEndDate.setDate(endDate.getDate() + 7);
-        
+
         try {
             const queryParams = new URLSearchParams({
                 [targetType === 'account' ? 'accountId' : 'cardId']: targetId,
@@ -75,7 +77,7 @@ export function ReconcilePageClient() {
             toast({ variant: 'destructive', title: 'Erro ao buscar transações manuais' });
         }
     }, [toast]);
-    
+
     const fetchReconciliationData = useCallback(async (params: { reconciliationId?: string; accountId?: string; cardId?: string }) => {
         try {
             const res = await api.get('/reconcile/status', { params });
@@ -93,14 +95,14 @@ export function ReconcilePageClient() {
                 setActiveTab('reconcile');
             }
         } catch (error) {
-             setReconciliation(null);
+            setReconciliation(null);
         }
     }, [accounts, cards, fetchManualTransactions]);
 
     const pollReconciliationStatus = useCallback(async (reconciliationId: string) => {
         if (isPolling) return;
         setIsPolling(true);
-        
+
         const poll = async (): Promise<boolean> => {
             try {
                 const res = await api.get(`/reconcile/status?reconciliationId=${reconciliationId}`);
@@ -126,7 +128,7 @@ export function ReconcilePageClient() {
                 setIsPolling(false);
                 toast({ variant: 'destructive', title: 'Tempo de processamento excedido.' });
             }
-        }, 60000); 
+        }, 60000);
     }, [toast, isPolling, fetchReconciliationData]);
 
     const handleUploadSuccess = async (reconciliationId: string, targetId: string, targetType: 'account' | 'card') => {
@@ -154,23 +156,23 @@ export function ReconcilePageClient() {
         try {
             await api.post('/reconcile/match', { importedTransactionId, manualTransactionId });
             if (reconciliation) {
-                 await fetchReconciliationData({ reconciliationId: reconciliation.id });
+                await fetchReconciliationData({ reconciliationId: reconciliation.id });
             }
             toast({ title: 'Conciliado!', description: 'A transação foi conciliada com sucesso.', className: 'bg-green-100 dark:bg-green-800' });
         } catch (error) {
-             toast({ variant: 'destructive', title: 'Erro ao conciliar transação.' });
+            toast({ variant: 'destructive', title: 'Erro ao conciliar transação.' });
         }
     };
-    
+
     const handleDiscard = async (importedTransactionId: string) => {
-         try {
+        try {
             await api.post('/reconcile/discard', { importedTransactionId });
             if (reconciliation) {
-                 await fetchReconciliationData({ reconciliationId: reconciliation.id });
+                await fetchReconciliationData({ reconciliationId: reconciliation.id });
             }
-             toast({ title: 'Transação Descartada.', variant: 'destructive' });
+            toast({ title: 'Transação Descartada.', variant: 'destructive' });
         } catch (error) {
-             toast({ variant: 'destructive', title: 'Erro ao descartar transação.' });
+            toast({ variant: 'destructive', title: 'Erro ao descartar transação.' });
         }
     };
 
@@ -179,11 +181,11 @@ export function ReconcilePageClient() {
             fetchReconciliationData({ reconciliationId: reconciliation.id });
         }
     };
-    
+
     const handleFinalize = async (reconciliationId: string) => {
         try {
             await api.post(`/reconcile/${reconciliationId}/finalize`);
-            toast({ title: "Reconciliação Finalizada!", description: "As pendências foram descartadas."});
+            toast({ title: "Reconciliação Finalizada!", description: "As pendências foram descartadas." });
             setReconciliation(null);
             setHistoryKey(Date.now());
         } catch (error: any) {
@@ -230,72 +232,108 @@ export function ReconcilePageClient() {
         return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
     };
 
+    // Calculate metrics for Hero
+    const heroMetrics = reconciliation ? {
+        balanceDifference: Number(reconciliation.balanceDifference || 0),
+        pendingItems: reconciliation.importedTransactions.filter(t => ['PENDING', 'SUGGESTED'].includes(t.status)).length,
+        matchedItems: reconciliation.importedTransactions.filter(t => t.status === 'RECONCILED').length,
+        totalItems: reconciliation.importedTransactions.length,
+        accuracy: reconciliation.importedTransactions.length > 0
+            ? (reconciliation.importedTransactions.filter(t => t.status === 'RECONCILED').length / reconciliation.importedTransactions.length) * 100
+            : 0
+    } : undefined;
+
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-center gap-4">
-                    <GitCompareArrows className="h-8 w-8 text-primary" />
-                    <div>
-                        <h1 className="text-3xl font-bold font-headline">Reconciliação Bancária</h1>
-                        <p className="text-muted-foreground">Importe seus extratos e mantenha tudo em perfeita sincronia.</p>
-                    </div>
-                </div>
-                <Button variant="outline" className="self-start lg:self-auto" onClick={() => setGuideDialogOpen(true)}>
+        <div className="space-y-8">
+            <ReconcileHero
+                status={reconciliation ? 'active' : 'idle'}
+                metrics={heroMetrics}
+            />
+
+            <div className="flex justify-end">
+                <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setGuideDialogOpen(true)}>
                     <HelpCircle className="h-4 w-4 mr-2" />
-                    Como usar
+                    Como funciona a reconciliação?
                 </Button>
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="reconcile">Conciliar Agora</TabsTrigger>
-                    <TabsTrigger value="history">Histórico</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
+                <TabsList className="grid w-full max-w-md grid-cols-2 bg-muted/50 p-1 backdrop-blur-sm">
+                    <TabsTrigger
+                        value="reconcile"
+                        className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground"
+                    >
+                        <ArrowRightLeft className="mr-2 h-4 w-4" />
+                        Conciliar Agora
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="history"
+                        className="data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground"
+                    >
+                        <History className="mr-2 h-4 w-4" />
+                        Histórico
+                    </TabsTrigger>
                 </TabsList>
-                <TabsContent value="reconcile" className="mt-6 space-y-6">
+
+                <TabsContent value="reconcile" className="space-y-6">
                     {isPolling ? (
-                        <Card className="flex flex-col items-center justify-center h-64 gap-4">
+                        <Card className="flex h-64 flex-col items-center justify-center gap-4 border-dashed border-primary/20 bg-primary/5">
                             <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                            <p className="text-lg font-medium">Processando seu extrato...</p>
-                            <p className="text-sm text-muted-foreground">Aguarde um momento, isso pode levar alguns segundos.</p>
+                            <div className="text-center">
+                                <p className="text-lg font-medium text-primary">Processando seu extrato...</p>
+                                <p className="text-sm text-muted-foreground">A inteligência artificial está analisando suas transações.</p>
+                            </div>
                         </Card>
                     ) : !reconciliation ? (
-                         <Card>
-                            <CardHeader>
-                                <CardTitle>Iniciar Nova Reconciliação</CardTitle>
-                                <CardDescription>
-                                    Selecione a conta ou cartão e envie o arquivo de extrato (OFX ou CSV).
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ReconcileUploader 
-                                    accounts={accounts} 
-                                    cards={cards}
-                                    templates={templates}
-                                    onSuccess={handleUploadSuccess} 
-                                    isProcessing={isPolling}
-                                    onTargetChange={(id, type) => {
-                                        const targetList = type === 'account' ? accounts : cards;
-                                        const target = targetList.find(t => t.id === id);
-                                        if (target) setSelectedTarget({ ...target, type });
-                                    }}
-                                />
-                            </CardContent>
-                        </Card>
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4 }}
+                        >
+                            <Card className="overflow-hidden border-none bg-gradient-to-br from-white to-gray-50 shadow-lg dark:from-gray-900 dark:to-gray-950">
+                                <CardHeader className="border-b bg-muted/20 pb-8 pt-6">
+                                    <CardTitle className="text-xl">Iniciar Nova Reconciliação</CardTitle>
+                                    <CardDescription>
+                                        Selecione a conta ou cartão e envie o arquivo de extrato (OFX ou CSV).
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-6">
+                                    <ReconcileUploader
+                                        accounts={accounts}
+                                        cards={cards}
+                                        templates={templates}
+                                        onSuccess={handleUploadSuccess}
+                                        isProcessing={isPolling}
+                                        onTargetChange={(id, type) => {
+                                            const targetList = type === 'account' ? accounts : cards;
+                                            const target = targetList.find(t => t.id === id);
+                                            if (target) setSelectedTarget({ ...target, type });
+                                        }}
+                                    />
+                                </CardContent>
+                            </Card>
+                        </motion.div>
                     ) : (
-                        <ReconcileView
-                            reconciliation={reconciliation}
-                            manualTransactions={manualTransactions}
-                            onMatch={handleMatch}
-                            onDiscard={handleDiscard}
-                            onTransactionCreated={handleTransactionCreated}
-                            onFinalize={() => handleFinalize(reconciliation.id)}
-                            onCancel={handleCancel}
-                            onBulkImportStart={handleBulkImportStart}
-                        />
+                        <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.4 }}
+                        >
+                            <ReconcileView
+                                reconciliation={reconciliation}
+                                manualTransactions={manualTransactions}
+                                onMatch={handleMatch}
+                                onDiscard={handleDiscard}
+                                onTransactionCreated={handleTransactionCreated}
+                                onFinalize={() => handleFinalize(reconciliation.id)}
+                                onCancel={handleCancel}
+                                onBulkImportStart={handleBulkImportStart}
+                            />
+                        </motion.div>
                     )}
                 </TabsContent>
-                <TabsContent value="history" className="mt-6">
-                    <Card>
+                <TabsContent value="history">
+                    <Card className="border-none shadow-md">
                         <CardHeader>
                             <CardTitle>Histórico de Reconciliações</CardTitle>
                             <CardDescription>
@@ -303,11 +341,11 @@ export function ReconcilePageClient() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                           <ReconciliationHistoryList 
-                             key={historyKey}
-                             onResume={fetchReconciliationData}
-                             onFinalize={handleFinalize}
-                           />
+                            <ReconciliationHistoryList
+                                key={historyKey}
+                                onResume={fetchReconciliationData}
+                                onFinalize={handleFinalize}
+                            />
                         </CardContent>
                     </Card>
                 </TabsContent>

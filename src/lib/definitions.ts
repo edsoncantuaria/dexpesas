@@ -47,12 +47,12 @@ export type User = {
     level: number;
     clanId?: string | null;
     clanMembership?: {
-      role: ClanRole;
-      clanId?: string | null;
+        role: ClanRole;
+        clanId?: string | null;
     } | null;
     clanMemberships?: {
-      role: ClanRole;
-      clanId: string;
+        role: ClanRole;
+        clanId: string;
     }[];
     phoneNumber?: string | null;
     phoneVerified?: boolean;
@@ -70,7 +70,7 @@ export type LegacyRuin = {
     endDate: string;
     originalRecurrenceId: string;
 }
-  
+
 export type GamificationProfile = {
     id: string;
     userId: string;
@@ -106,7 +106,7 @@ export type GamificationProfile = {
     Viagem: number;
     Vicios: number;
 };
-  
+
 export type Account = {
     id: string;
     userId: string;
@@ -151,11 +151,11 @@ export type Card = {
 };
 
 export type Tag = {
-  id: string;
-  name: string;
-  userId: string;
+    id: string;
+    name: string;
+    userId: string;
 };
-  
+
 export type Transaction = {
     id: string;
     userId: string;
@@ -331,7 +331,7 @@ export type InvestmentMetricSnapshot = {
     churnRate: number;
     createdAt: string;
 };
-  
+
 export type Category = {
     id: string;
     nome: string;
@@ -341,7 +341,7 @@ export type Category = {
     parentCategoryId?: string | null;
     userId?: string | null;
 };
-  
+
 export type Achievement = {
     id: string;
     name: string;
@@ -349,7 +349,7 @@ export type Achievement = {
     icon: string;
     xp: number;
 };
-  
+
 export type UnlockedAchievement = {
     id: string;
     userId: string;
@@ -376,21 +376,21 @@ export type Budget = {
 };
 
 export type NotificationAction = {
-  label: string;
-  action: string;
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary';
+    label: string;
+    action: string;
+    variant?: 'default' | 'destructive' | 'outline' | 'secondary';
 }
 
 export type Notification = {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  type: 'TRANSACTION_CREATED' | 'PAYMENT_DUE' | 'LIMIT_ALERT' | 'ACHIEVEMENT_UNLOCKED' | 'BUDGET_ALERT' | 'UPCOMING_PAYMENT' | 'STREAK_AWARDED';
-  read: boolean;
-  createdAt: string;
-  relatedId?: string | null;
-  actions?: NotificationAction[];
+    id: string;
+    userId: string;
+    title: string;
+    message: string;
+    type: 'TRANSACTION_CREATED' | 'PAYMENT_DUE' | 'LIMIT_ALERT' | 'ACHIEVEMENT_UNLOCKED' | 'BUDGET_ALERT' | 'UPCOMING_PAYMENT' | 'STREAK_AWARDED';
+    read: boolean;
+    createdAt: string;
+    relatedId?: string | null;
+    actions?: NotificationAction[];
 };
 
 export type GoalContribution = {
@@ -529,7 +529,7 @@ export type CellSharedAccount = {
     metadata?: Record<string, unknown> | null;
     createdAt: string;
     updatedAt: string;
-  account?: Account | null;
+    account?: Account | null;
 };
 
 export type CellSharedExpenseParticipant = {
@@ -649,16 +649,16 @@ export type FinancialOverview = {
 };
 
 export type FilterState = {
-  text: string | null;
-  accounts: string[];
-  cards: string[];
-  categories: string[];
-  methods: string[];
-  tags: string[];
-  type: 'receita' | 'despesa' | null;
-  dateRange?: DateRange;
-  value_greater_than?: number | null;
-  value_less_than?: number | null;
+    text: string | null;
+    accounts: string[];
+    cards: string[];
+    categories: string[];
+    methods: string[];
+    tags: string[];
+    type: 'receita' | 'despesa' | null;
+    dateRange?: DateRange;
+    value_greater_than?: number | null;
+    value_less_than?: number | null;
 };
 
 export type Automation = {
@@ -684,9 +684,9 @@ export type CategorizationRule = {
 };
 
 export type OcrData = {
-  estabelecimento?: string;
-  data?: string;
-  valor?: number;
+    estabelecimento?: string;
+    data?: string;
+    valor?: number;
 };
 
 export type ImportedTransaction = {
@@ -697,7 +697,7 @@ export type ImportedTransaction = {
     type: 'CREDIT' | 'DEBIT';
     description: string;
     fitId: string;
-    status: 'PENDING' | 'SUGGESTED' |'RECONCILED' | 'DISCARDED';
+    status: 'PENDING' | 'SUGGESTED' | 'RECONCILED' | 'DISCARDED';
     manualTransactionId?: string | null;
     similarityScore?: number | null;
 };
@@ -796,10 +796,10 @@ export type Clan = {
     _count: { members: number };
     leaderId: string;
     members?: Array<{
-      userId: string;
-      role: ClanRole;
-      permissions?: Record<string, boolean> | null;
-      user?: Pick<User, 'id' | 'name' | 'avatarUrl' | 'level'> | null;
+        userId: string;
+        role: ClanRole;
+        permissions?: Record<string, boolean> | null;
+        user?: Pick<User, 'id' | 'name' | 'email' | 'avatarUrl' | 'level'> | null;
     }>;
 }
 

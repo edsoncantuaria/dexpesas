@@ -162,7 +162,7 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
             }
         }
     };
-    
+
     const handleTemplateChange = (templateId: string) => {
         const template = templates.find(t => t.id === templateId);
         if (template) {
@@ -179,7 +179,7 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
         }
         setSelectedTemplate(templateId);
     }
-    
+
     const parseLocaleNumber = (value: string) => {
         if (!value) return NaN;
         let normalized = value.trim();
@@ -206,7 +206,7 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         setIsSubmitting(true);
         const [targetType, targetId] = values.reconciliationTarget.split(':');
-        
+
         const formData = new FormData();
         formData.append('targetId', targetId);
         formData.append('targetType', targetType);
@@ -220,7 +220,7 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
         }
         formData.append('statementCurrency', values.statementCurrency || 'BRL');
         formData.append('statementTimezone', values.statementTimezone || 'America/Sao_Paulo');
-        
+
         if (values.fileType === 'CSV' && values.csvMapping) {
             formData.append('mapping', JSON.stringify(values.csvMapping));
             if (values.saveTemplate) {
@@ -242,26 +242,26 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
             setIsSubmitting(false);
         }
     };
-    
+
     const isLoading = isSubmitting || isProcessing;
 
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                     <FormField
+                    <FormField
                         control={form.control}
                         name="reconciliationTarget"
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Conta ou Cartão</FormLabel>
-                                <Select 
-                                    onValueChange={(value) => { 
+                                <Select
+                                    onValueChange={(value) => {
                                         field.onChange(value);
                                         const [type, id] = value.split(':');
-                                        onTargetChange(id, type as 'account' | 'card'); 
-                                    }} 
-                                    value={field.value} 
+                                        onTargetChange(id, type as 'account' | 'card');
+                                    }}
+                                    value={field.value}
                                     disabled={isLoading}
                                 >
                                     <FormControl><SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger></FormControl>
@@ -361,7 +361,7 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
                                     <FormLabel>Fuso Horário das Datas</FormLabel>
                                     <Select value={field.value} onValueChange={field.onChange}>
                                         <FormControl>
-                                            <SelectTrigger><SelectValue placeholder="Selecione o fuso"/></SelectTrigger>
+                                            <SelectTrigger><SelectValue placeholder="Selecione o fuso" /></SelectTrigger>
                                         </FormControl>
                                         <SelectContent>
                                             {timezoneOptions.map(option => (
@@ -383,7 +383,7 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
                     {parsedBalances && currentTarget && (
                         <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
                             <p className="font-semibold text-foreground">Saldo cadastrado x saldo do extrato</p>
-                            <p>Saldo configurado no Dexpesas: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(currentTarget.saldoInicial ?? currentTarget.saldo ?? 0))}</p>
+                            <p>Saldo configurado no Dexpesas: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number('saldoInicial' in currentTarget ? currentTarget.saldoInicial : 0))}</p>
                             <p>Saldo inicial do extrato: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parsedBalances.opening)}</p>
                             <p className="mt-1">
                                 Ajuste a conta para {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parsedBalances.opening)} antes de continuar. Isto evita bloqueios na finalização.
@@ -400,24 +400,24 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
                             <FormItem>
                                 <FormLabel>Tipo de Arquivo</FormLabel>
                                 <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
-                                    <FormControl><SelectTrigger><SelectValue/></SelectTrigger></FormControl>
+                                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                                     <SelectContent>
-                                        <SelectItem value="OFX"><div className='flex items-center gap-2'><FileText className='h-4 w-4'/> OFX (Padrão Bancário)</div></SelectItem>
-                                        <SelectItem value="CSV"><div className='flex items-center gap-2'><FileUp className='h-4 w-4'/> CSV (Planilha)</div></SelectItem>
+                                        <SelectItem value="OFX"><div className='flex items-center gap-2'><FileText className='h-4 w-4' /> OFX (Padrão Bancário)</div></SelectItem>
+                                        <SelectItem value="CSV"><div className='flex items-center gap-2'><FileUp className='h-4 w-4' /> CSV (Planilha)</div></SelectItem>
                                     </SelectContent>
                                 </Select>
                             </FormItem>
                         )}
                     />
-                     <FormItem>
+                    <FormItem>
                         <FormLabel>Arquivo do Extrato</FormLabel>
                         <FormControl>
-                            <Input type="file" accept={watchFileType === 'OFX' ? '.ofx' : '.csv'} onChange={handleFileChange} disabled={isLoading}/>
+                            <Input type="file" accept={watchFileType === 'OFX' ? '.ofx' : '.csv'} onChange={handleFileChange} disabled={isLoading} />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
                 </div>
-                
+
                 {watchFileType === 'CSV' && (
                     <div className="space-y-4 rounded-md border p-4 bg-muted/30">
                         <h4 className="font-semibold text-foreground">Mapeamento de Colunas CSV</h4>
@@ -436,41 +436,41 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
                             </div>
                         )}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                             <FormField control={form.control} name="csvMapping.date" render={({ field }) => ( <FormItem><FormLabel>Coluna da Data</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione"/></SelectTrigger></FormControl><SelectContent>{fileHeaders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)}/>
-                             <FormField control={form.control} name="csvMapping.description" render={({ field }) => ( <FormItem><FormLabel>Coluna da Descrição</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione"/></SelectTrigger></FormControl><SelectContent>{fileHeaders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)}/>
-                             <FormField control={form.control} name="csvMapping.amount" render={({ field }) => ( <FormItem><FormLabel>Coluna do Valor</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione"/></SelectTrigger></FormControl><SelectContent>{fileHeaders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)}/>
+                            <FormField control={form.control} name="csvMapping.date" render={({ field }) => (<FormItem><FormLabel>Coluna da Data</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{fileHeaders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                            <FormField control={form.control} name="csvMapping.description" render={({ field }) => (<FormItem><FormLabel>Coluna da Descrição</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{fileHeaders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                            <FormField control={form.control} name="csvMapping.amount" render={({ field }) => (<FormItem><FormLabel>Coluna do Valor</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl><SelectContent>{fileHeaders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                         </div>
                         <FormField control={form.control} name="csvMapping.type" render={({ field }) => (
                             <FormItem className="max-w-xs">
                                 <FormLabel>Coluna do Tipo (opcional)</FormLabel>
                                 <Select value={field.value} onValueChange={field.onChange}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione"/></SelectTrigger></FormControl>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         {fileHeaders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                                 <p className="text-xs text-muted-foreground">Use quando o arquivo sinaliza crédito/debito com uma letra.</p>
                             </FormItem>
-                        )}/>
+                        )} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField control={form.control} name="csvMapping.debit_value" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Valor usado para Débito</FormLabel>
                                     <FormControl><Input placeholder="Ex: D" {...field} /></FormControl>
                                 </FormItem>
-                            )}/>
+                            )} />
                             <FormField control={form.control} name="csvMapping.credit_value" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Valor usado para Crédito</FormLabel>
                                     <FormControl><Input placeholder="Ex: C" {...field} /></FormControl>
                                 </FormItem>
-                            )}/>
+                            )} />
                         </div>
-                        <FormField control={form.control} name="csvMapping.date_format" render={({ field }) => ( <FormItem className='max-w-xs'><FormLabel>Formato da Data</FormLabel><FormControl><Input placeholder="Ex: dd/MM/yyyy" {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                        
-                        <FormField control={form.control} name="saveTemplate" render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><FormLabel>Salvar este mapeamento como um template?</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange}/></FormControl></FormItem>)}/>
+                        <FormField control={form.control} name="csvMapping.date_format" render={({ field }) => (<FormItem className='max-w-xs'><FormLabel>Formato da Data</FormLabel><FormControl><Input placeholder="Ex: dd/MM/yyyy" {...field} /></FormControl><FormMessage /></FormItem>)} />
+
+                        <FormField control={form.control} name="saveTemplate" render={({ field }) => (<FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm"><FormLabel>Salvar este mapeamento como um template?</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
                         {form.watch('saveTemplate') && (
-                            <FormField control={form.control} name="templateName" render={({ field }) => ( <FormItem><FormLabel>Nome do Template</FormLabel><FormControl><Input placeholder="Ex: Extrato Nubank" {...field}/></FormControl><FormMessage /></FormItem>)}/>
+                            <FormField control={form.control} name="templateName" render={({ field }) => (<FormItem><FormLabel>Nome do Template</FormLabel><FormControl><Input placeholder="Ex: Extrato Nubank" {...field} /></FormControl><FormMessage /></FormItem>)} />
                         )}
                     </div>
                 )}

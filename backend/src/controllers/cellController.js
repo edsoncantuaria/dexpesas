@@ -78,6 +78,105 @@ class CellController {
     }
   }
 
+  async getMyCell(req, res, next) {
+    const userId = req.user.id;
+    try {
+      const membership = await prisma.clanMember.findFirst({
+        where: { userId },
+        include: { clan: true },
+      });
+
+      if (!membership) {
+        return res.json({ cell: null });
+      }
+
+      const cellId = membership.clanId;
+      const cell = await prisma.clan.findUnique({
+        where: { id: cellId },
+        include: {
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  avatarUrl: true,
+                  level: true,
+                },
+              },
+            },
+          },
+          leader: { select: { id: true, name: true, level: true } },
+          _count: { select: { members: true } },
+        },
+      });
+
+      const [budgets, funds, sharedAccounts, expenses, timelineEvents, equilibriumEntries, alerts] = await Promise.all([
+        CellBudgetService.listBudgets(cellId),
+        prisma.cellFund.findMany({
+          where: { cellId },
+          include: {
+            contributions: true,
+            custodian: { select: { id: true, name: true, avatarUrl: true } },
+            goal: true,
+          },
+        }),
+        prisma.cellSharedAccount.findMany({
+          where: { cellId },
+          include: { account: { select: { id: true, nome: true, userId: true, saldoInicial: true, tipo: true } } },
+        }),
+        prisma.sharedExpense.findMany({
+          where: { clanId: cellId },
+          include: {
+            category: { select: { id: true, nome: true } },
+            participants: {
+              include: {
+                user: { select: { id: true, name: true, avatarUrl: true } },
+                transaction: { select: { id: true, pago: true, status: true, accountId: true, data: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+        TimelineService.listEvents(cellId),
+        EquilibriumService.calculateEquilibrium(cellId),
+        CellAlertService.listAlerts(cellId),
+      ]);
+
+      // Ensure funds have goals (logic from listFunds)
+      const ensuredFunds = await Promise.all(
+        funds.map(async (fund) => {
+          if (fund.goal) return fund;
+          const goal = await prisma.goal.create({
+            data: {
+              clanId: cellId,
+              cellFundId: fund.id,
+              name: fund.name,
+              targetAmount: fund.targetAmount,
+              currentAmount: fund.currentAmount,
+              status: 'IN_PROGRESS',
+            },
+          });
+          return { ...fund, goal };
+        })
+      );
+
+      res.json(serialize({
+        cell,
+        budgets,
+        funds: ensuredFunds,
+        sharedAccounts,
+        expenses,
+        timelineEvents,
+        equilibriumEntries,
+        alerts
+      }));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getCellDetails(req, res, next) {
     const { cellId } = req.params;
     try {
@@ -613,18 +712,18 @@ class CellController {
       }
       const sanitizedSplits = Array.isArray(splits)
         ? splits
-            .map((entry) => ({
-              memberId: entry.memberId,
-              amount: Number(entry.amount),
-              accountId: entry.accountId,
-            }))
-            .filter(
-              (entry) =>
-                entry.memberId &&
-                entry.accountId &&
-                Number.isFinite(entry.amount) &&
-                entry.amount > 0,
-            )
+          .map((entry) => ({
+            memberId: entry.memberId,
+            amount: Number(entry.amount),
+            accountId: entry.accountId,
+          }))
+          .filter(
+            (entry) =>
+              entry.memberId &&
+              entry.accountId &&
+              Number.isFinite(entry.amount) &&
+              entry.amount > 0,
+          )
         : [];
       if (!sanitizedSplits.length) {
         return res.status(400).json({ message: 'Defina os participantes do rateio.' });
@@ -1288,7 +1387,7 @@ class CellController {
         if (!invite) {
           throw { statusCode: 404, message: 'Convite inválido ou expirado.' };
         }
-         clanId = invite.clanId;
+        clanId = invite.clanId;
         if (invite.clan._count.members >= invite.clan.maxMembers) {
           throw { statusCode: 400, message: 'Família lotada.' };
         }

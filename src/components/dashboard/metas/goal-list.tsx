@@ -47,7 +47,7 @@ function GoalImage({ imageUrl, goalName }: { imageUrl: string | null | undefined
           setIsLoading(false);
         }
       } else {
-        setPresignedUrl(imageUrl);
+        setPresignedUrl(imageUrl || null);
       }
     };
     fetchUrl();

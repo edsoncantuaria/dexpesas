@@ -26,6 +26,7 @@ router.use(authMiddleware);
 
 router.get('/', cellController.listCells);
 router.post('/', validate(cellSchema), cellController.createCell);
+router.get('/my-cell', cellController.getMyCell);
 router.get('/:cellId', cellController.getCellDetails);
 router.patch('/:cellId', validate(cellSchema.partial()), cellController.updateCell);
 

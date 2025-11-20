@@ -1,5 +1,5 @@
 
-      
+
 // src/components/dashboard/metas/add-goal-form.tsx
 'use client';
 
@@ -31,11 +31,11 @@ const formSchema = z.object({
 });
 
 type AddGoalFormProps = {
-    goal?: Goal | null;
-    accounts: Account[];
-    onSuccess: (goal: Omit<Goal, 'id' | 'userId' | 'currentAmount' | 'status' | 'contributions' | 'projectionDate'> & { id?: string }) => void;
-    onClose: () => void;
-    isSubmitting: boolean;
+  goal?: Goal | null;
+  accounts: Account[];
+  onSuccess: (goal: Omit<Goal, 'id' | 'userId' | 'currentAmount' | 'status' | 'contributions' | 'projectionDate'> & { id?: string }) => void;
+  onClose: () => void;
+  isSubmitting: boolean;
 };
 
 export function AddGoalForm({ goal, accounts, onSuccess, onClose, isSubmitting }: AddGoalFormProps) {
@@ -59,7 +59,7 @@ export function AddGoalForm({ goal, accounts, onSuccess, onClose, isSubmitting }
         name: goal.name,
         targetAmount: Number(goal.targetAmount),
         deadline: goal.deadline ? new Date(goal.deadline) : null,
-        accountId: goal.accountId || 'none',
+        accountId: (goal as any).accountId || 'none',
         imageUrl: goal.imageUrl,
       });
     }
@@ -94,60 +94,60 @@ export function AddGoalForm({ goal, accounts, onSuccess, onClose, isSubmitting }
           )}
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <FormField
+          <FormField
             control={form.control}
             name="targetAmount"
             render={({ field }) => (
-                <FormItem>
+              <FormItem>
                 <FormLabel>Valor Alvo</FormLabel>
                 <FormControl>
                   <CurrencyInput value={field.value} onValueChange={field.onChange} />
                 </FormControl>
                 <FormMessage />
-                </FormItem>
+              </FormItem>
             )}
-            />
-            <FormField
-                control={form.control}
-                name="deadline"
-                render={({ field }) => (
-                <FormItem className="flex flex-col">
-                    <FormLabel>Data Alvo (Opcional)</FormLabel>
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                    <PopoverTrigger asChild>
-                        <FormControl>
-                        <Button
-                            variant={'outline'}
-                            className={cn(
-                            'w-full pl-3 text-left font-normal h-10',
-                            !field.value && 'text-muted-foreground'
-                            )}
-                        >
-                            {field.value ? (
-                            format(field.value, 'PPP', { locale: ptBR })
-                            ) : (
-                            <span>Escolha uma data</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                        </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                            mode="single"
-                            selected={field.value ?? undefined}
-                            onSelect={(date) => {
-                                field.onChange(date);
-                                setIsCalendarOpen(false);
-                            }}
-                            initialFocus
-                        />
-                    </PopoverContent>
-                    </Popover>
-                    <FormMessage />
-                </FormItem>
-                )}
-            />
+          />
+          <FormField
+            control={form.control}
+            name="deadline"
+            render={({ field }) => (
+              <FormItem className="flex flex-col">
+                <FormLabel>Data Alvo (Opcional)</FormLabel>
+                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <FormControl>
+                      <Button
+                        variant={'outline'}
+                        className={cn(
+                          'w-full pl-3 text-left font-normal h-10',
+                          !field.value && 'text-muted-foreground'
+                        )}
+                      >
+                        {field.value ? (
+                          format(field.value, 'PPP', { locale: ptBR })
+                        ) : (
+                          <span>Escolha uma data</span>
+                        )}
+                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                      </Button>
+                    </FormControl>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={field.value ?? undefined}
+                      onSelect={(date) => {
+                        field.onChange(date);
+                        setIsCalendarOpen(false);
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
         <FormField
           control={form.control}
@@ -162,7 +162,7 @@ export function AddGoalForm({ goal, accounts, onSuccess, onClose, isSubmitting }
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                   <SelectItem value="none">Nenhuma</SelectItem>
+                  <SelectItem value="none">Nenhuma</SelectItem>
                   {accounts.filter(a => ['poupanca', 'investimento'].includes(a.tipo)).map((acc) => (
                     <SelectItem key={acc.id} value={acc.id}>
                       {acc.nome} ({acc.tipo})
@@ -174,7 +174,7 @@ export function AddGoalForm({ goal, accounts, onSuccess, onClose, isSubmitting }
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="imageUrl"
@@ -185,23 +185,23 @@ export function AddGoalForm({ goal, accounts, onSuccess, onClose, isSubmitting }
                 <div>
                   {watchImageUrl && !watchImageUrl.startsWith('http') ? (
                     <AttachmentPreviewer
-                        objectName={watchImageUrl}
-                        onRemove={() => form.setValue('imageUrl', null)}
+                      objectName={watchImageUrl}
+                      onRemove={() => form.setValue('imageUrl', null)}
                     />
                   ) : (
                     <div className='flex items-center gap-2'>
-                        <Input placeholder="Cole uma URL ou faça upload" {...field} value={field.value ?? ''} />
-                        <FileUpload
-                          onValueChange={(objectName) => field.onChange(objectName)}
-                          options={{
-                            maxFiles: 1,
-                            accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'] },
-                          }}
-                        >
-                           <Button type="button" variant="outline" size="icon" asChild>
-                               <div><Image className="h-4 w-4"/></div>
-                           </Button>
-                        </FileUpload>
+                      <Input placeholder="Cole uma URL ou faça upload" {...field} value={field.value ?? ''} />
+                      <FileUpload
+                        onValueChange={(objectName) => field.onChange(objectName)}
+                        options={{
+                          maxFiles: 1,
+                          accept: { 'image/*': ['.png', '.jpg', '.jpeg', '.gif', '.webp'] },
+                        }}
+                      >
+                        <Button type="button" variant="outline" size="icon" asChild>
+                          <div><Image className="h-4 w-4" /></div>
+                        </Button>
+                      </FileUpload>
                     </div>
                   )}
                 </div>
@@ -226,4 +226,3 @@ export function AddGoalForm({ goal, accounts, onSuccess, onClose, isSubmitting }
   );
 }
 
-    

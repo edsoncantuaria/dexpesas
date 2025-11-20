@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { BarChart3, Download, Filter, Loader2 } from 'lucide-react';
+import { BarChart3, Download, Filter, Loader2, PieChart, TrendingUp, Target, Wallet } from 'lucide-react';
 import type { Transaction, Category, Account, Card as CardType, Tag, Goal, Budget } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { TransactionFilters, type FilterState } from '@/components/dashboard/transacoes/transaction-filters';
@@ -18,16 +18,17 @@ import { Switch } from '@/components/ui/switch';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { NetWorthCard } from '@/components/dashboard/relatorios/net-worth-card';
 import { GoalSummaryCard } from '@/components/dashboard/relatorios/goal-summary-card';
 import { ComparativeExpensesChart } from '@/components/dashboard/relatorios/comparative-expenses-chart';
-import { DetailedSummary } from '@/components/dashboard/relatorios/detailed-summary';
 import { CashflowForecastChart } from '@/components/dashboard/relatorios/cashflow-forecast-chart';
 import { BudgetPerformanceTable } from '@/components/dashboard/relatorios/budget-performance-table';
 import { GoalsFundsOverview } from '@/components/dashboard/relatorios/goals-funds-overview';
 import { CardInsightsCard } from '@/components/dashboard/relatorios/card-insights-card';
 import { TagInsightsCard } from '@/components/dashboard/relatorios/tag-insights-card';
+import { ReportsHero } from '@/components/dashboard/relatorios/reports-hero';
+import { motion } from 'framer-motion';
 
 type FilterChip =
   | { key: string; label: string; type: 'dateRange' | 'type' | 'text' }
@@ -104,7 +105,7 @@ export default function RelatoriosPage() {
       setCategories(catRes.data);
       setTags(tagsRes.data);
       setBudgets(budgetsRes.data);
-    } catch(error) {
+    } catch (error) {
       toast({ variant: 'destructive', title: 'Erro ao buscar dados para relatórios' });
     } finally {
       setIsLoading(false);
@@ -117,7 +118,7 @@ export default function RelatoriosPage() {
 
   useEffect(() => {
     const handleTransactionUpdate = () => {
-      fetchData().catch(() => {});
+      fetchData().catch(() => { });
     };
     window.addEventListener('transaction-updated', handleTransactionUpdate);
     return () => window.removeEventListener('transaction-updated', handleTransactionUpdate);
@@ -126,7 +127,7 @@ export default function RelatoriosPage() {
   const filteredTransactions = useMemo(() => {
     let results = includePending ? allTransactions : allTransactions.filter(t => t.pago === true);
 
-    if(filters.dateRange?.from) {
+    if (filters.dateRange?.from) {
       const fromDate = filters.dateRange.from;
       const toDate = filters.dateRange.to || new Date();
       results = results.filter(t => {
@@ -283,40 +284,40 @@ export default function RelatoriosPage() {
     setFilters(newFilters);
     setIsFilterSheetOpen(false);
   };
-  
+
   const handleExport = async () => {
     setIsExporting(true);
     try {
-        const response = await api.post('/transactions/export', {
-            includePending,
-            text: filters.text,
-            categories: filters.categories,
-            accounts: filters.accounts,
-            cards: filters.cards,
-            methods: filters.methods,
-            type: filters.type,
-            dateRange: filters.dateRange?.from
-              ? {
-                  from: filters.dateRange.from?.toISOString(),
-                  to: filters.dateRange.to?.toISOString(),
-                }
-              : undefined,
-        }, {
-            responseType: 'blob',
-        });
-        
-        const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.setAttribute('href', URL.createObjectURL(blob));
-        link.setAttribute('download', 'jornada_financeira_export.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast({ title: "Exportação Concluída" });
+      const response = await api.post('/transactions/export', {
+        includePending,
+        text: filters.text,
+        categories: filters.categories,
+        accounts: filters.accounts,
+        cards: filters.cards,
+        methods: filters.methods,
+        type: filters.type,
+        dateRange: filters.dateRange?.from
+          ? {
+            from: filters.dateRange.from?.toISOString(),
+            to: filters.dateRange.to?.toISOString(),
+          }
+          : undefined,
+      }, {
+        responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.setAttribute('href', URL.createObjectURL(blob));
+      link.setAttribute('download', 'jornada_financeira_export.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast({ title: "Exportação Concluída" });
     } catch (error) {
-        toast({ variant: 'destructive', title: 'Erro na Exportação' });
+      toast({ variant: 'destructive', title: 'Erro na Exportação' });
     } finally {
-        setIsExporting(false);
+      setIsExporting(false);
     }
   };
 
@@ -326,164 +327,139 @@ export default function RelatoriosPage() {
   }
 
   return (
-    <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className='flex items-center gap-3'>
-                <BarChart3 className="h-8 w-8 text-primary" />
-                <div>
-                    <h1 className="text-3xl font-bold font-headline">Relatórios</h1>
-                    <p className="text-muted-foreground">Analise sua jornada financeira com filtros avançados.</p>
-                </div>
+    <div className="space-y-6 pb-20">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className='flex items-center gap-3'>
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <BarChart3 className="h-8 w-8 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold font-headline tracking-tight">Relatórios</h1>
+            <p className="text-muted-foreground">Análise detalhada da sua jornada financeira.</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting} className="hover:bg-primary/5">
+          {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+          Exportar CSV
+        </Button>
+      </div>
+
+      {/* Filters Section */}
+      <div className="rounded-2xl border bg-card/50 backdrop-blur-sm shadow-sm">
+        <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap items-center gap-3">
+            <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-2 border-dashed">
+                  <Filter className="h-4 w-4" />
+                  Filtros avançados
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-full max-w-md p-0">
+                <TransactionFilters
+                  accounts={accounts}
+                  cards={cards}
+                  categories={categories}
+                  tags={tags}
+                  currentFilters={filters}
+                  onFilterChange={handleFilterChange}
+                />
+              </SheetContent>
+            </Sheet>
+            <div className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm bg-background/50">
+              <Switch id="include-pending" checked={includePending} onCheckedChange={setIncludePending} />
+              <Label htmlFor="include-pending" className="cursor-pointer font-medium">Mostrar pendentes</Label>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
-                {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4" />}
-                Exportar CSV
+          </div>
+          {isFilterActive && (
+            <Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+              Limpar filtros
             </Button>
+          )}
         </div>
-
-        <div className="rounded-2xl border bg-card">
-          <div className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Filter className="h-4 w-4" />
-                    Filtros avançados
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-full max-w-md p-0">
-                  <TransactionFilters
-                    accounts={accounts}
-                    cards={cards}
-                    categories={categories}
-                    tags={tags}
-                    currentFilters={filters}
-                    onFilterChange={handleFilterChange}
-                  />
-                </SheetContent>
-              </Sheet>
-              <div className="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm">
-                <Switch id="include-pending" checked={includePending} onCheckedChange={setIncludePending}/>
-                <Label htmlFor="include-pending" className="cursor-pointer">Mostrar pendentes</Label>
-              </div>
+        {isFilterActive && (
+          <div className="border-t px-4 py-3 bg-muted/20">
+            <div className="flex flex-wrap gap-2">
+              {filterChips.map(chip => (
+                <Badge key={chip.key} variant="secondary" className="flex items-center gap-1 pl-2 pr-1 py-1">
+                  {chip.label}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveChip(chip)}
+                    className="rounded-full p-0.5 hover:bg-destructive/20 hover:text-destructive transition-colors ml-1"
+                    aria-label={`Remover filtro ${chip.label}`}
+                  >
+                    &times;
+                  </button>
+                </Badge>
+              ))}
             </div>
-            {isFilterActive && (
-              <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-                Limpar filtros
-              </Button>
-            )}
           </div>
-          <div className="border-t px-4 py-3">
-            {isFilterActive ? (
-              <div className="flex flex-wrap gap-2">
-                {filterChips.map(chip => (
-                  <Badge key={chip.key} variant="secondary" className="flex items-center gap-1">
-                    {chip.label}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveChip(chip)}
-                      className="rounded-full p-0.5 hover:text-destructive"
-                      aria-label={`Remover filtro ${chip.label}`}
-                    >
-                      &times;
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Nenhum filtro adicional aplicado. Use os filtros avançados para segmentar seus dados.
-              </p>
-            )}
-          </div>
-        </div>
-        
-        <Accordion type="multiple" className="w-full space-y-4">
-            <AccordionItem value="overview" className="border rounded-lg overflow-hidden">
-                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
-                    <h3 className="text-lg font-semibold">Resumo Geral</h3>
-                </AccordionTrigger>
-                <AccordionContent className="p-4">
-                    <DetailedSummary transactions={filteredTransactions} />
-                </AccordionContent>
-            </AccordionItem>
+        )}
+      </div>
 
-            <AccordionItem value="patrimony" className="border rounded-lg overflow-hidden">
-                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
-                    <h3 className="text-lg font-semibold">Metas e Patrimônio</h3>
-                </AccordionTrigger>
-                <AccordionContent className="p-4">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <GoalSummaryCard goals={goals} />
-                        <NetWorthCard transactions={allTransactions} accounts={accounts} />
-                    </div>
-                </AccordionContent>
-            </AccordionItem>
+      {/* Hero Section */}
+      <ReportsHero transactions={filteredTransactions} />
 
-            <AccordionItem value="cashflow" className="border rounded-lg overflow-hidden">
-                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
-                    <h3 className="text-lg font-semibold">Fluxo e Orçamentos</h3>
-                </AccordionTrigger>
-                <AccordionContent className="p-4">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        <CashflowForecastChart transactions={allTransactions} accounts={accounts} />
-                        <BudgetPerformanceTable budgets={budgets} />
-                    </div>
-                </AccordionContent>
-            </AccordionItem>
+      {/* Main Content - Tabs */}
+      <Tabs defaultValue="expenses" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 p-1 h-auto bg-muted/50 rounded-xl">
+          <TabsTrigger value="expenses" className="data-[state=active]:bg-background data-[state=active]:shadow-sm py-2.5 rounded-lg transition-all">
+            <PieChart className="h-4 w-4 mr-2" />
+            Despesas
+          </TabsTrigger>
+          <TabsTrigger value="flow" className="data-[state=active]:bg-background data-[state=active]:shadow-sm py-2.5 rounded-lg transition-all">
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Fluxo de Caixa
+          </TabsTrigger>
+          <TabsTrigger value="assets" className="data-[state=active]:bg-background data-[state=active]:shadow-sm py-2.5 rounded-lg transition-all">
+            <Target className="h-4 w-4 mr-2" />
+            Metas & Ativos
+          </TabsTrigger>
+          <TabsTrigger value="budgets" className="data-[state=active]:bg-background data-[state=active]:shadow-sm py-2.5 rounded-lg transition-all">
+            <Wallet className="h-4 w-4 mr-2" />
+            Orçamentos
+          </TabsTrigger>
+        </TabsList>
 
-            <AccordionItem value="funds" className="border rounded-lg overflow-hidden">
-                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
-                    <h3 className="text-lg font-semibold">Metas/Fundos e Cartões</h3>
-                </AccordionTrigger>
-                <AccordionContent className="p-4">
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        <GoalsFundsOverview goals={goals} />
-                        <CardInsightsCard cards={cards} transactions={filteredTransactions} />
-                    </div>
-                </AccordionContent>
-            </AccordionItem>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <TabsContent value="expenses" className="space-y-6 mt-0">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <ExpensesByCategoryChart transactions={filteredTransactions} />
+              <TopExpensesTable transactions={filteredTransactions} />
+            </div>
+            <ComparativeExpensesChart transactions={allTransactions} currentDateRange={filters.dateRange} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <PaymentMethodsChart transactions={filteredTransactions} />
+              <TagInsightsCard transactions={filteredTransactions} />
+            </div>
+          </TabsContent>
 
-            <AccordionItem value="tags" className="border rounded-lg overflow-hidden">
-                <AccordionTrigger className="p-4 hover:no-underline bg-muted/30">
-                    <h3 className="text-lg font-semibold">Tags e Projetos</h3>
-                </AccordionTrigger>
-                <AccordionContent className="p-4">
-                    <TagInsightsCard transactions={filteredTransactions} />
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
+          <TabsContent value="flow" className="space-y-6 mt-0">
+            <DailyFlowChart transactions={filteredTransactions} />
+            <CashflowForecastChart transactions={allTransactions} accounts={accounts} />
+          </TabsContent>
 
-        <Accordion type="multiple" className="w-full space-y-4 mt-6">
-            <AccordionItem value="expenses" className='border rounded-lg overflow-hidden'>
-                <AccordionTrigger className='p-4 hover:no-underline bg-muted/30'>
-                    <h3 className="text-lg font-semibold">Análise de Despesas</h3>
-                </AccordionTrigger>
-                <AccordionContent className='p-4 space-y-6'>
-                    <ExpensesByCategoryChart transactions={filteredTransactions} />
-                    <TopExpensesTable transactions={filteredTransactions} />
-                    <ComparativeExpensesChart transactions={allTransactions} currentDateRange={filters.dateRange} />
-                </AccordionContent>
-            </AccordionItem>
+          <TabsContent value="assets" className="space-y-6 mt-0">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <NetWorthCard transactions={allTransactions} accounts={accounts} />
+              <GoalSummaryCard goals={goals} />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <GoalsFundsOverview goals={goals} />
+              <CardInsightsCard cards={cards} transactions={filteredTransactions} />
+            </div>
+          </TabsContent>
 
-            <AccordionItem value="flow" className='border rounded-lg overflow-hidden'>
-                <AccordionTrigger className='p-4 hover:no-underline bg-muted/30'>
-                    <h3 className="text-lg font-semibold">Fluxo de Caixa</h3>
-                </AccordionTrigger>
-                <AccordionContent className='p-4 space-y-6'>
-                    <DailyFlowChart transactions={filteredTransactions} />
-                </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="distribution" className='border rounded-lg overflow-hidden'>
-                <AccordionTrigger className='p-4 hover:no-underline bg-muted/30'>
-                    <h3 className="text-lg font-semibold">Distribuição</h3>
-                </AccordionTrigger>
-                <AccordionContent className='p-4 space-y-6'>
-                    <PaymentMethodsChart transactions={filteredTransactions} />
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
+          <TabsContent value="budgets" className="space-y-6 mt-0">
+            <BudgetPerformanceTable budgets={budgets} />
+          </TabsContent>
+        </motion.div>
+      </Tabs>
     </div>
   );
 }

@@ -72,6 +72,14 @@ class EquilibriumService {
     return summary;
   }
 
+  static async calculateEquilibrium(cellId) {
+    const ledger = await this.getLedger(cellId);
+    return Array.from(ledger.entries()).map(([userId, balance]) => ({
+      userId,
+      balance,
+    }));
+  }
+
   static async summarizeAllCells() {
     const cells = await prisma.clan.findMany({ select: { id: true } });
     for (const cell of cells) {

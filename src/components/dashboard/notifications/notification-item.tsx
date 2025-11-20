@@ -53,9 +53,10 @@ type NotificationItemProps = {
     notification: Notification;
     onAction: (notificationId: string, action: string) => void;
     onMarkAsRead: (notificationId: string) => void;
+    onDismiss?: (notificationId: string) => void;
 };
 
-export function NotificationItem({ notification, onAction, onMarkAsRead }: NotificationItemProps) {
+export function NotificationItem({ notification, onAction, onMarkAsRead, onDismiss }: NotificationItemProps) {
     const Icon = notificationIcons[notification.type] || notificationIcons.DEFAULT;
     const iconGradient = notificationGradients[notification.type] || notificationGradients.DEFAULT;
     const iconColor = notificationIconColors[notification.type] || notificationIconColors.DEFAULT;
@@ -72,57 +73,68 @@ export function NotificationItem({ notification, onAction, onMarkAsRead }: Notif
 
     return (
         <motion.div
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            onDragEnd={(_, info) => {
+                if (info.offset.x > 100 && onDismiss) {
+                    onDismiss(notification.id);
+                }
+            }}
             whileHover={{ scale: 1.02 }}
-            transition={{ duration: 0.2 }}
-            className={cn(
-                "p-4 rounded-xl transition-all cursor-pointer border",
-                "bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm",
-                !notification.read
-                    ? 'border-primary/30 shadow-md shadow-primary/10'
-                    : 'border-border/50 opacity-75 hover:opacity-100'
-            )}
-            onClick={handleItemClick}
-            onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleItemClick()}
-            role="button"
-            tabIndex={0}
+            whileTap={{ cursor: "grabbing" }}
+            className="relative touch-pan-y"
         >
-            <div className="flex items-start gap-3">
-                <div className={cn(
-                    "p-2.5 rounded-xl bg-gradient-to-br shrink-0",
-                    iconGradient
-                )}>
-                    <Icon className={cn("h-5 w-5", iconColor)} />
-                </div>
-                <div className="flex-1 space-y-2 min-w-0">
-                    <div className="flex justify-between items-start gap-2">
-                        <p className="font-semibold text-sm leading-tight">{notification.title}</p>
-                        {!notification.read && (
-                            <motion.div
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="h-2 w-2 rounded-full bg-gradient-to-br from-primary to-primary/80 flex-shrink-0 mt-1.5 shadow-sm shadow-primary/50"
-                            />
-                        )}
+            <motion.div
+                className={cn(
+                    "p-4 rounded-xl transition-all cursor-pointer border relative z-10 bg-background",
+                    "bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm",
+                    !notification.read
+                        ? 'border-primary/30 shadow-md shadow-primary/10'
+                        : 'border-border/50 opacity-75 hover:opacity-100'
+                )}
+                onClick={handleItemClick}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && handleItemClick()}
+                role="button"
+                tabIndex={0}
+            >
+                <div className="flex items-start gap-3">
+                    <div className={cn(
+                        "p-2.5 rounded-xl bg-gradient-to-br shrink-0",
+                        iconGradient
+                    )}>
+                        <Icon className={cn("h-5 w-5", iconColor)} />
                     </div>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{notification.message}</p>
-                    {notification.actions && notification.actions.length > 0 && (
-                        <div className="flex items-center gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
-                            {notification.actions.map((action) => (
-                                <Button
-                                    key={action.action}
-                                    size="sm"
-                                    variant={action.variant || 'secondary'}
-                                    onClick={() => onAction(notification.id, action.action)}
-                                    className="h-8 text-xs transition-all hover:scale-105"
-                                >
-                                    {action.label}
-                                </Button>
-                            ))}
+                    <div className="flex-1 space-y-2 min-w-0">
+                        <div className="flex justify-between items-start gap-2">
+                            <p className="font-semibold text-sm leading-tight">{notification.title}</p>
+                            {!notification.read && (
+                                <motion.div
+                                    initial={{ scale: 0 }}
+                                    animate={{ scale: 1 }}
+                                    className="h-2 w-2 rounded-full bg-gradient-to-br from-primary to-primary/80 flex-shrink-0 mt-1.5 shadow-sm shadow-primary/50"
+                                />
+                            )}
                         </div>
-                    )}
-                    <p className="text-xs text-muted-foreground/70 pt-1">{timeAgo}</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{notification.message}</p>
+                        {notification.actions && notification.actions.length > 0 && (
+                            <div className="flex items-center gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                                {notification.actions.map((action) => (
+                                    <Button
+                                        key={action.action}
+                                        size="sm"
+                                        variant={action.variant || 'secondary'}
+                                        onClick={() => onAction(notification.id, action.action)}
+                                        className="h-8 text-xs transition-all hover:scale-105"
+                                    >
+                                        {action.label}
+                                    </Button>
+                                ))}
+                            </div>
+                        )}
+                        <p className="text-xs text-muted-foreground/70 pt-1">{timeAgo}</p>
+                    </div>
                 </div>
-            </div>
+            </motion.div>
         </motion.div>
     )
 }

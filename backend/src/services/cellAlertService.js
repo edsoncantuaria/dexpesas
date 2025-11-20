@@ -63,6 +63,10 @@ class CellAlertService {
     ]);
     return [...budgetAlerts, ...fundAlerts];
   }
+
+  static async listAlerts(cellId) {
+    return this.evaluateCell(cellId);
+  }
 }
 
 export default CellAlertService;

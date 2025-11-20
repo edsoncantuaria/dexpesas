@@ -133,6 +133,30 @@ export function NotificationPanel({ onClose, onCountChange }: NotificationPanelP
         }
     };
 
+    const handleDismiss = async (notificationId: string) => {
+        const originalNotifications = [...notifications];
+        setNotifications(prev => prev.filter(n => n.id !== notificationId));
+
+        try {
+            // Tenta deletar, se não existir rota de delete, marca como lida como fallback
+            try {
+                await api.delete(`/notifications/${notificationId}`);
+            } catch (e) {
+                // Fallback para marcar como lida se delete não existir
+                await api.post('/notifications/read-one', { notificationId });
+            }
+
+            toast({
+                title: 'Notificação removida',
+                className: "bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20"
+            });
+            window.dispatchEvent(new Event('notification-read'));
+        } catch (error) {
+            setNotifications(originalNotifications);
+            toast({ variant: 'destructive', title: 'Erro ao remover notificação' });
+        }
+    };
+
     const unreadCount = notifications.filter(n => !n.read).length;
 
     return (
@@ -169,20 +193,21 @@ export function NotificationPanel({ onClose, onCountChange }: NotificationPanelP
                     </div>
                 ) : (
                     <div className="p-3 space-y-2">
-                        <AnimatePresence>
+                        <AnimatePresence mode="popLayout">
                             {notifications.map((notification, index) => (
                                 <motion.div
                                     key={notification.id}
                                     layout
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
+                                    exit={{ opacity: 0, x: 100, transition: { duration: 0.2 } }}
                                     transition={{ duration: 0.3, delay: index * 0.05 }}
                                 >
                                     <NotificationItem
                                         notification={notification}
                                         onAction={handleAction}
                                         onMarkAsRead={handleMarkAsRead}
+                                        onDismiss={handleDismiss}
                                     />
                                 </motion.div>
                             ))}
