@@ -14,12 +14,13 @@ import {
   Scale,
   MessageSquareText,
   Calendar,
-  Wallet,
   CreditCard,
-  Banknote
+  Banknote,
+  Check,
+  X
 } from 'lucide-react';
 import type { MouseEvent } from 'react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import {
@@ -43,8 +44,9 @@ import {
 } from "@/components/ui/collapsible"
 import { DeleteTransactionDialog } from './delete-transaction-dialog';
 import { Badge } from '@/components/ui/badge';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { Card } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 type TransactionMobileListProps = {
@@ -58,6 +60,213 @@ type TransactionMobileListProps = {
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 const MOBILE_PAGE_SIZE = 30;
+
+// --- Skeleton Component ---
+export function TransactionListSkeleton() {
+  return (
+    <div className="space-y-6 pb-20 px-4 pt-4">
+      {[1, 2].map((group) => (
+        <div key={group} className="space-y-3">
+          {/* Date Header Skeleton */}
+          <div className="flex justify-between items-center py-2">
+            <Skeleton className="h-5 w-32 rounded-md" />
+            <Skeleton className="h-5 w-20 rounded-md" />
+          </div>
+          {/* Transaction Cards Skeleton */}
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="flex items-center p-4 gap-3 bg-card/50 rounded-xl border border-border/40">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <div className="flex justify-between">
+                  <Skeleton className="h-4 w-3/4 rounded-md" />
+                  <Skeleton className="h-4 w-20 rounded-md" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-3 w-16 rounded-md" />
+                  <Skeleton className="h-3 w-24 rounded-md" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// --- Swipeable Card Component ---
+const SwipeableTransactionCard = ({
+  transaction,
+  onEdit,
+  onDelete,
+  onTogglePaidStatus,
+  accountsAndCardsMap,
+  isEven,
+  handlePreviewClick
+}: {
+  transaction: Transaction,
+  onEdit: (t: Transaction) => void,
+  onDelete: (id: string) => void,
+  onTogglePaidStatus: (id: string) => void,
+  accountsAndCardsMap: Map<string, string>,
+  isEven: boolean,
+  handlePreviewClick: (e: MouseEvent, url: string) => void
+}) => {
+  const x = useMotionValue(0);
+  const controls = useMotionValue(0);
+  const [swipedState, setSwipedState] = useState<'none' | 'left' | 'right'>('none');
+
+  // Background color based on swipe
+  const bg = useTransform(x, [-100, 0, 100], ['rgba(239, 68, 68, 0.2)', 'rgba(0,0,0,0)', 'rgba(59, 130, 246, 0.2)']);
+
+  const handleDragEnd = (event: any, info: PanInfo) => {
+    const offset = info.offset.x;
+    const velocity = info.velocity.x;
+
+    if (offset < -100 || velocity < -500) {
+      // Swiped Left (Delete)
+      onDelete(transaction.id);
+    } else if (offset > 100 || velocity > 500) {
+      // Swiped Right (Edit/Pay)
+      // For now, let's toggle paid status on right swipe as a quick action, or edit?
+      // User said: "para a direita para editar/pagar"
+      // Let's trigger Edit for now, or maybe show options. 
+      // Actually, let's just trigger Edit as it's safer.
+      onEdit(transaction);
+    }
+  };
+
+  const isPaid = transaction.pago;
+  const isReceita = transaction.tipo === 'receita';
+  const sourceId = transaction.accountId || transaction.cardId;
+  const sourceName = sourceId ? accountsAndCardsMap.get(sourceId) : 'N/A';
+  const Icon = transaction.cardId ? CreditCard : Banknote;
+
+  const installmentValue = Number(transaction.valor);
+  const valorTotalOriginal = Number(transaction.valorTotal) || 0;
+  const totalInstallments = transaction.totalInstallments || 1;
+  const valueWithoutInterestPerInstallment = valorTotalOriginal > 0 ? valorTotalOriginal / totalInstallments : 0;
+  const interestPerInstallment = transaction.withInterest ? installmentValue - valueWithoutInterestPerInstallment : 0;
+
+  return (
+    <div className="relative overflow-hidden rounded-xl">
+      {/* Background Actions */}
+      <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
+        <div className={cn("flex items-center gap-2 text-blue-500 font-semibold transition-opacity duration-200", x.get() > 50 ? "opacity-100" : "opacity-0")}>
+          <Pencil className="h-5 w-5" /> Editar
+        </div>
+        <div className={cn("flex items-center gap-2 text-red-500 font-semibold transition-opacity duration-200", x.get() < -50 ? "opacity-100" : "opacity-0")}>
+          Excluir <Trash2 className="h-5 w-5" />
+        </div>
+      </div>
+
+      <motion.div
+        style={{ x, background: bg }}
+        drag="x"
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.7}
+        onDragEnd={handleDragEnd}
+        className={cn(
+          "relative bg-card border-0 shadow-sm transition-colors duration-200 rounded-xl",
+          isEven ? "bg-card/40" : "bg-card/80",
+          !isPaid && "opacity-80"
+        )}
+        whileTap={{ cursor: "grabbing" }}
+      >
+        <div className="flex items-center p-4 gap-3" onClick={() => onEdit(transaction)}>
+          <button
+            onClick={(e) => { e.stopPropagation(); onTogglePaidStatus(transaction.id); }}
+            className={cn(
+              "flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center transition-all duration-300 z-10",
+              isPaid
+                ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            )}
+          >
+            {isPaid ? (
+              <CheckCircle2 className="h-5 w-5" />
+            ) : (
+              <Circle className="h-5 w-5" />
+            )}
+          </button>
+
+          <div className="flex-1 min-w-0 space-y-1 pointer-events-none">
+            <div className="flex justify-between items-start gap-2">
+              <p className={cn(
+                "font-semibold text-sm leading-tight truncate",
+                !isPaid && "text-muted-foreground"
+              )}>
+                {transaction.descricao}
+              </p>
+              <div className={cn(
+                'font-bold text-sm whitespace-nowrap',
+                isReceita ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground',
+                !isPaid && 'text-muted-foreground'
+              )}>
+                {isReceita ? '+' : '-'} {installmentValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="truncate max-w-[100px] bg-muted/50 px-1.5 py-0.5 rounded-md">
+                {transaction.categoria}
+              </span>
+              <span>&bull;</span>
+              <div className="flex items-center gap-1 truncate">
+                <Icon className="h-3 w-3" />
+                <span className="truncate max-w-[80px]">{sourceName}</span>
+              </div>
+            </div>
+
+            {(transaction.tags?.length > 0 || transaction.installment) && (
+              <div className="flex flex-wrap gap-1 pt-1">
+                {transaction.installment && (
+                  <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal border-primary/20 text-primary">
+                    {transaction.installmentNumber}/{transaction.totalInstallments}
+                  </Badge>
+                )}
+                {transaction.tags?.map(tag => (
+                  <Badge key={tag.id} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-muted/50 text-muted-foreground">
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col items-end gap-2 z-10">
+            {transaction.attachmentUrl && (
+              <Button
+                variant="secondary"
+                size="icon"
+                className="h-8 w-8 rounded-full bg-primary/10 text-primary hover:bg-primary/20"
+                onClick={(e) => { e.stopPropagation(); handlePreviewClick(e, transaction.attachmentUrl!); }}
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+            )}
+
+            <div className="flex gap-1">
+              {transaction.notes && (
+                <Popover>
+                  <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground/50">
+                      <MessageSquareText className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2 text-sm whitespace-pre-wrap">
+                    {transaction.notes}
+                  </PopoverContent>
+                </Popover>
+              )}
+              {interestPerInstallment > 0 && <Info className="h-3 w-3 text-muted-foreground/50 mt-2" />}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  )
+}
 
 
 // Componente para o cabeçalho de resumo diário
@@ -170,15 +379,6 @@ export function TransactionMobileList({
     setVisibleCount(MOBILE_PAGE_SIZE);
   }, [data]);
 
-  const handleDropdownClick = (e: MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  const handleToggleStatusClick = (e: MouseEvent, transactionId: string) => {
-    e.stopPropagation();
-    onTogglePaidStatus(transactionId);
-  }
-
   const handlePreviewClick = (e: MouseEvent, objectName: string) => {
     e.stopPropagation();
     setViewingAttachment(objectName);
@@ -218,140 +418,19 @@ export function TransactionMobileList({
               transition={{ duration: 0.4, delay: groupIndex * 0.05 }}
             >
               <DailySummaryHeader date={date} transactions={groupedTransactions[date]} />
-              <div className="space-y-3 px-1">
-                {groupedTransactions[date].map((transaction, itemIndex) => {
-                  const isPaid = transaction.pago;
-                  const isReceita = transaction.tipo === 'receita';
-                  const sourceId = transaction.accountId || transaction.cardId;
-                  const sourceName = sourceId ? accountsAndCardsMap.get(sourceId) : 'N/A';
-                  const Icon = transaction.cardId ? CreditCard : Banknote;
-
-                  const installmentValue = Number(transaction.valor);
-                  const valorTotalOriginal = Number(transaction.valorTotal) || 0;
-                  const totalInstallments = transaction.totalInstallments || 1;
-                  const valueWithoutInterestPerInstallment = valorTotalOriginal > 0 ? valorTotalOriginal / totalInstallments : 0;
-                  const interestPerInstallment = transaction.withInterest ? installmentValue - valueWithoutInterestPerInstallment : 0;
-
-
-                  return (
-                    <motion.div
-                      key={transaction.id}
-                      onClick={() => onEdit(transaction)}
-                      className="cursor-pointer group"
-                      whileTap={{ scale: 0.98 }}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: itemIndex * 0.05 }}
-                    >
-                      <Card className={cn(
-                        "border-0 shadow-sm bg-card/50 hover:bg-card transition-colors duration-200",
-                        !isPaid && "opacity-80"
-                      )}>
-                        <div className="flex items-center p-4 gap-3">
-                          <button
-                            onClick={(e) => handleToggleStatusClick(e, transaction.id)}
-                            className={cn(
-                              "flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center transition-all duration-300",
-                              isPaid
-                                ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                            )}
-                          >
-                            {isPaid ? (
-                              <CheckCircle2 className="h-5 w-5" />
-                            ) : (
-                              <Circle className="h-5 w-5" />
-                            )}
-                          </button>
-
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <div className="flex justify-between items-start gap-2">
-                              <p className={cn(
-                                "font-semibold text-sm leading-tight truncate",
-                                !isPaid && "text-muted-foreground"
-                              )}>
-                                {transaction.descricao}
-                              </p>
-                              <div className={cn(
-                                'font-bold text-sm whitespace-nowrap',
-                                isReceita ? 'text-emerald-600 dark:text-emerald-400' : 'text-foreground',
-                                !isPaid && 'text-muted-foreground'
-                              )}>
-                                {isReceita ? '+' : '-'} {installmentValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <span className="truncate max-w-[100px] bg-muted/50 px-1.5 py-0.5 rounded-md">
-                                {transaction.categoria}
-                              </span>
-                              <span>&bull;</span>
-                              <div className="flex items-center gap-1 truncate">
-                                <Icon className="h-3 w-3" />
-                                <span className="truncate max-w-[80px]">{sourceName}</span>
-                              </div>
-                            </div>
-
-                            {/* Tags e Badges Extras */}
-                            {(transaction.tags?.length > 0 || transaction.installment) && (
-                              <div className="flex flex-wrap gap-1 pt-1">
-                                {transaction.installment && (
-                                  <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-normal border-primary/20 text-primary">
-                                    {transaction.installmentNumber}/{transaction.totalInstallments}
-                                  </Badge>
-                                )}
-                                {transaction.tags?.map(tag => (
-                                  <Badge key={tag.id} variant="secondary" className="text-[10px] h-5 px-1.5 font-normal bg-muted/50 text-muted-foreground">
-                                    {tag.name}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Ações Rápidas (Visíveis apenas se houver algo relevante ou no menu) */}
-                          <div className="flex flex-col items-end gap-1">
-                            {(transaction.notes || transaction.attachmentUrl || interestPerInstallment > 0) && (
-                              <div className="flex gap-1">
-                                {transaction.notes && <MessageSquareText className="h-3 w-3 text-muted-foreground/50" />}
-                                {transaction.attachmentUrl && <Eye className="h-3 w-3 text-muted-foreground/50" />}
-                                {interestPerInstallment > 0 && <Info className="h-3 w-3 text-muted-foreground/50" />}
-                              </div>
-                            )}
-
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground/50 hover:text-foreground" onClick={handleDropdownClick}>
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" onClick={handleDropdownClick} className="w-48">
-                                <DropdownMenuItem onClick={() => onEdit(transaction)}>
-                                  <Pencil className="mr-2 h-4 w-4" />
-                                  Editar
-                                </DropdownMenuItem>
-                                {transaction.attachmentUrl && (
-                                  <DropdownMenuItem onClick={(e) => handlePreviewClick(e, transaction.attachmentUrl!)}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    Ver Comprovante
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive bg-destructive/5 focus:bg-destructive/10"
-                                  onClick={() => setDeletingTransaction(transaction)}
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Excluir
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </Card>
-                    </motion.div>
-                  );
-                })}
+              <div className="space-y-2 px-1">
+                {groupedTransactions[date].map((transaction, itemIndex) => (
+                  <SwipeableTransactionCard
+                    key={transaction.id}
+                    transaction={transaction}
+                    onEdit={onEdit}
+                    onDelete={(id) => setDeletingTransaction(transaction)}
+                    onTogglePaidStatus={onTogglePaidStatus}
+                    accountsAndCardsMap={accountsAndCardsMap}
+                    isEven={itemIndex % 2 === 0}
+                    handlePreviewClick={handlePreviewClick}
+                  />
+                ))}
               </div>
             </motion.div>
           ))}

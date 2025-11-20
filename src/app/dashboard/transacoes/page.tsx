@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Transaction, Account, Card as CardType, Category, Tag } from '@/lib/definitions';
 import { Button } from '@/components/ui/button';
-import { TransactionMobileList } from '@/components/dashboard/transacoes/transaction-mobile-list';
+import { TransactionMobileList, TransactionListSkeleton } from '@/components/dashboard/transacoes/transaction-mobile-list';
 import { useToast } from '@/hooks/use-toast';
 import { Filter, Search, X, Plus } from 'lucide-react';
 import { MonthlySummary } from '@/components/dashboard/transacoes/monthly-summary';
@@ -175,7 +175,7 @@ function TransactionsPageContent() {
       });
     }
 
-    if (filters.text) results = results.filter(t => t.descricao.toLowerCase().includes(filters.text!.toLowerCase()));
+    if (filters.text) results = results.filter(t => t.descricao.toLowerCase().includes((filters.text || '').toLowerCase()));
     if (filters.accounts.length > 0) results = results.filter(t => t.accountId && filters.accounts.includes(t.accountId));
     if (filters.cards.length > 0) results = results.filter(t => t.cardId && filters.cards.includes(t.cardId));
     if (filters.categories.length > 0) results = results.filter(t => filters.categories.includes(t.categoria));
@@ -250,6 +250,9 @@ function TransactionsPageContent() {
 
   const renderContent = () => {
     if (isLoadingTransactions) {
+      if (isMobile) {
+        return <TransactionListSkeleton />
+      }
       return (
         <div className="flex items-center justify-center py-20">
           <LoadingScreen />
