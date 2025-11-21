@@ -12,24 +12,32 @@ import { useToast } from '@/hooks/use-toast';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { InventoryCard } from '@/components/dashboard/progresso/inventory-card';
 
+import { AchievementsList } from '@/components/dashboard/progresso/achievements-list';
+
 export default function ProgressoPage() {
     const [profile, setProfile] = useState<(GamificationProfile & { updatedAt: string }) | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [inventory, setInventory] = useState<UserItem[]>([]);
+    const [allAchievements, setAllAchievements] = useState([]);
+    const [unlockedAchievements, setUnlockedAchievements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
 
     const fetchData = useCallback(async (showLoading = true) => {
         if (showLoading) setIsLoading(true);
         try {
-            const [profileRes, userRes, inventoryRes] = await Promise.all([
+            const [profileRes, userRes, inventoryRes, allAchievRes, unlockedAchievRes] = await Promise.all([
                 api.get('/gamification/profile'),
                 api.get('/user'),
-                api.get('/data/inventory')
+                api.get('/data/inventory'),
+                api.get('/achievements/all'),
+                api.get('/achievements/unlocked')
             ]);
             setProfile(profileRes.data);
             setUser(userRes.data);
             setInventory(inventoryRes.data);
+            setAllAchievements(allAchievRes.data);
+            setUnlockedAchievements(unlockedAchievRes.data);
         } catch (error) {
             toast({
                 variant: "destructive",
@@ -39,35 +47,39 @@ export default function ProgressoPage() {
             if (showLoading) setIsLoading(false);
         }
     }, [toast]);
-    
+
     useEffect(() => {
         fetchData();
     }, [fetchData]);
-    
+
     if (isLoading || !profile || !user) {
         return <LoadingScreen />;
     }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/dashboard" className="p-2 rounded-md hover:bg-muted">
-           <ChevronLeft className="h-5 w-5" />
-        </Link>
-        <div>
-            <h1 className="text-3xl font-bold font-headline">Seu Progresso Detalhado</h1>
-            <p className="text-muted-foreground">Veja todos os seus atributos e complete missões para ganhar mais XP.</p>
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center gap-4">
+                <Link href="/dashboard" className="p-2 rounded-md hover:bg-muted">
+                    <ChevronLeft className="h-5 w-5" />
+                </Link>
+                <div>
+                    <h1 className="text-3xl font-bold font-headline">Seu Progresso Detalhado</h1>
+                    <p className="text-muted-foreground">Veja todos os seus atributos e complete missões para ganhar mais XP.</p>
+                </div>
+            </div>
+            <div className="grid gap-6 lg:grid-cols-3">
+                <div className="lg:col-span-2 space-y-6">
+                    <AllAttributes profile={profile} />
+                    <AchievementsList
+                        allAchievements={allAchievements}
+                        unlockedAchievements={unlockedAchievements}
+                    />
+                </div>
+                <div className="lg:col-span-1 space-y-6">
+                    <FinancialQuests user={user} />
+                    <InventoryCard items={inventory} onItemEquip={() => fetchData(false)} />
+                </div>
+            </div>
         </div>
-      </div>
-       <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-             <AllAttributes profile={profile} />
-          </div>
-          <div className="lg:col-span-1 space-y-6">
-            <FinancialQuests user={user} />
-            <InventoryCard items={inventory} onItemEquip={() => fetchData(false)} />
-          </div>
-       </div>
-    </div>
-  );
+    );
 }

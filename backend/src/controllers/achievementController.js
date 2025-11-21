@@ -1,30 +1,31 @@
-// backend/src/controllers/achievementController.js
 import prisma from '../config/prismaClient.js';
 import AuditService from '../services/auditService.js';
 
 class AchievementController {
     /**
-     * Lista todas as conquistas cadastradas. Rota pública.
+     * [PUBLIC] Lista todas as conquistas disponíveis.
      */
     async getAllAchievements(req, res, next) {
         try {
             const achievements = await prisma.achievement.findMany({
-                orderBy: { name: 'asc' }
+                orderBy: { xp: 'asc' }
             });
             res.json(achievements);
         } catch (error) {
             next(error);
         }
     }
-    
+
     /**
      * [ADMIN] Cria uma nova conquista.
      */
     async createAchievement(req, res, next) {
-        const { name, description, icon, xp } = req.body;
+        const { name, description, icon, xp, trigger, criteria } = req.body;
         try {
             const newAchievement = await prisma.achievement.create({
-                data: { name, description, icon, xp }
+                data: {
+                    name, description, icon, xp, trigger, criteria
+                }
             });
             await AuditService.log({ userId: req.user.id, action: 'ADMIN_CREATE_ACHIEVEMENT', entity: 'ACHIEVEMENT', entityId: newAchievement.id, details: { after: newAchievement }, ipAddress: req.ip });
             res.status(201).json(newAchievement);
@@ -38,18 +39,17 @@ class AchievementController {
      */
     async updateAchievement(req, res, next) {
         const { id } = req.params;
-        const { name, description, icon, xp } = req.body;
+        const { name, description, icon, xp, trigger, criteria } = req.body;
         try {
-            const originalAchievement = await prisma.achievement.findUnique({ where: { id } });
-            if (!originalAchievement) {
-                return res.status(404).json({ message: 'Conquista não encontrada.' });
-            }
-            const updatedAchievement = await prisma.achievement.update({
+            const original = await prisma.achievement.findUnique({ where: { id } });
+            if (!original) return res.status(404).json({ message: 'Conquista não encontrada.' });
+
+            const updated = await prisma.achievement.update({
                 where: { id },
-                data: { name, description, icon, xp }
+                data: { name, description, icon, xp, trigger, criteria }
             });
-            await AuditService.log({ userId: req.user.id, action: 'ADMIN_UPDATE_ACHIEVEMENT', entity: 'ACHIEVEMENT', entityId: id, details: { before: originalAchievement, after: updatedAchievement }, ipAddress: req.ip });
-            res.json(updatedAchievement);
+            await AuditService.log({ userId: req.user.id, action: 'ADMIN_UPDATE_ACHIEVEMENT', entity: 'ACHIEVEMENT', entityId: id, details: { before: original, after: updated }, ipAddress: req.ip });
+            res.json(updated);
         } catch (error) {
             next(error);
         }
@@ -61,18 +61,11 @@ class AchievementController {
     async deleteAchievement(req, res, next) {
         const { id } = req.params;
         try {
-            const originalAchievement = await prisma.achievement.findUnique({ where: { id } });
-            if (!originalAchievement) {
-                return res.status(404).json({ message: 'Conquista não encontrada.' });
-            }
-
-            const unlockedCount = await prisma.unlockedAchievement.count({ where: { achievementId: id } });
-            if (unlockedCount > 0) {
-                return res.status(400).json({ message: `Não é possível deletar. ${unlockedCount} usuários já desbloquearam esta conquista.` });
-            }
+            const original = await prisma.achievement.findUnique({ where: { id } });
+            if (!original) return res.status(404).json({ message: 'Conquista não encontrada.' });
 
             await prisma.achievement.delete({ where: { id } });
-            await AuditService.log({ userId: req.user.id, action: 'ADMIN_DELETE_ACHIEVEMENT', entity: 'ACHIEVEMENT', entityId: id, details: { before: originalAchievement }, ipAddress: req.ip });
+            await AuditService.log({ userId: req.user.id, action: 'ADMIN_DELETE_ACHIEVEMENT', entity: 'ACHIEVEMENT', entityId: id, details: { before: original }, ipAddress: req.ip });
             res.status(204).send();
         } catch (error) {
             next(error);

@@ -318,6 +318,8 @@ model User {
   gamificationMode     GamificationMode @default(FULL)
   level                Int @default(1)
   xp                   Int @default(0)
+  weeklyXp             Int @default(0)
+  lastWeeklyReset      DateTime @default(now())
   heroClass            String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
@@ -1092,8 +1094,10 @@ model Achievement {
   id                   String @id @default(cuid())
   name                 String
   description          String
-  icon                 String
+  icon                 String @db.LongText
   xp                   Int
+  trigger              String? // Ex: 'TRANSACTION_CREATED'
+  criteria             Json?   // Ex: { "count": 50, "category": "Alimentação" }
 
   // --- Relações ---
   unlockedBy           UnlockedAchievement[]

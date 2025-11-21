@@ -13,6 +13,7 @@ import { CreditPactCard } from '@/components/dashboard/mission-cards/credit-pact
 import { ChallengeTowerCard } from '@/components/dashboard/mission-cards/challenge-tower-card';
 import { TimelineCard } from '@/components/dashboard/progresso/timeline-card';
 import { BossBattleCard } from '@/components/dashboard/boss/boss-battle-card';
+import { MonthlyMissionBoard } from '@/components/dashboard/mission-cards/monthly-mission-board';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -325,6 +326,7 @@ function DashboardPageContent() {
         </div>
         {isGamificationEnabled && !isLiteMode && (
           <div className="lg:col-span-1 space-y-6">
+            <MonthlyMissionBoard />
             <TimelineCard logs={timelineLogs} />
           </div>
         )}

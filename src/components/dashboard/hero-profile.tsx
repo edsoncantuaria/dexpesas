@@ -9,7 +9,7 @@ import { useEffect, useState, useMemo } from 'react';
 import api from '@/lib/api';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { iconMap } from '@/lib/icon-map';
-import { Crown, Star, Users, Banknote, Eye, EyeOff } from 'lucide-react';
+import { Crown, Star, Users, Banknote, Eye, EyeOff, Dumbbell, BookOpen, Shield, Sparkles, Scroll } from 'lucide-react';
 import Link from 'next/link';
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
 import { getGamificationCopy } from '@/lib/gamification-copy';
@@ -126,25 +126,86 @@ export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchi
                         </div>
                     )}
 
-                    {/* XP Bar */}
+                    {/* XP Bar & Weekly Progress */}
                     {heroCopy.showXp && (
-                        <div className="max-w-md mx-auto md:mx-0 pt-2">
-                            <div className="flex justify-between text-xs text-indigo-200 mb-1">
-                                <span>XP Atual</span>
-                                <span>{profile.xp} / {xpNeeded(profile.level)}</span>
-                            </div>
-                            <div className="relative h-2.5 bg-black/20 rounded-full overflow-hidden">
-                                <div
-                                    className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all duration-500"
-                                    style={{ width: `${xpPercentage}%` }}
-                                />
-                                {showGlow && (
-                                    <motion.div
-                                        animate={{ opacity: [0, 1, 0] }}
-                                        transition={{ duration: 2, repeat: Infinity }}
-                                        className="absolute inset-0 bg-white/30"
+                        <div className="max-w-md mx-auto md:mx-0 pt-2 space-y-3">
+                            {/* Level Progress */}
+                            <div>
+                                <div className="flex justify-between text-xs text-indigo-200 mb-1">
+                                    <span>XP Nível {profile.level}</span>
+                                    <span>{profile.xp} / {xpNeeded(profile.level)}</span>
+                                </div>
+                                <div className="relative h-2.5 bg-black/20 rounded-full overflow-hidden">
+                                    <div
+                                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-400 to-orange-500 transition-all duration-500"
+                                        style={{ width: `${xpPercentage}%` }}
                                     />
-                                )}
+                                    {showGlow && (
+                                        <motion.div
+                                            animate={{ opacity: [0, 1, 0] }}
+                                            transition={{ duration: 2, repeat: Infinity }}
+                                            className="absolute inset-0 bg-white/30"
+                                        />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Weekly XP Cap */}
+                            {profile.weeklyCap && (
+                                <div>
+                                    <div className="flex justify-between text-[10px] text-indigo-300 mb-0.5">
+                                        <span>Limite Semanal</span>
+                                        <span>{profile.weeklyXp || 0} / {profile.weeklyCap}</span>
+                                    </div>
+                                    <Progress value={((profile.weeklyXp || 0) / profile.weeklyCap) * 100} className="h-1 bg-black/20" indicatorClassName="bg-indigo-400" />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Attributes Grid - Only in Full Mode */}
+                    {mode === 'FULL' && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/10">
+                            <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
+                                <div className="flex items-center justify-center gap-1.5 text-red-300 mb-1">
+                                    <Dumbbell className="h-3.5 w-3.5" />
+                                    <span className="text-xs font-bold uppercase tracking-wider">Força</span>
+                                </div>
+                                <div className="text-lg font-bold">{profile.Forca || 0}</div>
+                            </div>
+                            <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
+                                <div className="flex items-center justify-center gap-1.5 text-blue-300 mb-1">
+                                    <BookOpen className="h-3.5 w-3.5" />
+                                    <span className="text-xs font-bold uppercase tracking-wider">Sabedoria</span>
+                                </div>
+                                <div className="text-lg font-bold">{profile.Sabedoria || 0}</div>
+                            </div>
+                            <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
+                                <div className="flex items-center justify-center gap-1.5 text-green-300 mb-1">
+                                    <Shield className="h-3.5 w-3.5" />
+                                    <span className="text-xs font-bold uppercase tracking-wider">Resistência</span>
+                                </div>
+                                <div className="text-lg font-bold">{profile.Resistencia || 0}</div>
+                            </div>
+                            <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
+                                <div className="flex items-center justify-center gap-1.5 text-amber-300 mb-1">
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    <span className="text-xs font-bold uppercase tracking-wider">Sorte</span>
+                                </div>
+                                <div className="text-lg font-bold">{profile.Sorte || 0}</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Oracle Insight */}
+                    {mode === 'FULL' && profile.insight && (
+                        <div className="mt-4 p-3 bg-indigo-950/40 border border-indigo-400/20 rounded-lg backdrop-blur-sm">
+                            <div className="flex gap-2 items-start">
+                                <Scroll className="h-4 w-4 text-indigo-300 mt-0.5 shrink-0" />
+                                <div>
+                                    <p className="text-xs font-bold text-indigo-300 uppercase tracking-wider mb-0.5">Oráculo</p>
+                                    <p className="text-sm text-indigo-100 italic">"{profile.insight}"</p>
+                                </div>
                             </div>
                         </div>
                     )}

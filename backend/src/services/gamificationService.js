@@ -41,38 +41,41 @@ const achievements = {
         }
     },
     'PAYMENT_ON_TIME': {
-         id: 'clz8w5i320004or01k9lmnpqr', // ID Fixo
-         name: 'Pontualidade em Pessoa',
-         message: 'Você pagou uma conta em dia! A disciplina é o caminho.',
-         xp: 20,
-         check: async (tx, userId, transactionId) => {
+        id: 'clz8w5i320004or01k9lmnpqr', // ID Fixo
+        name: 'Pontualidade em Pessoa',
+        message: 'Você pagou uma conta em dia! A disciplina é o caminho.',
+        xp: 20,
+        check: async (tx, userId, transactionId) => {
             if (!transactionId) return false;
             const transaction = await tx.transaction.findUnique({ where: { id: transactionId } });
             // Considera "em dia" se for pago na data de vencimento ou antes.
             return transaction && !transaction.pago && new Date() <= new Date(transaction.data);
-         }
+        }
     }
 };
 
 
 // Definição dos eventos de gamificação que concedem XP
+// Definição dos eventos de gamificação que concedem XP
 const gamificationEvents = {
-    TRANSACTION_CREATED: { xp: 5, description: 'Registrou uma nova transação.' },
-    BUDGET_CREATED: { xp: 10, description: 'Criou um novo orçamento.' },
-    GOAL_CONTRIBUTION: { xp: 15, description: 'Contribuiu para uma meta.' },
-    GOAL_COMPLETED: { xp: 250, description: 'Completou uma meta financeira.' },
-    BILL_PAID: { xp: 10, description: 'Pagou uma fatura.' },
-    BILL_UNPAID: { xp: -10, description: 'Desmarcou um pagamento.' }, // Novo evento de penalidade
+    TRANSACTION_CREATED: { xp: 15, description: 'Registrou uma nova transação.' },
+    BUDGET_CREATED: { xp: 50, description: 'Criou um novo orçamento.' },
+    GOAL_CONTRIBUTION: { xp: 30, description: 'Contribuiu para uma meta.' },
+    GOAL_COMPLETED: { xp: 500, description: 'Completou uma meta financeira.' },
+    BILL_PAID: { xp: 25, description: 'Pagou uma fatura.' },
+    BILL_UNPAID: { xp: -25, description: 'Desmarcou um pagamento.' },
     // Penalidades
-    PAYMENT_DUE: { xp: -75, description: 'Deixou uma conta vencer.' },
+    PAYMENT_DUE: { xp: -100, description: 'Deixou uma conta vencer.' },
     BUDGET_EXCEEDED: { xp: -50, description: 'Estourou o limite de um orçamento.' },
-    VICE_SPENDING: { xp: -15, description: 'Gasto em uma categoria de "Vício".' },
-    GUILD_CONTRIBUTION: { xp: 25, description: 'Contribuiu para o banco da família.', limit: { period: 'daily', max: 3 } },
-    GUILD_MISSION_COMPLETED: { xp: 100, description: 'Completou uma missão cooperativa.', limit: { period: 'weekly', max: 2 } },
-    RECONCILIATION_STREAK: { xp: 40, description: 'Manteve a rotina de reconciliação.', limit: { period: 'daily', max: 1 } },
-    DAILY_CHECKIN: { xp: 12, description: 'Realizou o check-in diário.', limit: { period: 'daily', max: 1 } },
-    INVESTMENT_PLAN_STREAK: { xp: 60, description: 'Manteve o plano de investimentos por 3 meses seguidos.', limit: { period: 'monthly', max: 1 } },
+    VICE_SPENDING: { xp: -20, description: 'Gasto em uma categoria de "Vício".' },
+    GUILD_CONTRIBUTION: { xp: 40, description: 'Contribuiu para o banco da família.', limit: { period: 'daily', max: 3 } },
+    GUILD_MISSION_COMPLETED: { xp: 150, description: 'Completou uma missão cooperativa.', limit: { period: 'weekly', max: 2 } },
+    RECONCILIATION_STREAK: { xp: 60, description: 'Manteve a rotina de reconciliação.', limit: { period: 'daily', max: 1 } },
+    DAILY_CHECKIN: { xp: 20, description: 'Realizou o check-in diário.', limit: { period: 'daily', max: 1 } },
+    INVESTMENT_PLAN_STREAK: { xp: 100, description: 'Manteve o plano de investimentos por 3 meses seguidos.', limit: { period: 'monthly', max: 1 } },
 };
+
+const WEEKLY_XP_CAP = 1000;
 
 
 // Fórmula de XP para o próximo nível
@@ -82,63 +85,46 @@ export const getXpNeededForLevel = xpNeeded;
 /**
  * Nova árvore de classes.
  */
-const getHeroClass = (level, attributes) => {
-    const sortedAttributes = Object.entries(attributes)
-        .sort(([, a], [, b]) => b - a)
-        .map(([key]) => key);
-    
-    const [highest, second, , lowest] = sortedAttributes;
-    const tier = Math.floor((level - 1) / 6); // 0, 1, 2, 3+
+/**
+ * Nova árvore de classes baseada em thresholds.
+ */
+/**
+ * Nova árvore de classes baseada em thresholds.
+ */
+const getHeroClass = (attributes) => {
+    const { Forca, Resistencia, Sabedoria, Sorte } = attributes;
 
-    const archetypes = {
-        poder: (highest === 'Forca' && second === 'Resistencia') || (highest === 'Resistencia' && second === 'Forca'),
-        disciplina: (highest === 'Resistencia' && second === 'Sabedoria') || (highest === 'Sabedoria' && second === 'Resistencia'),
-        estrategia: (highest === 'Sabedoria' && second === 'Forca') || (highest === 'Forca' && second === 'Sabedoria'),
-        audacia: (highest === 'Forca' && second === 'Sorte') || (highest === 'Sorte' && second === 'Forca'),
-        persistencia: (highest === 'Sabedoria' && second === 'Sorte') || (highest === 'Sorte' && second === 'Sabedoria'),
-    };
-    
-    // Classes de Tier 0 (Nível 1-5)
-    if (tier === 0) {
-        if (archetypes.poder) return 'Bruto Financeiro';
-        if (archetypes.disciplina) return 'Guardião Iniciante';
-        if (archetypes.estrategia) return 'Arquiteto de Planos';
-        if (archetypes.audacia) return 'Mercador Ousado';
-        if (archetypes.persistencia) return 'Escriba Diligente';
-        return 'Aventureiro Novato';
-    }
-    
-    // Classes de Tier 1 (Nível 6-11)
-    if (tier === 1) {
-        if (archetypes.poder) return 'Barão da Renda';
-        if (archetypes.disciplina) return 'Paladino do Lucro';
-        if (archetypes.estrategia) return 'Mestre de Guilda';
-        if (archetypes.audacia) return 'Corsário de Crédito';
-        if (archetypes.persistencia) return 'Estratega de Dívidas';
-        return 'Explorador de Mercados';
-    }
+    // Tier 4 (Legendary) - Attribute > 95
+    if (Forca > 95 && Resistencia > 95 && Sabedoria > 95 && Sorte > 95) return 'Divindade Financeira';
+    if (Forca > 95) return 'Titã da Renda';
+    if (Resistencia > 95) return 'Guardião Eterno';
+    if (Sabedoria > 95) return 'Oráculo Supremo';
+    if (Sorte > 95) return 'Arauto do Destino';
 
-    // Classes de Tier 2 (Nível 12-17)
-    if (tier === 2) {
-        if (archetypes.poder) return 'Magnata Industrial';
-        if (archetypes.disciplina) return 'Ascendente Prudente';
-        if (archetypes.estrategia) return 'Regente Visionário';
-        if (archetypes.audacia) return 'Caçador de Dívidas';
-        if (archetypes.persistencia) return 'Oráculo da Oportunidade';
-        return 'Navegador de Capital';
-    }
-    
-    // Classes de Tier 3 (Nível 18+)
-    if (tier >= 3) {
-        if (archetypes.poder) return 'Soberano Imperial';
-        if (archetypes.disciplina) return 'Avatar da Abundância';
-        if (archetypes.estrategia) return 'Arconte do Tesouro';
-        if (archetypes.audacia) return 'Lorde do Risco';
-        if (archetypes.persistencia) return 'Eremita Iluminado';
-        return 'Lenda Viva';
-    }
+    // Tier 3 (Master) - Attribute > 90
+    if (Forca > 90) return 'Soberano Imperial';
+    if (Resistencia > 90) return 'Avatar da Abundância';
+    if (Sabedoria > 90) return 'Arconte do Tesouro';
+    if (Sorte > 90) return 'Lorde do Destino';
 
-    return 'Aventureiro';
+    // Specialist Classes (Mixed High Attributes)
+    if (Forca > 70 && Sabedoria < 40) return 'Bárbaro Investidor';
+    if (Sabedoria > 70 && Forca < 40) return 'Erudito Falido';
+    if (Sorte > 80 && Resistencia < 30) return 'Apostador Audaz';
+
+    // Tier 2 (Advanced) - Attribute > 60
+    if (Forca > 60) return 'Magnata Industrial';
+    if (Resistencia > 60) return 'Guardião de Ouro';
+    if (Sabedoria > 60) return 'Regente Visionário';
+    if (Sorte > 60) return 'Caçador de Fortunas';
+
+    // Tier 1 (Novice) - Attribute > 30
+    if (Forca > 30) return 'Guerreiro da Renda';
+    if (Resistencia > 30) return 'Escudeiro da Poupança';
+    if (Sabedoria > 30) return 'Aprendiz Sábio';
+    if (Sorte > 30) return 'Aventureiro Sortudo';
+
+    return 'Aventureiro Iniciante';
 };
 
 
@@ -174,19 +160,47 @@ class GamificationService {
         return count >= limit.max;
     }
 
-     /**
-     * Processa a mudança de XP de um usuário, lidando com level-ups.
-     * @param {Prisma.TransactionClient} tx - Instância transacional do Prisma.
-     * @param {string} userId - O ID do usuário.
-     * @param {number} deltaXp - A quantidade de XP a ser adicionada (pode ser negativa).
-     */
+    /**
+    * Processa a mudança de XP de um usuário, lidando com level-ups e limite semanal.
+    * @param {Prisma.TransactionClient} tx - Instância transacional do Prisma.
+    * @param {string} userId - O ID do usuário.
+    * @param {number} deltaXp - A quantidade de XP a ser adicionada (pode ser negativa).
+    */
     static async processXpChange(tx, userId, deltaXp) {
-        const user = await tx.user.findUnique({ 
+        const user = await tx.user.findUnique({
             where: { id: userId },
-            include: { inventoryItems: { where: { equipped: true }, include: { item: true }}}
+            include: { inventoryItems: { where: { equipped: true }, include: { item: true } } }
         });
         if (!user) return;
-        
+        if (user.gamificationMode === 'OFF') return;
+
+        // Verifica e reseta o limite semanal se necessário
+        const now = new Date();
+        const lastReset = new Date(user.lastWeeklyReset);
+        const daysSinceReset = differenceInDays(now, lastReset);
+
+        let currentWeeklyXp = user.weeklyXp;
+
+        if (daysSinceReset >= 7) {
+            currentWeeklyXp = 0;
+            await tx.user.update({
+                where: { id: userId },
+                data: { weeklyXp: 0, lastWeeklyReset: now }
+            });
+        }
+
+        // Se for ganho de XP, verifica o limite
+        if (deltaXp > 0) {
+            if (currentWeeklyXp >= WEEKLY_XP_CAP) {
+                console.log(`⚠️ Limite semanal de XP atingido para usuário ${userId}.`);
+                return;
+            }
+            // Ajusta deltaXp se for ultrapassar o limite
+            if (currentWeeklyXp + deltaXp > WEEKLY_XP_CAP) {
+                deltaXp = WEEKLY_XP_CAP - currentWeeklyXp;
+            }
+        }
+
         // Aplica bônus de itens e eventos
         let finalXp = deltaXp;
         let xpMultiplier = 1.0;
@@ -198,7 +212,7 @@ class GamificationService {
                 xpMultiplier *= bonus.xpMultiplier;
             }
         });
-        
+
         // 2. Multiplicador de Eventos
         const activeEvent = await tx.gameEvent.findFirst({
             where: {
@@ -212,7 +226,7 @@ class GamificationService {
         if (activeEvent && activeEvent.multiplier) {
             xpMultiplier *= activeEvent.multiplier;
         }
-        
+
         finalXp = Math.floor(deltaXp * xpMultiplier);
 
         let currentXp = user.xp + finalXp;
@@ -223,7 +237,7 @@ class GamificationService {
             currentXp -= needed;
             currentLevel++;
             needed = xpNeeded(currentLevel);
-            
+
             await NotificationService.createNotification(tx, user, {
                 title: 'Level Up!',
                 message: `Parabéns! Você alcançou o Nível ${currentLevel}!`,
@@ -237,51 +251,110 @@ class GamificationService {
                 details: { oldLevel: user.level, newLevel: currentLevel }
             });
         }
-        
+
+        // Atualiza XP total e XP semanal
         await tx.user.update({
             where: { id: userId },
             data: {
                 level: currentLevel,
                 xp: currentXp,
+                weeklyXp: { increment: deltaXp > 0 ? deltaXp : 0 }
             }
         });
     }
 
-     /**
-     * Verifica e concede conquistas a um usuário com base em uma ação gatilho.
-     * @param {PrismaClient | Prisma.TransactionClient} tx - Instância do Prisma.
-     * @param {string} userId - O ID do usuário.
-     * @param {string} trigger - A ação que disparou a verificação (ex: 'BUDGET_CREATED').
-     */
+    /**
+    * Verifica e concede conquistas a um usuário com base em uma ação gatilho.
+    * @param {PrismaClient | Prisma.TransactionClient} tx - Instância do Prisma.
+    * @param {string} userId - O ID do usuário.
+    * @param {string} trigger - A ação que disparou a verificação (ex: 'BUDGET_CREATED').
+    */
+    /**
+    * Verifica e concede conquistas a um usuário com base em uma ação gatilho.
+    * @param {PrismaClient | Prisma.TransactionClient} tx - Instância do Prisma.
+    * @param {string} userId - O ID do usuário.
+    * @param {string} trigger - A ação que disparou a verificação (ex: 'BUDGET_CREATED').
+    * @param {string} entityId - ID da entidade relacionada (opcional).
+    */
     static async checkAndAwardAchievements(tx, userId, trigger, entityId) {
         const user = await tx.user.findUnique({ where: { id: userId } });
         if (!user || !user.enableAchievementNotifications) return;
-        
+        if (user.gamificationMode === 'OFF') return;
+
+        // 1. Conquistas Hardcoded (Legado/Complexas)
         const achievementKey = Object.keys(achievements).find(key => key.startsWith(trigger.split('_')[0]));
-        if (!achievementKey) return;
-        
-        const achievement = achievements[achievementKey];
-            
-        const existingUnlock = await tx.unlockedAchievement.findUnique({
-            where: { userId_achievementId: { userId, achievementId: achievement.id } }
+        if (achievementKey) {
+            const achievement = achievements[achievementKey];
+            const existingUnlock = await tx.unlockedAchievement.findUnique({
+                where: { userId_achievementId: { userId, achievementId: achievement.id } }
+            });
+            if (!existingUnlock && await achievement.check(tx, userId, entityId)) {
+                // Cria registro se não existir no banco (para hardcoded)
+                // Nota: Idealmente, todos deveriam estar no banco.
+                // Simplificação: Apenas concede XP e notificação se não tiver ID de banco real
+                await this.processXpChange(tx, userId, achievement.xp);
+                await NotificationService.createNotification(tx, user, {
+                    title: `Conquista Desbloqueada: ${achievement.name}!`,
+                    message: achievement.message,
+                    type: 'ACHIEVEMENT_UNLOCKED'
+                });
+                // Tenta salvar o unlock se o ID existir no banco (migração futura)
+            }
+        }
+
+        // 2. Conquistas Dinâmicas (Do Banco)
+        const dynamicAchievements = await tx.achievement.findMany({
+            where: { trigger }
         });
-        if (existingUnlock) return;
 
-        if (await achievement.check(tx, userId, entityId)) {
-            await tx.unlockedAchievement.create({
-                data: { userId, achievementId: achievement.id }
+        for (const achievement of dynamicAchievements) {
+            const existingUnlock = await tx.unlockedAchievement.findUnique({
+                where: { userId_achievementId: { userId, achievementId: achievement.id } }
             });
-            
-            await this.processXpChange(tx, userId, achievement.xp);
+            if (existingUnlock) continue;
 
-            await NotificationService.createNotification(tx, user, {
-                title: `Conquista Desbloqueada: ${achievement.name}!`,
-                message: achievement.message,
-                type: 'ACHIEVEMENT_UNLOCKED'
-            });
+            let criteriaMet = true;
+            if (achievement.criteria) {
+                criteriaMet = await this.evaluateCriteria(tx, userId, achievement.criteria, entityId);
+            }
+
+            if (criteriaMet) {
+                await tx.unlockedAchievement.create({
+                    data: { userId, achievementId: achievement.id }
+                });
+                await this.processXpChange(tx, userId, achievement.xp);
+                await NotificationService.createNotification(tx, user, {
+                    title: `Conquista Desbloqueada: ${achievement.name}!`,
+                    message: achievement.description,
+                    type: 'ACHIEVEMENT_UNLOCKED'
+                });
+            }
         }
     }
-    
+
+    static async evaluateCriteria(tx, userId, criteria, entityId) {
+        // Implementação básica de critérios
+        // Ex: { "type": "count", "entity": "transaction", "min": 50 }
+        // Ex: { "type": "amount", "min": 1000 }
+
+        if (criteria.type === 'count') {
+            const model = criteria.entity === 'transaction' ? tx.transaction :
+                criteria.entity === 'budget' ? tx.budget : null;
+            if (!model) return false;
+            const count = await model.count({ where: { userId } });
+            return count >= (criteria.min || 1);
+        }
+
+        if (criteria.type === 'amount' && entityId) {
+            // Assume que entityId é de uma transação
+            const transaction = await tx.transaction.findUnique({ where: { id: entityId } });
+            if (!transaction) return false;
+            return Number(transaction.valor) >= (criteria.min || 0);
+        }
+
+        return true; // Se não tiver critérios específicos implementados, assume true (cuidado!)
+    }
+
     /**
      * Aplica uma recompensa ou penalidade de XP para um evento específico.
      * @param {Prisma.TransactionClient} tx - Instância transacional do Prisma.
@@ -323,91 +396,104 @@ class GamificationService {
         });
     }
 
-    
-     /**
-     * Calcula todos os atributos de gamificação para um usuário.
-     * Esta função é projetada para ser chamada sob demanda para obter os dados mais recentes.
-     * @param {string} userId - O ID do usuário.
-     * @returns {Promise<object>} Um objeto com todos os atributos calculados.
+
+    /**
+     * Gera um insight "in-character" baseado nos atributos.
      */
+    static getInsight(attributes) {
+        const { Forca, Resistencia, Sabedoria, Sorte } = attributes;
+        const lowest = Object.entries(attributes).sort(([, a], [, b]) => a - b)[0];
+        const [lowAttr, lowValue] = lowest;
+
+        if (lowValue > 80) return "Você é uma lenda viva! O reino prospera sob sua gestão.";
+
+        switch (lowAttr) {
+            case 'Forca':
+                return "Sua força vital (Renda) precisa de atenção. Busque novas fontes de poder ou fortaleça sua saúde.";
+            case 'Resistencia':
+                return "Suas defesas (Investimentos) estão baixas. O inverno financeiro pode ser cruel sem uma muralha de reservas.";
+            case 'Sabedoria':
+                return "Você age por impulso. Consulte os pergaminhos do Orçamento para guiar suas decisões com mais Sabedoria.";
+            case 'Sorte':
+                return "Nuvens escuras (Dívidas) pairam sobre você. Realize rituais de pagamento para limpar seu karma financeiro.";
+            default:
+                return "Continue sua jornada, aventureiro. O equilíbrio é a chave.";
+        }
+    }
+
     static async calculateAllAttributes(userId) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) return {};
 
         const threeMonthsAgo = subMonths(new Date(), 3);
-        const yesterday = endOfMonth(subMonths(new Date(), 1));
 
-        const [transactions, accounts, budgets, debtsCategory] = await Promise.all([
-            prisma.transaction.findMany({
-                where: { userId, pago: true, data: { gte: threeMonthsAgo } },
-                include: { category: true },
-            }),
-            prisma.account.findMany({
-                where: { userId },
-                include: { transactions: { where: { pago: true } } },
-            }),
-            prisma.budget.findMany({
-                where: { userId, month: { lte: yesterday.toISOString().slice(0, 7) } },
-            }),
-            prisma.category.findFirst({
-                where: { nome: 'DividasEEmprestimos', userId: null }
-            })
-        ]);
-        
-        const RENDA_MEDIA_POPULACAO = 2800; 
-        const monthlyIncome = transactions
-            .filter(t => t.tipo === 'receita' && t.category?.nome === 'Salario')
-            .reduce((sum, t) => sum + Number(t.valor), 0) / 3;
-        
-        const strength = monthlyIncome > 0 ? (monthlyIncome / RENDA_MEDIA_POPULACAO) * 100 : 0;
-        
-        const totalReserve = accounts
+        // Busca transações e contas
+        const transactions = await prisma.transaction.findMany({
+            where: { userId, pago: true, data: { gte: threeMonthsAgo } },
+            include: { category: true },
+        });
+
+        const accounts = await prisma.account.findMany({
+            where: { userId },
+        });
+
+        // Categorias Mapeadas (Isso poderia vir do banco/config)
+        const CATEGORY_MAP = {
+            FORCA: ['Salario', 'Renda Extra', 'Saude', 'Esporte', 'Academia'],
+            SABEDORIA: ['Educacao', 'Livros', 'Cursos', 'Assinaturas'],
+            RESISTENCIA: ['Investimento', 'Poupanca', 'Seguros', 'Emergencia'],
+            SORTE: ['Doacao', 'Presentes', 'Dividas', 'Emprestimos', 'Lazer']
+        };
+
+        // --- CÁLCULO DE FORÇA (Renda + Saúde) ---
+        const income = transactions
+            .filter(t => t.tipo === 'receita')
+            .reduce((sum, t) => sum + Number(t.valor), 0);
+
+        const healthSpending = transactions
+            .filter(t => t.tipo === 'despesa' && CATEGORY_MAP.FORCA.includes(t.category?.nome))
+            .reduce((sum, t) => sum + Number(t.valor), 0);
+
+        // Força baseada em renda consistente e investimento em saúde
+        // Normalização: Renda ideal ~5k, Gasto saúde ideal ~500
+        let strength = Math.min(100, (income / 15000) * 70 + (healthSpending / 1500) * 30);
+
+
+        // --- CÁLCULO DE SABEDORIA (Educação + Orçamento) ---
+        const educationSpending = transactions
+            .filter(t => t.tipo === 'despesa' && CATEGORY_MAP.SABEDORIA.includes(t.category?.nome))
+            .reduce((sum, t) => sum + Number(t.valor), 0);
+
+        // Sabedoria baseada em investimento em educação
+        let wisdom = Math.min(100, (educationSpending / 1000) * 100);
+
+
+        // --- CÁLCULO DE RESISTÊNCIA (Reservas + Investimentos) ---
+        const totalReserves = accounts
             .filter(a => ['poupanca', 'investimento'].includes(a.tipo))
-            .reduce((sum, acc) => {
-                 const accountBalance = Number(acc.saldoInicial) + acc.transactions.reduce((s, t) => s + (t.tipo === 'receita' ? Number(t.valor) : -Number(t.valor)), 0);
-                 return sum + accountBalance;
-            }, 0);
-        
-        const monthlyExpenses = transactions
-            .filter(t => t.tipo === 'despesa')
-            .reduce((sum, t) => sum + Number(t.valor), 0) / 3;
+            .reduce((sum, acc) => sum + Number(acc.saldoInicial), 0); // Simplificado para saldo atual
 
-        const resilience = monthlyExpenses > 0 ? (totalReserve / monthlyExpenses) * 10 : 0;
-        
-        let completedBudgets = 0;
-        if (budgets.length > 0) {
-            const budgetIds = budgets.map(b => b.id);
-            const expensesByBudgetMonth = await prisma.transaction.groupBy({
-                by: ['categoryId'],
-                _sum: { valor: true },
-                where: {
-                    userId,
-                    pago: true,
-                    tipo: 'despesa',
-                    categoryId: { in: budgets.map(b => b.categoryId) },
-                    data: { lte: yesterday }
-                }
-            });
-            const expensesMap = new Map(expensesByBudgetMonth.map(e => [e.categoryId, e._sum.valor]));
-            
-            budgets.forEach(budget => {
-                const spent = expensesMap.get(budget.categoryId) || 0;
-                if (Number(spent) <= Number(budget.limit)) {
-                    completedBudgets++;
-                }
-            });
-        }
-        const wisdom = budgets.length > 0 ? (completedBudgets / budgets.length) * 100 : 0;
-        
-        let luck = 50;
-        if (debtsCategory) {
-            const allDebts = await prisma.transaction.findMany({ where: { userId, categoryId: debtsCategory.id, tipo: 'despesa' }});
-            if (allDebts.length > 0) {
-                const paidDebtsCount = allDebts.filter(d => d.pago).length;
-                luck = (paidDebtsCount / allDebts.length) * 100;
-            }
-        }
-        
+        const investmentSpending = transactions
+            .filter(t => t.tipo === 'despesa' && CATEGORY_MAP.RESISTENCIA.includes(t.category?.nome))
+            .reduce((sum, t) => sum + Number(t.valor), 0);
+
+        // Resistência baseada em patrimônio acumulado e fluxo de investimento
+        let resilience = Math.min(100, (totalReserves / 20000) * 60 + (investmentSpending / 3000) * 40);
+
+
+        // --- CÁLCULO DE SORTE (Carisma/Social + Dívidas Pagas) ---
+        const socialSpending = transactions
+            .filter(t => t.tipo === 'despesa' && CATEGORY_MAP.SORTE.includes(t.category?.nome))
+            .reduce((sum, t) => sum + Number(t.valor), 0);
+
+        let luck = Math.min(100, (socialSpending / 1000) * 100);
+
+        // Ajuste fino para não zerar
+        strength = Math.max(1, strength);
+        wisdom = Math.max(1, wisdom);
+        resilience = Math.max(1, resilience);
+        luck = Math.max(1, luck);
+
         const attributes = {
             Forca: parseFloat(strength.toFixed(1)),
             Resistencia: parseFloat(resilience.toFixed(1)),
@@ -415,15 +501,24 @@ class GamificationService {
             Sorte: parseFloat(luck.toFixed(1)),
         };
 
-        const heroClass = getHeroClass(user.level, attributes);
+        const heroClass = getHeroClass(attributes);
+        const insight = this.getInsight(attributes);
+
+        // Atualiza classe do usuário se mudou
+        if (user.heroClass !== heroClass) {
+            await prisma.user.update({ where: { id: userId }, data: { heroClass } });
+        }
 
         return {
             ...attributes,
             heroClass,
+            insight,
+            weeklyXp: user.weeklyXp,
+            weeklyCap: WEEKLY_XP_CAP,
             updatedAt: new Date().toISOString(),
         };
     }
-    
+
     static calculateGoalProjection(goal) {
         if (goal.status === 'COMPLETED' || Number(goal.currentAmount) >= Number(goal.targetAmount)) {
             return null;
@@ -436,11 +531,11 @@ class GamificationService {
         const sortedContributions = goal.contributions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         const firstDate = new Date(sortedContributions[0].date);
         const lastDate = new Date(sortedContributions[sortedContributions.length - 1].date);
-        
+
         const monthsElapsed = Math.max(1, differenceInDays(lastDate, firstDate) / 30.44);
         const totalContributed = sortedContributions.reduce((sum, c) => sum + Number(c.amount), 0);
         const averagePerMonth = totalContributed / monthsElapsed;
-        
+
         if (averagePerMonth <= 0) return null;
 
         const remainingAmount = Number(goal.targetAmount) - Number(goal.currentAmount);
@@ -448,8 +543,52 @@ class GamificationService {
 
         return addMonths(new Date(), monthsToComplete);
     }
-    
+
+    static async generateMonthlyMissions(tx, userId) {
+        const startOfCurrentMonth = startOfMonth(new Date());
+
+        // Verifica se já existem missões para este mês
+        const existingMissions = await tx.userMission.findFirst({
+            where: {
+                userId,
+                mission: {
+                    recurrenceType: 'MONTHLY'
+                },
+                createdAt: { gte: startOfCurrentMonth }
+            }
+        });
+
+        if (existingMissions) return;
+
+        // Busca templates de missões mensais
+        const missionTemplates = await tx.mission.findMany({
+            where: {
+                isActive: true,
+                recurrenceType: 'MONTHLY'
+            }
+        });
+
+        // Se não houver templates, cria alguns padrões
+        if (missionTemplates.length === 0) {
+            // Criar templates padrão se não existirem (fallback)
+            // Em produção, isso seria populado via seed ou admin panel
+        }
+
+        for (const template of missionTemplates) {
+            await tx.userMission.create({
+                data: {
+                    userId,
+                    missionId: template.id,
+                    progressJson: { count: 0 },
+                }
+            });
+        }
+    }
+
     static async checkMissionProgress(tx, userId, triggerType, payload) {
+        // Gera missões mensais se necessário (lazy load)
+        await this.generateMonthlyMissions(tx, userId);
+
         const userMissions = await tx.userMission.findMany({
             where: {
                 userId,
@@ -461,13 +600,13 @@ class GamificationService {
         for (const userMission of userMissions) {
             const { mission } = userMission;
             const triggerSpec = mission.triggerSpec || {};
-            
+
             if (mission.scope === 'GUILD') {
                 // Lógica de Missão de Guilda
                 // (a ser implementada)
             } else {
                 // Lógica de Missão de Usuário
-                 if (triggerSpec.type !== triggerType) continue;
+                if (triggerSpec.type !== triggerType) continue;
 
                 if (triggerSpec.type === 'TRANSACTION_CREATED') {
                     let progress = userMission.progressJson || { count: 0 };
@@ -485,7 +624,7 @@ class GamificationService {
             }
         }
     }
-    
+
     static async completeUserMission(tx, userId, userMission, finalProgress) {
         console.log(`Missão "${userMission.mission.title}" completada por ${userId}!`);
         await this.processXpChange(tx, userId, userMission.mission.xpReward);
@@ -506,7 +645,7 @@ class GamificationService {
         }
         const finishedMission = await tx.userMission.update({
             where: { id: userMission.id },
-            data: { 
+            data: {
                 progressJson: finalProgress,
                 completedAt: new Date(),
                 rewardClaimed: true,
@@ -524,10 +663,10 @@ class GamificationService {
 
         const user = await tx.user.findUnique({
             where: { id: userId },
-            include: { inventoryItems: { where: { equipped: true }, include: { item: true }}}
+            include: { inventoryItems: { where: { equipped: true }, include: { item: true } } }
         });
         if (!user) return;
-        
+
         let damageMultiplier = 1.0;
         user.inventoryItems.forEach(userItem => {
             const bonus = userItem.item.bonusJson || {};
@@ -539,13 +678,13 @@ class GamificationService {
         const userAttributes = await this.calculateAllAttributes(userId);
         const strength = userAttributes.Forca || 0;
         const damage = Math.floor(baseDamage * (strength / 100) * damageMultiplier);
-        
+
         if (damage <= 0) return;
 
         const updatedBoss = await tx.boss.update({
             where: { id: activeBoss.id }, data: { currentHp: { decrement: damage } },
         });
-        
+
         console.log(`⚔️ Usuário ${userId} causou ${damage} de dano ao chefe ${activeBoss.name}. HP restante: ${updatedBoss.currentHp}`);
         await AuditService.log({
             userId, action: 'BOSS_DAMAGE', entity: 'BOSS', entityId: activeBoss.id,
@@ -562,10 +701,10 @@ class GamificationService {
             await this.distributeBossRewards(tx, activeBoss);
         }
     }
-    
+
     static async distributeBossRewards(tx, boss) {
         console.log(`🏆 Distribuindo recompensas para a derrota do chefe ${boss.name}`);
-        const damageLogs = await tx.auditLog.findMany({ where: { entity: 'BOSS', entityId: boss.id, action: 'BOSS_DAMAGE' }});
+        const damageLogs = await tx.auditLog.findMany({ where: { entity: 'BOSS', entityId: boss.id, action: 'BOSS_DAMAGE' } });
         if (damageLogs.length === 0) return;
 
         const totalDamage = damageLogs.reduce((sum, log) => sum + (log.details.damage || 0), 0);
@@ -575,9 +714,9 @@ class GamificationService {
             if (!userContributions[userId]) userContributions[userId] = 0;
             userContributions[userId] += log.details.damage || 0;
         });
-        
+
         const rewards = boss.rewardJson || {};
-        
+
         for (const userId in userContributions) {
             const user = await tx.user.findUnique({ where: { id: userId } });
             if (!user) continue;
@@ -595,14 +734,14 @@ class GamificationService {
             if (rewards.items && Array.isArray(rewards.items)) {
                 for (const itemReward of rewards.items) {
                     const { itemId, qty } = itemReward;
-                    const existingItem = await tx.userItem.findFirst({ where: { userId, itemId }});
+                    const existingItem = await tx.userItem.findFirst({ where: { userId, itemId } });
                     if (existingItem) await tx.userItem.update({ where: { id: existingItem.id }, data: { quantity: { increment: qty } } });
-                    else await tx.userItem.create({ data: { userId, itemId, quantity: qty }});
-                    const itemDetails = await tx.item.findUnique({ where: { id: itemId }});
+                    else await tx.userItem.create({ data: { userId, itemId, quantity: qty } });
+                    const itemDetails = await tx.item.findUnique({ where: { id: itemId } });
                     rewardMessage += `- ${qty}x ${itemDetails?.name || 'Item Raro'}\n`;
                 }
             }
-            
+
             await NotificationService.createNotification(tx, user, {
                 title: "Recompensa de Chefe!", message: rewardMessage, type: 'ACHIEVEMENT_UNLOCKED'
             });

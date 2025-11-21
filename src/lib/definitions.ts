@@ -41,9 +41,7 @@ export type User = {
     favoriteCategories?: string[] | string | null;
     dashboardPreferences?: Record<string, unknown> | string | null;
     hideFamilyMode?: boolean;
-    gamificationMode?: GamificationMode;
     isAdmin: boolean;
-    gamificationMode?: 'FULL' | 'LITE' | 'OFF';
     level: number;
     clanId?: string | null;
     clanMembership?: {
@@ -76,6 +74,9 @@ export type GamificationProfile = {
     userId: string;
     level: number;
     xp: number;
+    weeklyXp?: number;
+    weeklyCap?: number;
+    insight?: string;
     heroClass?: string | null;
     xpTarget?: number;
     xpToNextLevel?: number;
