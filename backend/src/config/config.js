@@ -21,6 +21,14 @@ export default {
         privateKey: process.env.VAPID_PRIVATE_KEY,
         subject: process.env.VAPID_SUBJECT,
     },
+    sendgrid: {
+        apiKey: process.env.SENDGRID_API_KEY,
+        fromEmail: process.env.SENDGRID_FROM_EMAIL,
+        fromName: process.env.SENDGRID_FROM_NAME || 'Dexpesas'
+    },
+    app: {
+        url: process.env.APP_URL || 'http://localhost:3000'
+    },
     minio: {
         endPoint: process.env.MINIO_ENDPOINT,
         port: parseInt(process.env.MINIO_PORT, 10),

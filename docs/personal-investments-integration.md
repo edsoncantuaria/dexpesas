@@ -34,7 +34,7 @@
 | `InvestmentContribution` | `id`, `planId`, `accountId`, `holdingId?`, `amount`, `fromAccountId`, `leisureImpact`, `status`, `source` (`manual`, `automation`, `windfall`, `aiSuggestion`) | Histório de aportes com vínculo ao excedente calculado. |
 | `InvestmentSnapshot` | `id`, `planId`, `month`, `totalInvested`, `totalReturns`, `leisureSpent`, `deltaVsPlan`, `commentaryJson` | Base para análises e gráficos. |
 
-> **Implementação**: adicionar os modelos ao `models.json`, regenerar Prisma e criar migration. Reaproveitar enums existentes (`AccountType`, `AutomationType`, etc.).
+> **Implementação**: adicionar os modelos ao prisma, regenerar Prisma e criar migration. Reaproveitar enums existentes (`AccountType`, `AutomationType`, etc.).
 
 ### Backend
 

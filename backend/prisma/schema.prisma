@@ -1,7 +1,3 @@
-// ATENÇÃO: Este arquivo é gerado automaticamente.
-// NÃO EDITE ESTE ARQUIVO DIRETAMENTE.
-// Edite o arquivo "models.json" e execute o script de geração.
-
 datasource db {
   provider = "mysql"
   url      = env("DATABASE_URL")
@@ -309,6 +305,11 @@ model User {
   fixedMonthlyIncome   Decimal? @db.Decimal(18, 2)
   phoneNumber          String?
   phoneVerified        Boolean @default(false)
+  emailVerified        Boolean @default(false)
+  emailVerificationToken String?
+  emailVerificationExpires DateTime?
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
   twoFactorEnabled     Boolean @default(false)
   twoFactorSecret      String?
   favoriteCategories   Json? @default("[]")

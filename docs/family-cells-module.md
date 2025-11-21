@@ -288,7 +288,7 @@ Este documento servirá como blueprint para implementação incremental das Fam�
 Cada épico inclui dependências explícitas (ex.: CELL-FE depende de CELL-BE/CELL-MIG) e checkpoints de flag para liberar fases (F0-F4).
 
 ### Migração de Dados & Infra
-- [x] Criar migration Prisma e atualizar models.json renomeando `clans`/`clan_*` para `family_cells`/`cell_*`.
+- [x] Criar migration Prisma renomeando `clans`/`clan_*` para `family_cells`/`cell_*`.
 - [x] Backfill de `permissions_json` com defaults baseados no role atual.
 - [x] Migrar `shared_expenses` para `cell_expenses` com histórico de splits.
 - [x] Popular `cell_events` a partir de audit logs existentes.

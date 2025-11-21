@@ -78,6 +78,11 @@ As chaves de acesso e URLs de conexão são gerenciadas através de um arquivo `
         *   `VAPID_PRIVATE_KEY`: Cole o valor da "Private Key".
         *   `VAPID_SUBJECT`: **Importante!** Este campo deve ser um link `mailto:` com seu e-mail de contato ou a URL `https:` do seu site. Isso é usado pelos serviços de push para identificar quem está enviando a notificação.
             *   **Exemplo:** `mailto:seu-email@exemplo.com`
+4.  **Configurar SendGrid para e-mails transacionais**:
+    *   `SENDGRID_API_KEY`: API key da sua conta SendGrid.
+    *   `SENDGRID_FROM_EMAIL`: Remetente verificado no SendGrid (ex.: `no-reply@seu-dominio.com`).
+    *   `SENDGRID_FROM_NAME` (opcional): Nome amigável do remetente (ex.: `Dexpesas`).
+    *   `APP_URL`: URL base usada nos links de verificação e reset de senha (ex.: `http://localhost:3000` em desenvolvimento).
 
 ### Passo 4: Instalar Dependências do Backend
 
