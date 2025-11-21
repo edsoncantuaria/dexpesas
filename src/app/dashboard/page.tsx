@@ -22,6 +22,7 @@ import { CellSummaryCard } from '@/components/dashboard/overview/cell-summary-ca
 import { SmartSummary } from '@/components/dashboard/smart-summary';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { PrivacyProvider } from '@/contexts/PrivacyContext';
+import { TutorialOverlay } from '@/components/dashboard/tutorial/tutorial-overlay';
 
 const cardComponents: { [key: string]: React.ComponentType<any> } = {
   account_book: AccountBookCard,
@@ -56,6 +57,35 @@ function DashboardPageContent() {
     userId: user?.id,
   });
 
+  const fetchFamilyData = useCallback(async (currentUser: User) => {
+    const resolvedCellId =
+      currentUser?.clanId ||
+      currentUser?.clanMembership?.clanId ||
+      currentUser?.clanMemberships?.[0]?.clanId;
+
+    if (resolvedCellId) {
+      try {
+        const [cellRes, budgetsRes, fundsRes] = await Promise.all([
+          api.get(`/cells/${resolvedCellId}`),
+          api.get(`/cells/${resolvedCellId}/budgets`),
+          api.get(`/cells/${resolvedCellId}/funds`),
+        ]);
+        setClan(cellRes.data);
+        setCellBudgets(budgetsRes.data);
+        setCellFunds(fundsRes.data);
+      } catch (clanError) {
+        console.warn('Não foi possível buscar os dados da família. O usuário pode ter saído.', clanError);
+        setClan(null);
+        setCellBudgets([]);
+        setCellFunds([]);
+      }
+    } else {
+      setClan(null);
+      setCellBudgets([]);
+      setCellFunds([]);
+    }
+  }, []);
+
   const fetchGamificationData = useCallback(
     async (enabled: boolean, currentUser?: User | null) => {
       if (!enabled) {
@@ -64,7 +94,7 @@ function DashboardPageContent() {
         setAllAchievements([]);
         setTimelineLogs([]);
         setActiveBoss(null);
-        setClan(null);
+        // setClan(null); // Removed to persist family data
         setIsGamificationLoading(false);
         return;
       }
@@ -141,33 +171,6 @@ function DashboardPageContent() {
             description: 'Alguns recursos de gamificação não responderam, mas o dashboard foi carregado.',
           });
         }
-
-        const resolvedCellId =
-          currentUser?.clanId ||
-          currentUser?.clanMembership?.clanId ||
-          currentUser?.clanMemberships?.[0]?.clanId;
-
-        if (resolvedCellId) {
-          try {
-            const [cellRes, budgetsRes, fundsRes] = await Promise.all([
-              api.get(`/cells/${resolvedCellId}`),
-              api.get(`/cells/${resolvedCellId}/budgets`),
-              api.get(`/cells/${resolvedCellId}/funds`),
-            ]);
-            setClan(cellRes.data);
-            setCellBudgets(budgetsRes.data);
-            setCellFunds(fundsRes.data);
-          } catch (clanError) {
-            console.warn('Não foi possível buscar os dados da família. O usuário pode ter saído.', clanError);
-            setClan(null);
-            setCellBudgets([]);
-            setCellFunds([]);
-          }
-        } else {
-          setClan(null);
-          setCellBudgets([]);
-          setCellFunds([]);
-        }
       } catch (error) {
         console.warn('Erro ao carregar dados de gamificação', error);
         toast({
@@ -180,7 +183,6 @@ function DashboardPageContent() {
         setAllAchievements([]);
         setTimelineLogs([]);
         setActiveBoss(null);
-        setClan(null);
       } finally {
         setIsGamificationLoading(false);
       }
@@ -216,6 +218,9 @@ function DashboardPageContent() {
       setBudgets(budgetsData.data);
       setTransactions(transactionsData.data);
 
+      // Fetch Family Data independently
+      fetchFamilyData(user);
+
       const mode = user.gamificationMode ?? 'FULL';
       const shouldEnable = mode !== 'OFF';
       setIsGamificationEnabled(shouldEnable);
@@ -246,7 +251,7 @@ function DashboardPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchGamificationData, toast]);
+  }, [fetchGamificationData, fetchFamilyData, toast]);
 
   useEffect(() => {
     fetchData();
@@ -277,6 +282,7 @@ function DashboardPageContent() {
 
   return (
     <div className="space-y-6">
+      <TutorialOverlay />
       {isGamificationEnabled && profile && (
         <HeroProfile
           user={user}

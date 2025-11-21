@@ -98,7 +98,7 @@ class UserController {
                     mainFinancialGoal,
                     fixedMonthlyIncome: fixedMonthlyIncome !== undefined && fixedMonthlyIncome !== null ? parseFloat(fixedMonthlyIncome) : null,
                 },
-                 select: { 
+                select: {
                     id: true, email: true, username: true, name: true, age: true, gender: true, avatarUrl: true, futureProjectionCount: true,
                     daysUntilDueReminder: true, enableAchievementNotifications: true, enableBudgetNotifications: true, enableLimitAlerts: true, enableUpcomingPaymentNotifications: true,
                     professionalSituation: true, monthlyIncomeRange: true, investmentProfile: true, mainFinancialGoal: true, fixedMonthlyIncome: true,
@@ -109,9 +109,9 @@ class UserController {
             next(error);
         }
     }
-    
+
     async updatePreferences(req, res, next) {
-        const { 
+        const {
             futureProjectionCount,
             daysUntilDueReminder,
             enableAchievementNotifications,
@@ -129,6 +129,7 @@ class UserController {
             dashboardPreferences,
             hideFamilyMode,
             gamificationMode,
+            hasCompletedTutorial,
         } = req.body;
         const userId = req.user.id;
 
@@ -148,6 +149,10 @@ class UserController {
                 // Correção: Garante que o layout seja sempre uma string JSON
                 dashboardLayout: typeof dashboardLayout === 'object' ? JSON.stringify(dashboardLayout) : dashboardLayout,
             };
+
+            if (typeof hasCompletedTutorial === 'boolean') {
+                dataToUpdate.hasCompletedTutorial = hasCompletedTutorial;
+            }
             if (typeof hideFamilyMode === 'boolean') {
                 dataToUpdate.hideFamilyMode = hideFamilyMode;
             }
@@ -165,7 +170,7 @@ class UserController {
 
             if (futureProjectionCount !== undefined) {
                 const count = Number(futureProjectionCount);
-                 if (isNaN(count) || count < 1 || count > 50) {
+                if (isNaN(count) || count < 1 || count > 50) {
                     return res.status(400).json({ message: 'O valor da projeção futura deve ser um número entre 1 e 50.' });
                 }
                 dataToUpdate.futureProjectionCount = count;
@@ -213,12 +218,13 @@ class UserController {
                         dashboardPreferences: true,
                         gamificationMode: true,
                         hideFamilyMode: true,
+                        hasCompletedTutorial: true,
                     },
                 });
             });
 
             res.json(updatedUser);
-        } catch(error) {
+        } catch (error) {
             next(error);
         }
     }
@@ -235,8 +241,8 @@ class UserController {
             });
             res.json(updatedUser);
         } catch (error) {
-             if (error.code === 'P2002') {
-                 return res.status(409).json({ message: `O ${error.meta.target.includes('email') ? 'email' : 'usuário'} já está em uso.` });
+            if (error.code === 'P2002') {
+                return res.status(409).json({ message: `O ${error.meta.target.includes('email') ? 'email' : 'usuário'} já está em uso.` });
             }
             next(error);
         }
@@ -357,7 +363,7 @@ class UserController {
             if (!unlockedAchievement) {
                 return res.status(404).json({ message: 'Conquista não desbloqueada pelo usuário.' });
             }
-            
+
             // Lógica para limitar o número de destaques
             if (destacada === true) {
                 const highlightedCount = await prisma.unlockedAchievement.count({

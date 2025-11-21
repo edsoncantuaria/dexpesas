@@ -52,7 +52,7 @@ export function SmartSummary({ accounts, transactions, budgets, cards }: SmartSu
         new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
     return (
-        <div className="space-y-4">
+        <div id="smart-summary" className="space-y-4">
             <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Resumo Financeiro</h2>
                 <button

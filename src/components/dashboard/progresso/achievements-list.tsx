@@ -13,34 +13,24 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-interface Achievement {
-    id: string;
-    name: string;
-    description: string;
-    icon: string;
-    xp: number;
-}
-
-interface UnlockedAchievement {
-    id: string;
-    userId: string;
-    achievementId: string;
-    unlockedAt: string;
-}
+import type { Achievement, UnlockedAchievement } from "@/lib/definitions";
 
 interface AchievementsListProps {
     allAchievements: Achievement[];
     unlockedAchievements: UnlockedAchievement[];
+    onTogglePin?: (achievementId: string, isPinned: boolean) => void;
+    ignoreGamificationMode?: boolean;
 }
 
 type FilterType = 'all' | 'unlocked' | 'locked';
 
-export function AchievementsList({ allAchievements, unlockedAchievements }: AchievementsListProps) {
+export function AchievementsList({ allAchievements, unlockedAchievements, onTogglePin, ignoreGamificationMode = false }: AchievementsListProps) {
     const unlockedIds = new Set(unlockedAchievements.map(ua => ua.achievementId));
+    const pinnedIds = new Set(unlockedAchievements.filter(ua => ua.destacada).map(ua => ua.achievementId));
     const { isClassic } = useGamificationMode();
     const [filter, setFilter] = useState<FilterType>('all');
 
-    if (isClassic) return null;
+    if (isClassic && !ignoreGamificationMode) return null;
 
     // Create a map for quick unlock date lookup
     const unlockMap = new Map(
@@ -55,11 +45,16 @@ export function AchievementsList({ allAchievements, unlockedAchievements }: Achi
         return true;
     });
 
-    // Sort: unlocked first, then by XP
+    // Sort: pinned first, then unlocked, then by XP
     const sortedAchievements = [...filteredAchievements].sort((a, b) => {
+        const aPinned = pinnedIds.has(a.id);
+        const bPinned = pinnedIds.has(b.id);
+        if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
         const aUnlocked = unlockedIds.has(a.id);
         const bUnlocked = unlockedIds.has(b.id);
         if (aUnlocked !== bUnlocked) return aUnlocked ? -1 : 1;
+
         return b.xp - a.xp;
     });
 
@@ -113,9 +108,14 @@ export function AchievementsList({ allAchievements, unlockedAchievements }: Achi
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {sortedAchievements.map((achievement) => {
                                 const isUnlocked = unlockedIds.has(achievement.id);
+                                const isPinned = pinnedIds.has(achievement.id);
                                 const IconComponent = iconMap[achievement.icon as keyof typeof iconMap] || Trophy;
-                                const isBase64 = achievement.icon.startsWith('data:image');
+                                const isBase64 = achievement.icon?.startsWith('data:image');
                                 const unlockDate = unlockMap.get(achievement.id);
+
+                                // Handle potential legacy field names from API
+                                const displayName = achievement.name || (achievement as any).nome || 'Conquista sem nome';
+                                const displayDesc = achievement.description || (achievement as any).descricao || 'Sem descrição';
 
                                 return (
                                     <div
@@ -125,7 +125,8 @@ export function AchievementsList({ allAchievements, unlockedAchievements }: Achi
                                             "hover:shadow-md",
                                             isUnlocked
                                                 ? "bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20 border-amber-200 dark:border-amber-800 shadow-sm"
-                                                : "bg-muted/30 border-muted-foreground/20 opacity-60 grayscale hover:opacity-80"
+                                                : "bg-muted/30 border-muted-foreground/20 opacity-60 grayscale hover:opacity-80",
+                                            isPinned && "ring-2 ring-primary ring-offset-2"
                                         )}
                                     >
                                         {/* Icon */}
@@ -139,7 +140,7 @@ export function AchievementsList({ allAchievements, unlockedAchievements }: Achi
                                                 <div className="relative h-6 w-6">
                                                     <Image
                                                         src={achievement.icon}
-                                                        alt={achievement.name}
+                                                        alt={displayName}
                                                         fill
                                                         className="object-contain"
                                                     />
@@ -156,13 +157,31 @@ export function AchievementsList({ allAchievements, unlockedAchievements }: Achi
                                                     "font-semibold text-sm leading-tight",
                                                     isUnlocked && "text-amber-900 dark:text-amber-100"
                                                 )}>
-                                                    {achievement.name}
+                                                    {displayName}
                                                 </h4>
                                                 {!isUnlocked && <Lock className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />}
+
+                                                {/* Pin Button */}
+                                                {isUnlocked && onTogglePin && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6 -mt-1 -mr-1 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                                                        onClick={() => onTogglePin(achievement.id, isPinned)}
+                                                        disabled={!isPinned && pinnedIds.size >= 2}
+                                                    >
+                                                        <div className={cn(
+                                                            "h-4 w-4 transition-colors",
+                                                            isPinned ? "text-primary fill-primary" : "text-muted-foreground"
+                                                        )}>
+                                                            📌
+                                                        </div>
+                                                    </Button>
+                                                )}
                                             </div>
 
                                             <p className="text-xs text-muted-foreground line-clamp-2">
-                                                {achievement.description}
+                                                {displayDesc}
                                             </p>
 
                                             <div className="flex items-center justify-between pt-1">
@@ -185,8 +204,8 @@ export function AchievementsList({ allAchievements, unlockedAchievements }: Achi
                                             </div>
                                         </div>
 
-                                        {/* Unlocked Badge */}
-                                        {isUnlocked && (
+                                        {/* Unlocked Badge (only if not pinned to avoid clutter) */}
+                                        {isUnlocked && !isPinned && !onTogglePin && (
                                             <div className="absolute top-2 right-2">
                                                 <div className="bg-amber-500 text-white rounded-full p-1">
                                                     <Check className="h-3 w-3" />

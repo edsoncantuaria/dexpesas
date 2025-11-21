@@ -6,7 +6,7 @@ export function QuickActions() {
     return (
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
             <Link href="/dashboard/transacoes">
-                <Button variant="outline" className="h-auto flex-col gap-2 p-4 min-w-[100px] hover:bg-primary/5 hover:border-primary/50 transition-all">
+                <Button id="add-transaction-btn" variant="outline" className="h-auto flex-col gap-2 p-4 min-w-[100px] hover:bg-primary/5 hover:border-primary/50 transition-all">
                     <div className="p-2 bg-primary/10 rounded-full">
                         <PlusCircle className="h-5 w-5 text-primary" />
                     </div>

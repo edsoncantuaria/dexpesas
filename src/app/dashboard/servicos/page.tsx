@@ -3,13 +3,13 @@
 
 import Link from "next/link";
 import { useMemo } from 'react';
-import { 
-    Grid3x3, 
-    Landmark, 
-    CreditCard, 
-    BarChart3, 
-    Trophy, 
-    Rocket, 
+import {
+    Grid3x3,
+    Landmark,
+    CreditCard,
+    BarChart3,
+    Trophy,
+    Rocket,
     BrainCircuit,
     ChevronRight,
     Target,
@@ -20,10 +20,12 @@ import {
     Tags,
     Users,
     Swords,
-    TrendingUp
+    TrendingUp,
+    Shield
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
+import { useUser } from '@/contexts/UserContext';
 
 type ServiceItem = {
     href: string;
@@ -65,7 +67,7 @@ const baseServiceItems: ServiceItem[] = [
         iconBgClass: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400'
     },
     // Ferramentas de Análise e Automação
-     {
+    {
         href: '/dashboard/relatorios',
         title: 'Relatórios',
         description: 'Visualize gráficos e análises',
@@ -94,8 +96,8 @@ const baseServiceItems: ServiceItem[] = [
         Icon: BrainCircuit,
         iconBgClass: 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400'
     },
-     {
-        href: '/dashboard/regras', 
+    {
+        href: '/dashboard/regras',
         title: 'Regras de Categorização',
         description: 'Ensine o app a organizar seus gastos',
         Icon: BookText,
@@ -154,6 +156,22 @@ export default function ServicosPage() {
             });
     }, [isClassic, isLite]);
 
+    const { user } = useUser();
+    const finalServiceItems = useMemo(() => {
+        const items = [...serviceItems];
+        if (user?.isAdmin) {
+            items.push({
+                href: '/dashboard/admin',
+                title: 'Painel Admin',
+                description: 'Gerencie usuários, conquistas e configurações do sistema',
+                Icon: Shield,
+                iconBgClass: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+            });
+        }
+        return items;
+    }, [serviceItems, user]);
+
+
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
@@ -165,7 +183,7 @@ export default function ServicosPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {serviceItems.map((item) => (
+                {finalServiceItems.map((item) => (
                     <Link href={item.href} key={item.href} className="group">
                         <div className="bg-card p-4 rounded-lg border flex items-center gap-4 transition-all group-hover:border-primary group-hover:bg-primary/5 h-full">
                             <div className={`p-3 rounded-lg ${item.iconBgClass}`}>

@@ -54,7 +54,7 @@ export function MonthlyMissionBoard() {
     if (isClassic) return null;
 
     return (
-        <Card className="border-indigo-100 bg-gradient-to-br from-white to-indigo-50/50 dark:from-slate-950 dark:to-slate-900/50 dark:border-slate-800">
+        <Card id="mission-board" className="border-indigo-100 bg-gradient-to-br from-white to-indigo-50/50 dark:from-slate-950 dark:to-slate-900/50 dark:border-slate-800">
             <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

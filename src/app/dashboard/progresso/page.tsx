@@ -27,7 +27,7 @@ export default function ProgressoPage() {
             const [profileRes, userRes, allAchievRes, unlockedAchievRes] = await Promise.all([
                 api.get('/gamification/profile'),
                 api.get('/user'),
-                api.get('/achievements/all'),
+                api.get('/achievements'),
                 api.get('/achievements/unlocked')
             ]);
             setProfile(profileRes.data);

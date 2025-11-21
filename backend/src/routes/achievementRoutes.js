@@ -9,6 +9,7 @@ router.use(authMiddleware);
 
 // Public Routes
 router.get('/', achievementController.getAllAchievements);
+router.get('/all', achievementController.getAllAchievements); // Alias for consistency
 router.get('/unlocked', achievementController.getUnlockedAchievements);
 
 // Admin Routes

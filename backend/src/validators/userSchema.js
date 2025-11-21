@@ -14,22 +14,23 @@ export const updateProfileSchema = z.object({
 });
 
 export const updatePreferencesSchema = z.object({
-    futureProjectionCount: z.coerce.number().min(1).max(50).optional(),
-    daysUntilDueReminder: z.coerce.number().optional(),
-    enableAchievementNotifications: z.boolean().optional(),
-    enableBudgetNotifications: z.boolean().optional(),
-    enableLimitAlerts: z.boolean().optional(),
-    enableUpcomingPaymentNotifications: z.boolean().optional(),
-    enableOcr: z.boolean().optional(),
-    enableDailySummary: z.boolean().optional(),
-    enableBudgetSuggestion: z.boolean().optional(),
-    enableReconciliationAi: z.boolean().optional(),
-    enableGoalProjection: z.boolean().optional(),
-    habilitarDescricaoInteligente: z.boolean().optional(),
-    dashboardLayout: z.any().optional(),
-    favoriteCategoryIds: z.array(z.string()).optional(),
-    dashboardPreferences: z.record(z.any()).optional(),
-    hideFamilyMode: z.boolean().optional(),
+  futureProjectionCount: z.coerce.number().min(1).max(50).optional(),
+  daysUntilDueReminder: z.coerce.number().optional(),
+  enableAchievementNotifications: z.boolean().optional(),
+  enableBudgetNotifications: z.boolean().optional(),
+  enableLimitAlerts: z.boolean().optional(),
+  enableUpcomingPaymentNotifications: z.boolean().optional(),
+  enableOcr: z.boolean().optional(),
+  enableDailySummary: z.boolean().optional(),
+  enableBudgetSuggestion: z.boolean().optional(),
+  enableReconciliationAi: z.boolean().optional(),
+  enableGoalProjection: z.boolean().optional(),
+  habilitarDescricaoInteligente: z.boolean().optional(),
+  dashboardLayout: z.any().optional(),
+  favoriteCategoryIds: z.array(z.string()).optional(),
+  dashboardPreferences: z.record(z.any()).optional(),
+  hideFamilyMode: z.boolean().optional(),
+  hasCompletedTutorial: z.boolean().optional(),
 });
 
 
@@ -39,14 +40,14 @@ export const updateAccountInfoSchema = z.object({
 });
 
 export const changePasswordSchema = z.object({
-    currentPassword: z.string().min(1, 'Senha atual é obrigatória.'),
-    newPassword: z.string().min(6, 'A nova senha deve ter pelo menos 6 caracteres.'),
+  currentPassword: z.string().min(1, 'Senha atual é obrigatória.'),
+  newPassword: z.string().min(6, 'A nova senha deve ter pelo menos 6 caracteres.'),
 }).refine(data => data.currentPassword !== data.newPassword, {
-    message: 'A nova senha deve ser diferente da atual.',
-    path: ['newPassword'],
+  message: 'A nova senha deve ser diferente da atual.',
+  path: ['newPassword'],
 });
 
 export const updateSecuritySchema = z.object({
-    phoneNumber: z.string().regex(/^\+?\d{10,15}$/, 'Informe um telefone válido com DDD.').optional().nullable(),
-    twoFactorEnabled: z.boolean().optional(),
+  phoneNumber: z.string().regex(/^\+?\d{10,15}$/, 'Informe um telefone válido com DDD.').optional().nullable(),
+  twoFactorEnabled: z.boolean().optional(),
 });

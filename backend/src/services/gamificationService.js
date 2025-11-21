@@ -77,89 +77,117 @@ const gamificationEvents = {
 
 const WEEKLY_XP_CAP = 1000;
 
-
 // Fórmula de XP para o próximo nível
 const xpNeeded = (level) => Math.floor(100 * Math.pow(level, 1.15));
 export const getXpNeededForLevel = xpNeeded;
 
 /**
- * Nova árvore de classes.
- */
-/**
- * Sistema de classes baseado em padrões de gasto.
- * Reflete o equilíbrio e especialização dos atributos.
+ * Sistema de classes Granular e Único.
+ * Baseado em Tiers (Poder) e Arquétipos (Distribuição).
  */
 const getHeroClass = (attributes) => {
     const { Forca, Resistencia, Sabedoria, Sorte } = attributes;
 
-    // Calcula médias e dominância
+    // 1. Determinar Tier (Nível de Poder)
     const total = Forca + Resistencia + Sabedoria + Sorte;
-    const average = total / 4;
-    const highest = Math.max(Forca, Resistencia, Sabedoria, Sorte);
-    const lowest = Math.min(Forca, Resistencia, Sabedoria, Sorte);
-    const balance = highest - lowest; // Quanto maior, mais desequilibrado
+    const avg = total / 4;
 
-    // Identifica atributo dominante
-    const dominant =
-        Forca === highest ? 'Forca' :
-            Resistencia === highest ? 'Resistencia' :
-                Sabedoria === highest ? 'Sabedoria' : 'Sorte';
+    let tier = 1;
+    if (avg >= 90) tier = 5;      // Lenda
+    else if (avg >= 75) tier = 4; // Mestre
+    else if (avg >= 50) tier = 3; // Veterano
+    else if (avg >= 25) tier = 2; // Adepto
+    else tier = 1;                // Iniciante
 
-    // === CLASSES BALANCEADAS (Equilíbrio) ===
-    if (balance < 15 && average > 60) return 'Maestro do Equilíbrio';
-    if (balance < 20 && average > 40) return 'Guardião Harmônico';
-    if (balance < 25 && average > 25) return 'Aventureiro Versátil';
-    if (balance < 20) return 'Aprendiz Equilibrado';
+    // 2. Ordenar Atributos para identificar Arquétipo
+    const sortedAttrs = [
+        { name: 'Forca', val: Forca },
+        { name: 'Resistencia', val: Resistencia },
+        { name: 'Sabedoria', val: Sabedoria },
+        { name: 'Sorte', val: Sorte }
+    ].sort((a, b) => b.val - a.val);
 
-    // === CLASSES LENDÁRIAS (Maestria + Segundo Forte) ===
-    if (dominant === 'Forca' && Forca > 80) {
-        if (Resistencia > 60) return 'Imperador da Prosperidade';
-        if (Sabedoria > 60) return 'Líder Iluminado';
-        if (Sorte > 60) return 'Conquistador Afortunado';
-        return 'Titã da Renda';
-    }
-    if (dominant === 'Resistencia' && Resistencia > 80) {
-        if (Forca > 60) return 'Fortaleza Impenetrável';
-        if (Sabedoria > 60) return 'Sábio Guardião';
-        if (Sorte > 60) return 'Protetor da Fortuna';
-        return 'Guardião Eterno';
-    }
-    if (dominant === 'Sabedoria' && Sabedoria > 80) {
-        if (Forca > 60) return 'Estrategista Supremo';
-        if (Resistencia > 60) return 'Oráculo do Tesouro';
-        if (Sorte > 60) return 'Adivinho da Sorte';
-        return 'Oráculo Supremo';
-    }
-    if (dominant === 'Sorte' && Sorte > 80) {
-        if (Forca > 60) return 'Herói Carismático';
-        if (Resistencia > 60) return 'Nobre Generoso';
-        if (Sabedoria > 60) return 'Filósofo da Fortuna';
-        return 'Arauto do Destino';
+    const [first, second, third, fourth] = sortedAttrs;
+    const maxVal = first.val;
+    const minVal = fourth.val;
+    const spread = maxVal - minVal;
+
+    // 3. Verificar Ratios Especiais (Prioridade Alta)
+    if (Forca > 60 && Sabedoria < 20) return 'Bárbaro Analfabeto';
+    if (Sabedoria > 60 && Forca < 20 && Resistencia < 20) return 'Mago de Vidro';
+    if (Sorte > 60 && Resistencia < 20) return 'Dublê de Corpo';
+    if (Resistencia > 60 && Sorte < 20) return 'Muralha de Pedra';
+
+    // 4. Identificar Arquétipo e Classe
+
+    // === EQUILIBRADO ===
+    if (spread < 15) {
+        switch (tier) {
+            case 5: return 'A Entidade Perfeita';
+            case 4: return 'Avatar do Equilíbrio';
+            case 3: return 'Equilibrista Vital';
+            case 2: return 'Aventureiro Versátil';
+            default: return 'Cidadão Comum';
+        }
     }
 
-    // === CLASSES ESPECIALIZADAS (Alta maestria, baixa em outra) ===
-    if (Forca > 60 && Sabedoria < 25) return 'Gigante Impulsivo';
-    if (Forca > 60 && Resistencia < 25) return 'Gastador Opulento';
-    if (Sabedoria > 60 && Forca < 25) return 'Erudito Ascético';
-    if (Sabedoria > 60 && Sorte < 25) return 'Pensador Solitário';
-    if (Resistencia > 60 && Sorte < 25) return 'Avarento Cauteloso';
-    if (Sorte > 60 && Resistencia < 25) return 'Generoso Despreocupado';
+    // === PURO ===
+    if (first.val > (second.val * 1.4)) {
+        const type = first.name;
+        switch (type) {
+            case 'Forca':
+                if (tier >= 5) return 'Deus da Guerra';
+                if (tier === 4) return 'Titã da Renda';
+                if (tier === 3) return 'Campeão';
+                if (tier === 2) return 'Guerreiro';
+                return 'Brutamontes';
+            case 'Resistencia':
+                if (tier >= 5) return 'Imortal';
+                if (tier === 4) return 'Bastião';
+                if (tier === 3) return 'Muralha';
+                if (tier === 2) return 'Guardião';
+                return 'Sentinela';
+            case 'Sabedoria':
+                if (tier >= 5) return 'Onisciente';
+                if (tier === 4) return 'Arquimago';
+                if (tier === 3) return 'Sábio';
+                if (tier === 2) return 'Mago';
+                return 'Estudioso';
+            case 'Sorte':
+                if (tier >= 5) return 'Manipulador da Realidade';
+                if (tier === 4) return 'Mestre do Destino';
+                if (tier === 3) return 'Trapaceiro';
+                if (tier === 2) return 'Ladino';
+                return 'Apostador';
+        }
+    }
 
-    // === CLASSES INTERMEDIÁRIAS (Dominante) ===
-    if (dominant === 'Forca' && Forca > 50) return 'Magnata Emergente';
-    if (dominant === 'Resistencia' && Resistencia > 50) return 'Guardião Prudente';
-    if (dominant === 'Sabedoria' && Sabedoria > 50) return 'Estrategista Sagaz';
-    if (dominant === 'Sorte' && Sorte > 50) return 'Socialite Carismático';
+    // === HÍBRIDO ===
+    if (second.val > (first.val * 0.7) && second.val > (third.val * 1.3)) {
+        const combo = [first.name, second.name].sort().join('+');
+        switch (combo) {
+            case 'Forca+Resistencia': return tier >= 4 ? 'Juggernaut' : 'Gladiador';
+            case 'Forca+Sabedoria': return tier >= 4 ? 'Grão-Mestre Monge' : 'Estrategista Marcial';
+            case 'Forca+Sorte': return tier >= 4 ? 'Rei dos Piratas' : 'Saqueador';
+            case 'Resistencia+Sabedoria': return tier >= 4 ? 'Hierofante' : 'Clérigo';
+            case 'Resistencia+Sorte': return tier >= 4 ? 'Magnata Soberano' : 'Mercador';
+            case 'Sabedoria+Sorte': return tier >= 4 ? 'Vidente Supremo' : 'Bardo';
+        }
+    }
 
-    // === CLASSES INICIANTES (Dominante menor) ===
-    if (dominant === 'Forca') return 'Trabalhador Dedicado';
-    if (dominant === 'Resistencia') return 'Poupador Iniciante';
-    if (dominant === 'Sabedoria') return 'Estudante Curioso';
-    if (dominant === 'Sorte') return 'Alma Generosa';
+    // === GENERALISTA ===
+    if (third.val > (first.val * 0.7)) {
+        const weak = fourth.name;
+        switch (weak) {
+            case 'Sorte': return 'Planejador Meticuloso';
+            case 'Sabedoria': return 'Executor Bruto';
+            case 'Resistencia': return 'Canhão de Vidro';
+            case 'Forca': return 'Suporte Tático';
+        }
+    }
 
-    return 'Aventureiro Iniciante';
+    return 'Aventureiro Errante';
 };
-
 
 class GamificationService {
     static getXpNeeded(level) {

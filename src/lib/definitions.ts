@@ -20,6 +20,7 @@ export type User = {
     gender?: 'masculino' | 'feminino' | 'outro' | 'naodizer';
     avatarUrl?: string | null;
     firstOpen: boolean;
+    hasCompletedTutorial: boolean;
     futureProjectionCount: number; // Renomeado de recorrenciaPadrao
     daysUntilDueReminder: number;
     enableAchievementNotifications: boolean;
@@ -56,6 +57,7 @@ export type User = {
     phoneVerified?: boolean;
     twoFactorEnabled?: boolean;
     lastSecurityNotificationAt?: string | null;
+    gamificationMode?: GamificationMode;
 };
 
 export type LegacyRuin = {

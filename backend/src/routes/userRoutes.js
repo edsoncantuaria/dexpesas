@@ -24,7 +24,9 @@ router.post('/complete-onboarding', userController.completeOnboarding);
 // Nova rota para buscar as "ruínas" de um usuário
 router.get('/legacy-ruins', userController.getLegacyRuins);
 
+// Rota para destacar/remover destaque de uma conquista
+router.patch('/achievements/:achievementId', userController.toggleAchievementHighlight);
 
 export default router;
 
-    
+

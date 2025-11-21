@@ -289,6 +289,7 @@ model User {
   isAdmin              Boolean @default(false)
   firstOpen            Boolean @default(true)
   futureProjectionCount Int @default(3)
+  hasCompletedTutorial Boolean @default(false)
   daysUntilDueReminder Int @default(3)
   enableAchievementNotifications Boolean @default(true)
   enableBudgetNotifications Boolean @default(true)

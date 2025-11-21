@@ -1,7 +1,7 @@
 // src/app/dashboard/conquistas/page.tsx
 'use client';
 
-import { AllAchievements } from "@/components/dashboard/conquistas/all-achievements";
+import { AchievementsList } from "@/components/dashboard/progresso/achievements-list";
 import type { Achievement, UnlockedAchievement } from "@/lib/definitions";
 import { ChevronLeft, Trophy } from "lucide-react";
 import Link from "next/link";
@@ -43,7 +43,7 @@ export default function ConquistasPage() {
     const handleHighlightToggle = async (achievementId: string, isHighlighted: boolean) => {
         // Optimistic update
         const originalUnlocked = [...unlockedAchievements];
-        setUnlockedAchievements(prev => prev.map(ua => 
+        setUnlockedAchievements(prev => prev.map(ua =>
             ua.achievementId === achievementId
                 ? { ...ua, destacada: !isHighlighted }
                 : ua
@@ -85,11 +85,13 @@ export default function ConquistasPage() {
                 </div>
             </div>
 
-            <AllAchievements 
-                allAchievements={allAchievements} 
-                unlockedAchievements={unlockedAchievements} 
-                onHighlightToggle={handleHighlightToggle}
+            <AchievementsList
+                allAchievements={allAchievements}
+                unlockedAchievements={unlockedAchievements}
+                onTogglePin={handleHighlightToggle}
+                ignoreGamificationMode={true}
             />
         </div>
     );
 }
+
