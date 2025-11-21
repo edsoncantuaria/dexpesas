@@ -8,13 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
-import { ArrowDownRight, ArrowUpRight, Download, Wallet } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Download, Wallet, Eye, EyeOff } from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, Tooltip } from 'recharts';
 import { FinancialOverview } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { startOfMonth, endOfMonth } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 type MonthlyOverviewCardProps = {
   overview: FinancialOverview | null;
@@ -25,6 +26,7 @@ const formatCurrency = (value: number) =>
 
 export function MonthlyOverviewCard({ overview }: MonthlyOverviewCardProps) {
   const [isExporting, setIsExporting] = useState(false);
+  const { showBalance, togglePrivacy } = usePrivacy();
   const { toast } = useToast();
 
   const handleExport = async () => {
@@ -95,6 +97,13 @@ export function MonthlyOverviewCard({ overview }: MonthlyOverviewCardProps) {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => togglePrivacy()}
+            className="text-muted-foreground hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-background/50"
+          >
+            {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
           {badgeCount > 0 && (
             <Badge variant="destructive" className="text-xs">
               +{badgeCount} alertas
@@ -113,7 +122,7 @@ export function MonthlyOverviewCard({ overview }: MonthlyOverviewCardProps) {
         <div className="space-y-4">
           <div>
             <p className="text-sm text-muted-foreground">Resultado do mês</p>
-            <p className="text-3xl font-bold">{formatCurrency(monthSummary.balance)}</p>
+            <p className="text-3xl font-bold">{showBalance ? formatCurrency(monthSummary.balance) : 'R$ ••••••'}</p>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               Projeção{' '}
               {monthSummary.projectedBalance >= monthSummary.balance ? (
@@ -121,7 +130,7 @@ export function MonthlyOverviewCard({ overview }: MonthlyOverviewCardProps) {
               ) : (
                 <ArrowDownRight className="h-3 w-3 text-destructive" />
               )}
-              {formatCurrency(monthSummary.projectedBalance)}
+              {showBalance ? formatCurrency(monthSummary.projectedBalance) : 'R$ ••••••'}
             </p>
             {monthSummary.variationPercentage !== null && (
               <p
@@ -142,19 +151,19 @@ export function MonthlyOverviewCard({ overview }: MonthlyOverviewCardProps) {
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-md border p-3">
               <p className="text-muted-foreground text-xs">Recebido</p>
-              <p className="font-semibold">{formatCurrency(monthSummary.received)}</p>
+              <p className="font-semibold">{showBalance ? formatCurrency(monthSummary.received) : 'R$ ••••'}</p>
             </div>
             <div className="rounded-md border p-3">
               <p className="text-muted-foreground text-xs">Pago</p>
-              <p className="font-semibold">{formatCurrency(monthSummary.spent)}</p>
+              <p className="font-semibold">{showBalance ? formatCurrency(monthSummary.spent) : 'R$ ••••'}</p>
             </div>
             <div className="rounded-md border p-3">
               <p className="text-muted-foreground text-xs">A receber</p>
-              <p className="font-semibold">{formatCurrency(monthSummary.toReceive)}</p>
+              <p className="font-semibold">{showBalance ? formatCurrency(monthSummary.toReceive) : 'R$ ••••'}</p>
             </div>
             <div className="rounded-md border p-3">
               <p className="text-muted-foreground text-xs">A pagar</p>
-              <p className="font-semibold">{formatCurrency(monthSummary.toPay)}</p>
+              <p className="font-semibold">{showBalance ? formatCurrency(monthSummary.toPay) : 'R$ ••••'}</p>
             </div>
           </div>
         </div>
@@ -172,7 +181,7 @@ export function MonthlyOverviewCard({ overview }: MonthlyOverviewCardProps) {
                   <p className="text-sm font-medium">{account.nome}</p>
                   <p className="text-xs text-muted-foreground">{account.instituicao || account.tipo}</p>
                 </div>
-                <p className="text-sm font-semibold">{formatCurrency(account.saldo)}</p>
+                <p className="text-sm font-semibold">{showBalance ? formatCurrency(account.saldo) : 'R$ ••••'}</p>
               </div>
             ))}
           </div>
@@ -206,7 +215,7 @@ export function MonthlyOverviewCard({ overview }: MonthlyOverviewCardProps) {
                   <div className="flex items-center justify-between text-xs">
                     <p>{budget.label}</p>
                     <p>
-                      {formatCurrency(budget.spent)} / {formatCurrency(budget.limit)}
+                      {showBalance ? `${formatCurrency(budget.spent)} / ${formatCurrency(budget.limit)}` : 'R$ •••• / R$ ••••'}
                     </p>
                   </div>
                   <Progress value={Math.min(percentage, 120)} />

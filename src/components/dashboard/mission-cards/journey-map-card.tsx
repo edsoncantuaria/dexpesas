@@ -1,8 +1,9 @@
 // src/components/dashboard/mission-cards/journey-map-card.tsx
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Map, TrendingUp, AlertTriangle, ArrowRight } from "lucide-react";
+import { Map, TrendingUp, AlertTriangle, ArrowRight, Eye, EyeOff } from "lucide-react";
 import type { Budget } from "@/lib/definitions";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useGamificationMode } from "@/hooks/use-gamification-mode";
 import { getGamificationCopy } from "@/lib/gamification-copy";
 import { motion } from "framer-motion";
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 interface JourneyMapCardProps {
     budgets: Budget[];
@@ -28,6 +30,7 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
     const router = useRouter();
     const { mode, isClassic } = useGamificationMode();
     const copy = getGamificationCopy('journeyMap', mode);
+    const { showBalance, togglePrivacy } = usePrivacy();
 
     // Ordena orçamentos por percentual de uso (decrescente) e pega os top 3
     const criticalBudgets = [...budgets]
@@ -55,10 +58,19 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
                         )}>
                             <Map className="h-6 w-6" />
                         </div>
-                        <div>
+                        <div className="flex-1">
                             <CardTitle className="font-headline text-lg tracking-tight">{copy.title}</CardTitle>
                             <CardDescription className="text-xs font-medium opacity-80">{copy.description}</CardDescription>
                         </div>
+                        {criticalBudgets.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); togglePrivacy(); }}
+                                className="text-muted-foreground hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-background/50"
+                            >
+                                {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6 flex-grow pt-4">
@@ -96,7 +108,7 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
                                                     "text-xs font-bold px-2 py-0.5 rounded-full",
                                                     isOverLimit ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
                                                 )}>
-                                                    {percentageFormat(budget.percentage)}
+                                                    {showBalance ? percentageFormat(budget.percentage) : '••%'}
                                                 </span>
                                             </div>
                                         </div>
@@ -105,14 +117,14 @@ export function JourneyMapCard({ budgets }: JourneyMapCardProps) {
                                             <motion.div
                                                 className={cn("h-full rounded-full", getProgressColor(budget.percentage))}
                                                 initial={{ width: 0 }}
-                                                animate={{ width: `${Math.min(budget.percentage, 100)}%` }}
+                                                animate={{ width: showBalance ? `${Math.min(budget.percentage, 100)}%` : '50%' }}
                                                 transition={{ duration: 1, ease: "easeOut" }}
                                             />
                                         </div>
 
                                         <div className="flex justify-between text-[10px] font-medium text-muted-foreground/80">
-                                            <span>{formatMoney(spent)}</span>
-                                            <span>de {formatMoney(limit)}</span>
+                                            <span>{showBalance ? formatMoney(spent) : 'R$ ••••'}</span>
+                                            <span>de {showBalance ? formatMoney(limit) : 'R$ ••••'}</span>
                                         </div>
                                     </motion.div>
                                 )

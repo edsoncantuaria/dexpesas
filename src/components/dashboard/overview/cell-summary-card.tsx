@@ -1,12 +1,14 @@
 // src/components/dashboard/overview/cell-summary-card.tsx
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { Users, Activity, ShieldCheck, Plus } from 'lucide-react';
+import { Users, Activity, ShieldCheck, Plus, Eye, EyeOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import type { Clan, CellFund, CellBudget } from '@/lib/definitions';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 type CellSummaryCardProps = {
   cell: Clan | null;
@@ -24,6 +26,7 @@ const formatCurrency = (value: unknown) =>
 
 export function CellSummaryCard({ cell, funds, budgets }: CellSummaryCardProps) {
   if (!cell) return null;
+  const { showBalance, togglePrivacy } = usePrivacy();
   const totalFunds = funds.reduce((acc, fund) => acc + Number(fund.currentAmount || 0), 0);
   const topBudgets = budgets.slice(0, 3);
 
@@ -39,7 +42,14 @@ export function CellSummaryCard({ cell, funds, budgets }: CellSummaryCardProps) 
             <p className="text-sm text-muted-foreground">Espaço compartilhado para orçamentos e decisões</p>
           </div>
         </div>
-        <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+        <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+          <button
+            type="button"
+            onClick={() => togglePrivacy()}
+            className="text-muted-foreground hover:text-primary transition-colors p-2 rounded-lg hover:bg-background/50"
+          >
+            {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
           <Link href="/dashboard/cells" className="w-full">
             <Button className="w-full md:w-auto">
               <ShieldCheck className="h-4 w-4 mr-2" />
@@ -57,7 +67,7 @@ export function CellSummaryCard({ cell, funds, budgets }: CellSummaryCardProps) 
       <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <div className="rounded-md border bg-muted/30 p-4 flex flex-col gap-2">
           <span className="text-xs text-muted-foreground uppercase tracking-wide">Saldo compartilhado</span>
-          <span className="text-2xl font-bold">{formatCurrency(cell.balance)}</span>
+          <span className="text-2xl font-bold">{showBalance ? formatCurrency(cell.balance) : 'R$ ••••••'}</span>
           <span className="text-xs text-muted-foreground flex items-center gap-1">
             <Activity className="h-3.5 w-3.5 text-primary" />
             {cell._count?.members || cell.members?.length || 0} membros ativos
@@ -65,7 +75,7 @@ export function CellSummaryCard({ cell, funds, budgets }: CellSummaryCardProps) 
         </div>
         <div className="rounded-md border bg-muted/30 p-4 flex flex-col gap-2">
           <span className="text-xs text-muted-foreground uppercase tracking-wide">Fundos em andamento</span>
-          <div className="text-2xl font-bold">{formatCurrency(totalFunds)}</div>
+          <div className="text-2xl font-bold">{showBalance ? formatCurrency(totalFunds) : 'R$ ••••••'}</div>
           <div className="flex flex-wrap gap-2">
             {funds.slice(0, 3).map((fund) => (
               <Badge key={fund.id} variant="secondary" className="text-xs">
@@ -82,7 +92,7 @@ export function CellSummaryCard({ cell, funds, budgets }: CellSummaryCardProps) 
               {topBudgets.map((budget) => (
                 <div key={budget.id} className="flex items-center justify-between text-sm">
                   <span>{budget.label || 'Orçamento'}</span>
-                  <span className="font-semibold">{formatCurrency(budget.limit)}</span>
+                  <span className="font-semibold">{showBalance ? formatCurrency(budget.limit) : 'R$ ••••'}</span>
                 </div>
               ))}
             </div>

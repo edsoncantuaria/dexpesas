@@ -20,6 +20,7 @@ import { useClassicModeNotice } from '@/hooks/use-classic-mode-notice';
 import { CellSummaryCard } from '@/components/dashboard/overview/cell-summary-card';
 import { SmartSummary } from '@/components/dashboard/smart-summary';
 import { QuickActions } from '@/components/dashboard/quick-actions';
+import { PrivacyProvider } from '@/contexts/PrivacyContext';
 
 const cardComponents: { [key: string]: React.ComponentType<any> } = {
   account_book: AccountBookCard,
@@ -336,7 +337,9 @@ function DashboardPageContent() {
 export default function DashboardPage() {
   return (
     <Suspense fallback={<LoadingScreen />}>
-      <DashboardPageContent />
+      <PrivacyProvider>
+        <DashboardPageContent />
+      </PrivacyProvider>
     </Suspense>
   )
 }

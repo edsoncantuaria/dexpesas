@@ -1,9 +1,10 @@
 // src/components/dashboard/mission-cards/credit-pact-card.tsx
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ShieldHalf, CreditCard, AlertCircle, ArrowRight, CheckCircle2 } from "lucide-react";
+import { ShieldHalf, CreditCard, AlertCircle, ArrowRight, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import type { Card as CardType } from "@/lib/definitions";
 import { useMemo } from 'react';
 import Link from 'next/link';
@@ -14,6 +15,7 @@ import { getGamificationCopy } from "@/lib/gamification-copy";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
 import { motion } from "framer-motion";
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 interface CreditPactCardProps {
     cards: CardType[];
@@ -24,6 +26,7 @@ const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style
 export function CreditPactCard({ cards }: CreditPactCardProps) {
     const { mode, isClassic } = useGamificationMode();
     const copy = getGamificationCopy('creditPact', mode);
+    const { showBalance, togglePrivacy } = usePrivacy();
 
     const processedCards = useMemo(() => {
         if (cards.length === 0) return [];
@@ -68,10 +71,19 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                         )}>
                             {isClassic ? <CreditCard className="h-6 w-6" /> : <ShieldHalf className="h-6 w-6" />}
                         </div>
-                        <div>
+                        <div className="flex-1">
                             <CardTitle className="font-headline text-lg tracking-tight">{copy.title}</CardTitle>
                             <CardDescription className="text-xs font-medium opacity-80">{copy.description}</CardDescription>
                         </div>
+                        {processedCards.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); togglePrivacy(); }}
+                                className="text-muted-foreground hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-background/50"
+                            >
+                                {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-5 flex-grow pt-4">
@@ -100,7 +112,7 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                                             )}
                                         </div>
                                         <p className="text-xs text-muted-foreground mt-1">
-                                            Fatura: <span className="font-medium text-foreground">{formatCurrency(card.currentInvoiceAmount)}</span>
+                                            Fatura: <span className="font-medium text-foreground">{showBalance ? formatCurrency(card.currentInvoiceAmount) : 'R$ ••••'}</span>
                                         </p>
                                     </div>
                                     <div className="text-right">
@@ -109,7 +121,7 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                                             "text-sm font-bold",
                                             card.availableLimit < 0 ? "text-destructive" : "text-emerald-600"
                                         )}>
-                                            {formatCurrency(card.availableLimit)}
+                                            {showBalance ? formatCurrency(card.availableLimit) : 'R$ ••••'}
                                         </p>
                                     </div>
                                 </div>
@@ -123,7 +135,7 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                                                     card.percentage > 70 ? "bg-orange-500" : "bg-blue-500"
                                             )}
                                             initial={{ width: 0 }}
-                                            animate={{ width: `${Math.min(card.percentage, 100)}%` }}
+                                            animate={{ width: showBalance ? `${Math.min(card.percentage, 100)}%` : '50%' }}
                                             transition={{ duration: 1, ease: "easeOut" }}
                                         />
                                     </div>
@@ -164,6 +176,6 @@ export function CreditPactCard({ cards }: CreditPactCardProps) {
                     </Button>
                 </div>
             </Card>
-        </Link>
+        </Link >
     );
 }

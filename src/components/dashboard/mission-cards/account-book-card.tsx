@@ -15,6 +15,7 @@ import api from "@/lib/api";
 import { useGamificationMode } from "@/hooks/use-gamification-mode";
 import { getGamificationCopy } from "@/lib/gamification-copy";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 interface AccountBookCardProps {
     accounts: Account[];
@@ -59,7 +60,7 @@ const MetricCard = ({
 
 
 export function AccountBookCard({ accounts, transactions }: AccountBookCardProps) {
-    const [showBalance, setShowBalance] = useState(true);
+    const { showBalance, togglePrivacy } = usePrivacy();
     const [isExpanded, setIsExpanded] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -156,7 +157,7 @@ export function AccountBookCard({ accounts, transactions }: AccountBookCardProps
                             </motion.p>
                             <button
                                 type="button"
-                                onClick={(e) => { e.preventDefault(); setShowBalance(!showBalance); }}
+                                onClick={(e) => { e.preventDefault(); togglePrivacy(); }}
                                 className="text-muted-foreground hover:text-primary transition-colors"
                             >
                                 {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

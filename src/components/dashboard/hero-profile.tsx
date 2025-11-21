@@ -9,10 +9,11 @@ import { useEffect, useState, useMemo } from 'react';
 import api from '@/lib/api';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { iconMap } from '@/lib/icon-map';
-import { Crown, Star, Users, Banknote } from 'lucide-react';
+import { Crown, Star, Users, Banknote, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
 import { getGamificationCopy } from '@/lib/gamification-copy';
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 interface HeroProfileProps {
     user: User;
@@ -28,6 +29,7 @@ const formatCurrency = (value: number) =>
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchievements, familyBalance }: HeroProfileProps) {
+    const { showBalance, togglePrivacy } = usePrivacy();
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const { mode, isClassic } = useGamificationMode();
     const heroCopy = getGamificationCopy('hero', mode);
@@ -113,7 +115,14 @@ export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchi
                     {typeof familyBalance === 'number' && (
                         <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full text-sm backdrop-blur-sm">
                             <Banknote className="h-4 w-4 text-green-300" />
-                            <span>Saldo Familiar: <span className="font-bold text-green-300">{formatCurrency(familyBalance || 0)}</span></span>
+                            <span>Saldo Familiar: <span className="font-bold text-green-300">{showBalance ? formatCurrency(familyBalance || 0) : 'R$ ••••••'}</span></span>
+                            <button
+                                type="button"
+                                onClick={() => togglePrivacy()}
+                                className="ml-1 text-green-300 hover:text-white transition-colors"
+                            >
+                                {showBalance ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                            </button>
                         </div>
                     )}
 

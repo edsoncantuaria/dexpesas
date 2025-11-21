@@ -1,8 +1,9 @@
 // src/components/dashboard/mission-cards/challenge-tower-card.tsx
 'use client';
 
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Castle, Target, Trophy, ArrowRight, Star } from "lucide-react";
+import { Castle, Target, Trophy, ArrowRight, Star, Eye, EyeOff } from "lucide-react";
 import type { Goal } from "@/lib/definitions";
 import { Progress } from "@/components/ui/progress";
 import Link from 'next/link';
@@ -12,6 +13,7 @@ import { useGamificationMode } from "@/hooks/use-gamification-mode";
 import { getGamificationCopy } from "@/lib/gamification-copy";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { usePrivacy } from '@/contexts/PrivacyContext';
 
 interface ChallengeTowerCardProps {
     goals?: Goal[];
@@ -21,6 +23,7 @@ export function ChallengeTowerCard({ goals = [] }: ChallengeTowerCardProps) {
     const router = useRouter();
     const { mode, isClassic } = useGamificationMode();
     const copy = getGamificationCopy('challengeTower', mode);
+    const { showBalance, togglePrivacy } = usePrivacy();
 
     // Pega as 3 metas mais próximas de serem concluídas (maior %)
     const activeGoals = [...goals]
@@ -48,10 +51,19 @@ export function ChallengeTowerCard({ goals = [] }: ChallengeTowerCardProps) {
                         )}>
                             {isClassic ? <Target className="h-6 w-6" /> : <Castle className="h-6 w-6" />}
                         </div>
-                        <div>
+                        <div className="flex-1">
                             <CardTitle className="font-headline text-lg tracking-tight">{copy.title}</CardTitle>
                             <CardDescription className="text-xs font-medium opacity-80">{copy.description}</CardDescription>
                         </div>
+                        {activeGoals.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); togglePrivacy(); }}
+                                className="text-muted-foreground hover:text-primary transition-colors p-1.5 rounded-lg hover:bg-background/50"
+                            >
+                                {showBalance ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        )}
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-5 flex-grow pt-4">
@@ -78,7 +90,7 @@ export function ChallengeTowerCard({ goals = [] }: ChallengeTowerCardProps) {
                                         "text-xs font-bold px-2 py-0.5 rounded-full",
                                         goal.percentage >= 100 ? "bg-green-100 text-green-700" : "bg-indigo-100 text-indigo-700"
                                     )}>
-                                        {goal.percentage.toFixed(0)}%
+                                        {showBalance ? `${goal.percentage.toFixed(0)}%` : '••%'}
                                     </span>
                                 </div>
 
@@ -87,13 +99,13 @@ export function ChallengeTowerCard({ goals = [] }: ChallengeTowerCardProps) {
                                         <motion.div
                                             className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
                                             initial={{ width: 0 }}
-                                            animate={{ width: `${Math.min(goal.percentage, 100)}%` }}
+                                            animate={{ width: showBalance ? `${Math.min(goal.percentage, 100)}%` : '50%' }}
                                             transition={{ duration: 1, ease: "easeOut" }}
                                         />
                                     </div>
                                     <div className="flex justify-between text-[10px] font-medium text-muted-foreground/80">
-                                        <span>{Number(goal.currentAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                                        <span>{Number(goal.targetAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                                        <span>{showBalance ? Number(goal.currentAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••'}</span>
+                                        <span>{showBalance ? Number(goal.targetAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'R$ ••••'}</span>
                                     </div>
                                 </div>
                             </motion.div>
