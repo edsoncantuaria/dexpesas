@@ -86,43 +86,76 @@ export const getXpNeededForLevel = xpNeeded;
  * Nova árvore de classes.
  */
 /**
- * Nova árvore de classes baseada em thresholds.
- */
-/**
- * Nova árvore de classes baseada em thresholds.
+ * Sistema de classes baseado em padrões de gasto.
+ * Reflete o equilíbrio e especialização dos atributos.
  */
 const getHeroClass = (attributes) => {
     const { Forca, Resistencia, Sabedoria, Sorte } = attributes;
 
-    // Tier 4 (Legendary) - Attribute > 95
-    if (Forca > 95 && Resistencia > 95 && Sabedoria > 95 && Sorte > 95) return 'Divindade Financeira';
-    if (Forca > 95) return 'Titã da Renda';
-    if (Resistencia > 95) return 'Guardião Eterno';
-    if (Sabedoria > 95) return 'Oráculo Supremo';
-    if (Sorte > 95) return 'Arauto do Destino';
+    // Calcula médias e dominância
+    const total = Forca + Resistencia + Sabedoria + Sorte;
+    const average = total / 4;
+    const highest = Math.max(Forca, Resistencia, Sabedoria, Sorte);
+    const lowest = Math.min(Forca, Resistencia, Sabedoria, Sorte);
+    const balance = highest - lowest; // Quanto maior, mais desequilibrado
 
-    // Tier 3 (Master) - Attribute > 90
-    if (Forca > 90) return 'Soberano Imperial';
-    if (Resistencia > 90) return 'Avatar da Abundância';
-    if (Sabedoria > 90) return 'Arconte do Tesouro';
-    if (Sorte > 90) return 'Lorde do Destino';
+    // Identifica atributo dominante
+    const dominant =
+        Forca === highest ? 'Forca' :
+            Resistencia === highest ? 'Resistencia' :
+                Sabedoria === highest ? 'Sabedoria' : 'Sorte';
 
-    // Specialist Classes (Mixed High Attributes)
-    if (Forca > 70 && Sabedoria < 40) return 'Bárbaro Investidor';
-    if (Sabedoria > 70 && Forca < 40) return 'Erudito Falido';
-    if (Sorte > 80 && Resistencia < 30) return 'Apostador Audaz';
+    // === CLASSES BALANCEADAS (Equilíbrio) ===
+    if (balance < 15 && average > 60) return 'Maestro do Equilíbrio';
+    if (balance < 20 && average > 40) return 'Guardião Harmônico';
+    if (balance < 25 && average > 25) return 'Aventureiro Versátil';
+    if (balance < 20) return 'Aprendiz Equilibrado';
 
-    // Tier 2 (Advanced) - Attribute > 60
-    if (Forca > 60) return 'Magnata Industrial';
-    if (Resistencia > 60) return 'Guardião de Ouro';
-    if (Sabedoria > 60) return 'Regente Visionário';
-    if (Sorte > 60) return 'Caçador de Fortunas';
+    // === CLASSES LENDÁRIAS (Maestria + Segundo Forte) ===
+    if (dominant === 'Forca' && Forca > 80) {
+        if (Resistencia > 60) return 'Imperador da Prosperidade';
+        if (Sabedoria > 60) return 'Líder Iluminado';
+        if (Sorte > 60) return 'Conquistador Afortunado';
+        return 'Titã da Renda';
+    }
+    if (dominant === 'Resistencia' && Resistencia > 80) {
+        if (Forca > 60) return 'Fortaleza Impenetrável';
+        if (Sabedoria > 60) return 'Sábio Guardião';
+        if (Sorte > 60) return 'Protetor da Fortuna';
+        return 'Guardião Eterno';
+    }
+    if (dominant === 'Sabedoria' && Sabedoria > 80) {
+        if (Forca > 60) return 'Estrategista Supremo';
+        if (Resistencia > 60) return 'Oráculo do Tesouro';
+        if (Sorte > 60) return 'Adivinho da Sorte';
+        return 'Oráculo Supremo';
+    }
+    if (dominant === 'Sorte' && Sorte > 80) {
+        if (Forca > 60) return 'Herói Carismático';
+        if (Resistencia > 60) return 'Nobre Generoso';
+        if (Sabedoria > 60) return 'Filósofo da Fortuna';
+        return 'Arauto do Destino';
+    }
 
-    // Tier 1 (Novice) - Attribute > 30
-    if (Forca > 30) return 'Guerreiro da Renda';
-    if (Resistencia > 30) return 'Escudeiro da Poupança';
-    if (Sabedoria > 30) return 'Aprendiz Sábio';
-    if (Sorte > 30) return 'Aventureiro Sortudo';
+    // === CLASSES ESPECIALIZADAS (Alta maestria, baixa em outra) ===
+    if (Forca > 60 && Sabedoria < 25) return 'Gigante Impulsivo';
+    if (Forca > 60 && Resistencia < 25) return 'Gastador Opulento';
+    if (Sabedoria > 60 && Forca < 25) return 'Erudito Ascético';
+    if (Sabedoria > 60 && Sorte < 25) return 'Pensador Solitário';
+    if (Resistencia > 60 && Sorte < 25) return 'Avarento Cauteloso';
+    if (Sorte > 60 && Resistencia < 25) return 'Generoso Despreocupado';
+
+    // === CLASSES INTERMEDIÁRIAS (Dominante) ===
+    if (dominant === 'Forca' && Forca > 50) return 'Magnata Emergente';
+    if (dominant === 'Resistencia' && Resistencia > 50) return 'Guardião Prudente';
+    if (dominant === 'Sabedoria' && Sabedoria > 50) return 'Estrategista Sagaz';
+    if (dominant === 'Sorte' && Sorte > 50) return 'Socialite Carismático';
+
+    // === CLASSES INICIANTES (Dominante menor) ===
+    if (dominant === 'Forca') return 'Trabalhador Dedicado';
+    if (dominant === 'Resistencia') return 'Poupador Iniciante';
+    if (dominant === 'Sabedoria') return 'Estudante Curioso';
+    if (dominant === 'Sorte') return 'Alma Generosa';
 
     return 'Aventureiro Iniciante';
 };
@@ -427,79 +460,91 @@ class GamificationService {
 
         const threeMonthsAgo = subMonths(new Date(), 3);
 
-        // Busca transações e contas
+        // Busca transações
         const transactions = await prisma.transaction.findMany({
             where: { userId, pago: true, data: { gte: threeMonthsAgo } },
             include: { category: true },
         });
 
-        const accounts = await prisma.account.findMany({
-            where: { userId },
+        // Sistema de Trade-offs: Cada categoria afeta múltiplos atributos
+        // Valores positivos aumentam, valores negativos diminuem
+        const CATEGORY_EFFECTS = {
+            'Salario': { Forca: 2.0, Resistencia: 0.5, Sabedoria: -0.2 },
+            'Renda Extra': { Forca: 1.5, Resistencia: 0.3 },
+            'Saude': { Forca: 1.8, Resistencia: 0.4, Sorte: 0.2 },
+            'Esporte': { Forca: 1.5, Sorte: 0.3, Sabedoria: -0.1 },
+            'Academia': { Forca: 1.3, Resistencia: 0.2 },
+
+            'Educacao': { Sabedoria: 2.0, Forca: 0.3, Resistencia: -0.2 },
+            'Livros': { Sabedoria: 1.5, Sorte: 0.2 },
+            'Cursos': { Sabedoria: 1.8, Forca: 0.2 },
+            'Assinaturas': { Sabedoria: 1.0, Sorte: -0.1 },
+
+            'Investimento': { Resistencia: 2.0, Sabedoria: 0.5, Forca: -0.3 },
+            'Poupanca': { Resistencia: 1.5, Sorte: 0.2 },
+            'Seguros': { Resistencia: 1.3, Sabedoria: 0.2 },
+            'Emergencia': { Resistencia: 1.0 },
+
+            'Doacao': { Sorte: 2.0, Sabedoria: 0.3, Forca: -0.2 },
+            'Presentes': { Sorte: 1.5, Resistencia: -0.2 },
+            'Dividas': { Sorte: -1.5, Resistencia: -0.5 },
+            'Emprestimos': { Sorte: -1.0, Sabedoria: -0.3 },
+            'Lazer': { Sorte: 1.0, Sabedoria: -0.3, Resistencia: -0.5 },
+            'Entretenimento': { Sorte: 0.8, Sabedoria: -0.2 },
+            'Viagem': { Sorte: 1.2, Sabedoria: 0.1, Resistencia: -0.4 },
+
+            // Categorias gerais (com efeitos menores)
+            'Alimentacao': { Forca: 0.5, Sorte: 0.1 },
+            'Transporte': { Forca: 0.3 },
+            'Moradia': { Resistencia: 0.4, Forca: -0.1 },
+            'Outros': { Sorte: 0.1 },
+        };
+
+        // Inicializa atributos em 10 (ponto de partida neutro)
+        const attributes = {
+            Forca: 10,
+            Sabedoria: 10,
+            Resistencia: 10,
+            Sorte: 10
+        };
+
+        // Processa cada transação aplicando os efeitos
+        transactions.forEach(transaction => {
+            const categoryName = transaction.category?.nome;
+            if (!categoryName) return;
+
+            const effects = CATEGORY_EFFECTS[categoryName];
+            if (!effects) return;
+
+            // Valor da transação normalizado (divide por 100 para escalar)
+            const normalizedValue = Number(transaction.valor) / 100;
+
+            // Aplica cada efeito com diminishing returns
+            Object.entries(effects).forEach(([attr, effect]) => {
+                const currentValue = attributes[attr];
+
+                // Fórmula de diminishing returns:
+                // - Se efeito positivo: reduz ganho conforme atributo aumenta
+                // - Se efeito negativo: reduz perda conforme atributo diminui
+                let diminishingFactor;
+                if (effect > 0) {
+                    // Ganho reduz conforme se aproxima de 100
+                    diminishingFactor = Math.max(0.1, 1 - (currentValue / 150));
+                } else {
+                    // Perda reduz conforme se aproxima de 0
+                    diminishingFactor = Math.max(0.1, currentValue / 100);
+                }
+
+                // Aplica o efeito
+                const delta = effect * normalizedValue * diminishingFactor;
+                attributes[attr] = Math.max(1, Math.min(200, currentValue + delta));
+            });
         });
 
-        // Categorias Mapeadas (Isso poderia vir do banco/config)
-        const CATEGORY_MAP = {
-            FORCA: ['Salario', 'Renda Extra', 'Saude', 'Esporte', 'Academia'],
-            SABEDORIA: ['Educacao', 'Livros', 'Cursos', 'Assinaturas'],
-            RESISTENCIA: ['Investimento', 'Poupanca', 'Seguros', 'Emergencia'],
-            SORTE: ['Doacao', 'Presentes', 'Dividas', 'Emprestimos', 'Lazer']
-        };
-
-        // --- CÁLCULO DE FORÇA (Renda + Saúde) ---
-        const income = transactions
-            .filter(t => t.tipo === 'receita')
-            .reduce((sum, t) => sum + Number(t.valor), 0);
-
-        const healthSpending = transactions
-            .filter(t => t.tipo === 'despesa' && CATEGORY_MAP.FORCA.includes(t.category?.nome))
-            .reduce((sum, t) => sum + Number(t.valor), 0);
-
-        // Força baseada em renda consistente e investimento em saúde
-        // Normalização: Renda ideal ~5k, Gasto saúde ideal ~500
-        let strength = Math.min(100, (income / 15000) * 70 + (healthSpending / 1500) * 30);
-
-
-        // --- CÁLCULO DE SABEDORIA (Educação + Orçamento) ---
-        const educationSpending = transactions
-            .filter(t => t.tipo === 'despesa' && CATEGORY_MAP.SABEDORIA.includes(t.category?.nome))
-            .reduce((sum, t) => sum + Number(t.valor), 0);
-
-        // Sabedoria baseada em investimento em educação
-        let wisdom = Math.min(100, (educationSpending / 1000) * 100);
-
-
-        // --- CÁLCULO DE RESISTÊNCIA (Reservas + Investimentos) ---
-        const totalReserves = accounts
-            .filter(a => ['poupanca', 'investimento'].includes(a.tipo))
-            .reduce((sum, acc) => sum + Number(acc.saldoInicial), 0); // Simplificado para saldo atual
-
-        const investmentSpending = transactions
-            .filter(t => t.tipo === 'despesa' && CATEGORY_MAP.RESISTENCIA.includes(t.category?.nome))
-            .reduce((sum, t) => sum + Number(t.valor), 0);
-
-        // Resistência baseada em patrimônio acumulado e fluxo de investimento
-        let resilience = Math.min(100, (totalReserves / 20000) * 60 + (investmentSpending / 3000) * 40);
-
-
-        // --- CÁLCULO DE SORTE (Carisma/Social + Dívidas Pagas) ---
-        const socialSpending = transactions
-            .filter(t => t.tipo === 'despesa' && CATEGORY_MAP.SORTE.includes(t.category?.nome))
-            .reduce((sum, t) => sum + Number(t.valor), 0);
-
-        let luck = Math.min(100, (socialSpending / 1000) * 100);
-
-        // Ajuste fino para não zerar
-        strength = Math.max(1, strength);
-        wisdom = Math.max(1, wisdom);
-        resilience = Math.max(1, resilience);
-        luck = Math.max(1, luck);
-
-        const attributes = {
-            Forca: parseFloat(strength.toFixed(1)),
-            Resistencia: parseFloat(resilience.toFixed(1)),
-            Sabedoria: parseFloat(wisdom.toFixed(1)),
-            Sorte: parseFloat(luck.toFixed(1)),
-        };
+        // Arredonda para 1 casa decimal
+        Object.keys(attributes).forEach(key => {
+            attributes[key] = parseFloat(attributes[key].toFixed(1));
+        });
 
         const heroClass = getHeroClass(attributes);
         const insight = this.getInsight(attributes);

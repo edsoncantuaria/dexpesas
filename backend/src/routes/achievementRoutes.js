@@ -9,6 +9,7 @@ router.use(authMiddleware);
 
 // Public Routes
 router.get('/', achievementController.getAllAchievements);
+router.get('/unlocked', achievementController.getUnlockedAchievements);
 
 // Admin Routes
 const adminRouter = express.Router();

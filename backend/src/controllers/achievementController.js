@@ -17,6 +17,21 @@ class AchievementController {
     }
 
     /**
+     * [PUBLIC] Lista as conquistas desbloqueadas pelo usuário autenticado.
+     */
+    async getUnlockedAchievements(req, res, next) {
+        try {
+            const unlockedAchievements = await prisma.unlockedAchievement.findMany({
+                where: { userId: req.user.id },
+                orderBy: { unlockedAt: 'desc' }
+            });
+            res.json(unlockedAchievements);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
      * [ADMIN] Cria uma nova conquista.
      */
     async createAchievement(req, res, next) {

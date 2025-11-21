@@ -1,158 +1,191 @@
-// src/components/dashboard/progresso/all-attributes.tsx
-import type { GamificationProfile as GamificationProfileType } from '@/lib/definitions';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { categoryDetails } from '@/lib/data';
-import type { LucideIcon } from 'lucide-react';
-import { BarChart, Droplets, Dumbbell, Gamepad2, GraduationCap, HeartPulse, Home, ShoppingCart, Utensils, Wallet, ShieldCheck, Sword, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Info } from 'lucide-react';
+'use client';
 
+import type { GamificationProfile as GamificationProfileType } from '@/lib/definitions';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Dumbbell, BookOpen, Shield, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useGamificationMode } from '@/hooks/use-gamification-mode';
+import { useState } from 'react';
+import { AttributeExplainer } from './attribute-explainer';
 
 type AllAttributesProps = {
   profile: GamificationProfileType & { updatedAt: string };
 };
 
-// A mesma fórmula usada no backend para consistência
-const xpNeeded = (level: number) => Math.floor(100 * Math.pow(level, 1.5));
+const xpNeeded = (level: number) => Math.floor(100 * Math.pow(level, 1.15));
 
-const iconMap: Record<string, LucideIcon> = {
-  Utensils,
-  Gamepad2,
-  Droplets,
-  BarChart,
-  Dumbbell,
-  Home,
-  HeartPulse,
-  GraduationCap,
-  ShoppingCart,
-  Wallet,
-  Sword,
-  ShieldCheck,
-  Sparkles, // Ícone para Sorte
-};
-
-const attributeToIconMap: Record<string, LucideIcon | undefined> = {
-  ...new Map(categoryDetails.map(cat => [cat.nome, iconMap[cat.icon]])),
-  Forca: Sword,
-  Resistencia: ShieldCheck,
-  Sabedoria: GraduationCap,
-  Sorte: Sparkles,
-};
-
-const attributeDescriptions: Record<string, string> = {
-  Forca: 'Baseado em sua Renda, Saúde e Esportes.',
-  Resistencia: 'Baseado em Investimentos, Poupança e Seguros.',
-  Sabedoria: 'Baseado em Educação, Livros e Cursos.',
-  Sorte: 'Baseado em Caridade, Presentes e Pagamento de Dívidas.',
-};
-
-
-const SkullIcon = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M8 10h.01" />
-    <path d="M16 10h.01" />
-    <path d="M7 14c.5-1 2-2 5-2s4.5 1 5 2" />
-    <path d="M12 2a9 9 0 0 0-9 9c0 4.42 2.67 8.17 6.33 9.54" />
-    <path d="M21 11c0 4.42-2.67 8.17-6.33 9.54" />
-    <path d="M12.01 20.55c.67.13 1.33.2 2 .2 4.42 0 8-3.58 8-8 0-4.09-3.04-7.44 7-7.93" />
-    <path d="M12.01 20.55c-.67.13-1.33.2-2 .2-4.42 0-8-3.58-8-8 0-4.09 3.04-7.44 7-7.93" />
-  </svg>
-);
-
+const primaryAttributes = [
+  {
+    key: 'Forca' as const,
+    label: 'Força',
+    icon: Dumbbell,
+    gradient: 'from-red-500 to-orange-500',
+    bgGradient: 'from-red-50 to-orange-50 dark:from-red-950/20 dark:to-orange-950/20',
+    color: 'text-red-500',
+    description: 'Renda & Saúde'
+  },
+  {
+    key: 'Sabedoria' as const,
+    label: 'Sabedoria',
+    icon: BookOpen,
+    gradient: 'from-blue-500 to-cyan-500',
+    bgGradient: 'from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20',
+    color: 'text-blue-500',
+    description: 'Educação & Cursos'
+  },
+  {
+    key: 'Resistencia' as const,
+    label: 'Resistência',
+    icon: Shield,
+    gradient: 'from-green-500 to-emerald-500',
+    bgGradient: 'from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20',
+    color: 'text-green-500',
+    description: 'Investimentos & Poupança'
+  },
+  {
+    key: 'Sorte' as const,
+    label: 'Sorte',
+    icon: Sparkles,
+    gradient: 'from-amber-500 to-yellow-500',
+    bgGradient: 'from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20',
+    color: 'text-amber-500',
+    description: 'Caridade & Dívidas'
+  }
+];
 
 export function AllAttributes({ profile }: AllAttributesProps) {
-  const { level, xp, updatedAt, ...attributes } = profile;
+  const { mode } = useGamificationMode();
+  const [showExplainer, setShowExplainer] = useState(false);
+  const { level, xp } = profile;
 
   const xpForNextLevel = xpNeeded(level);
   const xpPercentage = (xp / xpForNextLevel) * 100;
 
-  const primaryStats = Object.entries(attributes)
-    .filter(([key]) => ['Forca', 'Resistencia', 'Sabedoria', 'Sorte'].includes(key));
-
-  const secondaryStats = Object.entries(attributes)
-    .filter(([key]) => !['id', 'userId', 'createdAt', 'updatedAt', 'heroClass', 'Forca', 'Resistencia', 'Sabedoria', 'Sorte'].includes(key) && typeof attributes[key as keyof typeof attributes] === 'number')
-    .sort(([, a], [, b]) => (b as number) - (a as number));
+  const isLite = mode === 'LITE';
 
   return (
-    <Card className="shadow-md h-full flex flex-col">
-      <CardHeader>
-        <div className="flex justify-between items-start flex-wrap gap-2">
-          <div>
-            <CardTitle className="font-headline text-xl">Level {level} - {profile.heroClass}</CardTitle>
-            <CardDescription>Progresso de Experiência (XP)</CardDescription>
+    <div className="space-y-6">
+      {/* Header Card */}
+      <Card className="bg-gradient-to-br from-violet-50 to-indigo-50 dark:from-violet-950/20 dark:to-indigo-950/20 border-violet-200 dark:border-violet-800">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Seus Atributos</CardTitle>
+            <button
+              onClick={() => setShowExplainer(!showExplainer)}
+              className="flex items-center gap-2 text-sm text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 transition-colors"
+            >
+              {showExplainer ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Ocultar Guia
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Como Funciona?
+                </>
+              )}
+            </button>
           </div>
-          <div className="text-right w-full sm:w-1/3">
-            <p className="text-sm font-semibold">{xp} / {xpForNextLevel} XP</p>
-            <Progress value={xpPercentage} className="h-2 mt-1" aria-label={`${xpPercentage}% para o próximo nível`} />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="flex-grow">
-        <h3 className="font-headline text-lg mb-4">Atributos Principais</h3>
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-2 mb-6">
-          {primaryStats.map(([key, value]) => {
-            if (typeof value !== 'number') return null;
-            const Icon = attributeToIconMap[key];
-            return (
-              <div key={key} className="flex flex-col gap-2 p-4 rounded-lg bg-muted/30 border border-accent/30 relative group">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {Icon && <Icon className="h-6 w-6 text-accent" />}
-                    <span className="font-semibold text-base">{key}</span>
-                  </div>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <Info className="h-4 w-4 text-muted-foreground/50 hover:text-accent transition-colors" />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{attributeDescriptions[key]}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Progress value={value} className="h-2 flex-1 [&>div]:bg-accent" />
-                  <span className="font-mono text-lg font-bold text-accent">{value}</span>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+          <p className="text-sm text-muted-foreground">
+            {isLite
+              ? 'Resumo dos seus principais indicadores financeiros'
+              : 'Atributos calculados com base nos últimos 3 meses de transações'}
+          </p>
+        </CardHeader>
+      </Card>
 
-        <h3 className="font-headline text-lg mb-4">Atributos Secundários</h3>
-        <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {secondaryStats.map(([key, value]) => {
-            if (typeof value !== 'number') return null;
-            const Icon = key === 'Vicios' ? SkullIcon : attributeToIconMap[key];
-            const isVicio = key === 'Vicios';
-            const maxPoints = 500;
-            const percentage = (value / maxPoints) * 100;
-            return (
-              <div key={key} className="flex flex-col gap-2 p-4 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-3">
-                  {Icon && <Icon className={cn("h-5 w-5", isVicio ? "text-destructive" : "text-primary")} />}
-                  <span className="font-semibold text-sm">{key}</span>
+      {/* Explainer */}
+      {showExplainer && <AttributeExplainer />}
+
+      {/* Primary Attributes Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {primaryAttributes.map((attr) => {
+          const value = profile[attr.key] || 0;
+          const Icon = attr.icon;
+
+          return (
+            <Card
+              key={attr.key}
+              className={cn(
+                "relative overflow-hidden transition-all hover:shadow-lg",
+                "bg-gradient-to-br border-2",
+                attr.bgGradient
+              )}
+            >
+              {/* Background decoration */}
+              <div className={cn(
+                "absolute top-0 right-0 w-24 h-24 opacity-10 -mr-8 -mt-8",
+                "bg-gradient-to-br rounded-full blur-2xl",
+                attr.gradient
+              )} />
+
+              <CardContent className="pt-6 relative">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "p-2.5 rounded-xl bg-white dark:bg-slate-900 shadow-sm",
+                      attr.color
+                    )}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg">{attr.label}</h3>
+                      {!isLite && (
+                        <p className="text-xs text-muted-foreground">{attr.description}</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Progress value={percentage} className={cn("h-1.5 flex-1", isVicio && "[&>div]:bg-destructive")} />
-                  <span className={cn("font-mono text-sm font-bold", isVicio ? "text-destructive" : "text-primary")}>{value}</span>
+
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between">
+                    <span className={cn("text-4xl font-bold", attr.color)}>
+                      {Math.round(value)}
+                    </span>
+                    <span className="text-sm text-muted-foreground">/100</span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Progress
+                      value={value}
+                      className="h-2 bg-white/50 dark:bg-slate-900/50"
+                      indicatorClassName={cn("bg-gradient-to-r", attr.gradient)}
+                    />
+                    {!isLite && (
+                      <p className="text-[10px] text-muted-foreground text-right">
+                        {value >= 90 ? '🔥 Excelente!' :
+                          value >= 60 ? '✨ Muito bom!' :
+                            value >= 30 ? '💪 Progredindo' :
+                              '🌱 Começando'}
+                      </p>
+                    )}
+                  </div>
                 </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* Secondary XP Progress (Lite mode only shows this) */}
+      {isLite && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Progresso de XP</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Nível {level}</span>
+                <span className="font-medium">{xp} / {xpForNextLevel} XP</span>
               </div>
-            );
-          })}
-        </div>
-      </CardContent>
-      <CardFooter>
-        <p className="text-xs text-muted-foreground">
-          Atributos atualizados em {format(new Date(updatedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-        </p>
-      </CardFooter>
-    </Card>
+              <Progress value={xpPercentage} className="h-3" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }

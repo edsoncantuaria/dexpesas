@@ -1,41 +1,37 @@
-// src/app/dashboard/progresso/page.tsx
 'use client';
 
 import { AllAttributes } from '@/components/dashboard/progresso/all-attributes';
-import { FinancialQuests } from '@/components/dashboard/progresso/financial-quests';
-import type { GamificationProfile, User, UserItem } from '@/lib/definitions';
-import { ChevronLeft } from 'lucide-react';
+import type { GamificationProfile, User } from '@/lib/definitions';
+import { ChevronLeft, BarChart3, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState, useCallback } from 'react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingScreen } from '@/components/ui/loading-screen';
-import { InventoryCard } from '@/components/dashboard/progresso/inventory-card';
-
 import { AchievementsList } from '@/components/dashboard/progresso/achievements-list';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useGamificationMode } from '@/hooks/use-gamification-mode';
 
 export default function ProgressoPage() {
     const [profile, setProfile] = useState<(GamificationProfile & { updatedAt: string }) | null>(null);
     const [user, setUser] = useState<User | null>(null);
-    const [inventory, setInventory] = useState<UserItem[]>([]);
     const [allAchievements, setAllAchievements] = useState([]);
     const [unlockedAchievements, setUnlockedAchievements] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const { toast } = useToast();
+    const { mode } = useGamificationMode();
 
     const fetchData = useCallback(async (showLoading = true) => {
         if (showLoading) setIsLoading(true);
         try {
-            const [profileRes, userRes, inventoryRes, allAchievRes, unlockedAchievRes] = await Promise.all([
+            const [profileRes, userRes, allAchievRes, unlockedAchievRes] = await Promise.all([
                 api.get('/gamification/profile'),
                 api.get('/user'),
-                api.get('/data/inventory'),
                 api.get('/achievements/all'),
                 api.get('/achievements/unlocked')
             ]);
             setProfile(profileRes.data);
             setUser(userRes.data);
-            setInventory(inventoryRes.data);
             setAllAchievements(allAchievRes.data);
             setUnlockedAchievements(unlockedAchievRes.data);
         } catch (error) {
@@ -56,30 +52,53 @@ export default function ProgressoPage() {
         return <LoadingScreen />;
     }
 
+    const isLite = mode === 'LITE';
+
     return (
         <div className="space-y-6">
+            {/* Header */}
             <div className="flex items-center gap-4">
-                <Link href="/dashboard" className="p-2 rounded-md hover:bg-muted">
+                <Link href="/dashboard" className="p-2 rounded-md hover:bg-muted transition-colors">
                     <ChevronLeft className="h-5 w-5" />
                 </Link>
                 <div>
-                    <h1 className="text-3xl font-bold font-headline">Seu Progresso Detalhado</h1>
-                    <p className="text-muted-foreground">Veja todos os seus atributos e complete missões para ganhar mais XP.</p>
+                    <h1 className="text-3xl font-bold font-headline">
+                        {isLite ? 'Seu Progresso' : 'Progresso do Herói'}
+                    </h1>
+                    <p className="text-muted-foreground">
+                        {isLite
+                            ? 'Acompanhe suas conquistas e evolua financeiramente'
+                            : 'Domine seus atributos e desbloqueie conquistas através dos seus gastos'}
+                    </p>
                 </div>
             </div>
-            <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-6">
+
+            {/* Tabbed Content */}
+            <Tabs defaultValue="attributes" className="w-full">
+                <TabsList className="grid w-full max-w-md grid-cols-2">
+                    <TabsTrigger value="attributes" className="text-xs sm:text-sm">
+                        <BarChart3 className="h-4 w-4 mr-1.5" />
+                        Atributos
+                    </TabsTrigger>
+                    <TabsTrigger value="achievements" className="text-xs sm:text-sm">
+                        <Trophy className="h-4 w-4 mr-1.5" />
+                        Conquistas
+                    </TabsTrigger>
+                </TabsList>
+
+                {/* Attributes Tab */}
+                <TabsContent value="attributes" className="space-y-6 mt-6">
                     <AllAttributes profile={profile} />
+                </TabsContent>
+
+                {/* Achievements Tab */}
+                <TabsContent value="achievements" className="mt-6">
                     <AchievementsList
                         allAchievements={allAchievements}
                         unlockedAchievements={unlockedAchievements}
                     />
-                </div>
-                <div className="lg:col-span-1 space-y-6">
-                    <FinancialQuests user={user} />
-                    <InventoryCard items={inventory} onItemEquip={() => fetchData(false)} />
-                </div>
-            </div>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
