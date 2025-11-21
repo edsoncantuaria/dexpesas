@@ -45,6 +45,7 @@ class UserController {
                     favoriteCategories: true,
                     dashboardPreferences: true,
                     hideFamilyMode: true,
+                    hasCompletedTutorial: true,
                     phoneNumber: true,
                     phoneVerified: true,
                     twoFactorEnabled: true,

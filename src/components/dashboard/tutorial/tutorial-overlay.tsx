@@ -48,26 +48,21 @@ export function TutorialOverlay() {
     const [isVisible, setIsVisible] = useState(false);
     const isProcessingRef = useRef(false);
 
-    // Check if tutorial should run - with localStorage backup
+    // Check if tutorial should run based on database value
     useEffect(() => {
         if (!user) return;
 
-        // Check localStorage first as a fast cache
-        const tutorialCompleted = localStorage.getItem('tutorialCompleted') === 'true';
-
         console.log('[Tutorial] User hasCompletedTutorial:', user.hasCompletedTutorial);
-        console.log('[Tutorial] localStorage tutorialCompleted:', tutorialCompleted);
 
-        // Show tutorial only if BOTH user.hasCompletedTutorial is false AND localStorage is not 'true'
-        if (!user.hasCompletedTutorial && !tutorialCompleted && !isVisible && !isProcessingRef.current) {
+        if (!user.hasCompletedTutorial && !isVisible && !isProcessingRef.current) {
             console.log('[Tutorial] Showing tutorial');
             const timer = setTimeout(() => setIsVisible(true), 1000);
             return () => clearTimeout(timer);
-        } else if ((user.hasCompletedTutorial || tutorialCompleted) && isVisible) {
+        } else if (user.hasCompletedTutorial && isVisible) {
             console.log('[Tutorial] Tutorial completed, hiding');
             setIsVisible(false);
         }
-    }, [user, isVisible]);
+    }, [user?.hasCompletedTutorial, isVisible]);
 
     const currentStep = STEPS[currentStepIndex];
 
@@ -89,20 +84,19 @@ export function TutorialOverlay() {
         isProcessingRef.current = true;
         console.log('[Tutorial] Marking tutorial as complete...');
 
-        // Immediately save to localStorage to prevent re-showing
-        localStorage.setItem('tutorialCompleted', 'true');
-        console.log('[Tutorial] Saved to localStorage');
-
-        // Hide immediately
-        setIsVisible(false);
-
         try {
             const response = await api.put("/user/preferences", { hasCompletedTutorial: true });
             console.log('[Tutorial] API response:', response.data);
+
+            // Wait for user context to update
             await fetchUser();
             console.log('[Tutorial] User data refreshed successfully');
+
+            // Hide after data is refreshed
+            setIsVisible(false);
         } catch (error) {
             console.error("[Tutorial] Failed to mark tutorial as complete", error);
+            setIsVisible(false);
         } finally {
             isProcessingRef.current = false;
         }

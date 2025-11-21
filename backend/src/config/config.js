@@ -26,6 +26,18 @@ export default {
         fromEmail: process.env.SENDGRID_FROM_EMAIL,
         fromName: process.env.SENDGRID_FROM_NAME || 'Dexpesas'
     },
+    smtp: {
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: process.env.SMTP_SECURE === 'true',
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+        fromEmail: process.env.SMTP_FROM_EMAIL,
+        fromName: process.env.SMTP_FROM_NAME || 'Dexpesas'
+    },
+    email: {
+        provider: process.env.EMAIL_PROVIDER || 'sendgrid' // 'sendgrid' or 'smtp'
+    },
     app: {
         url: process.env.APP_URL || 'http://localhost:3000'
     },
