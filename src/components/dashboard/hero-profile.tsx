@@ -9,7 +9,7 @@ import { useEffect, useState, useMemo } from 'react';
 import api from '@/lib/api';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { iconMap } from '@/lib/icon-map';
-import { Crown, Star, Users, Banknote, Eye, EyeOff, Dumbbell, BookOpen, Shield, Sparkles, Scroll } from 'lucide-react';
+import { Crown, Star, Users, Banknote, Eye, EyeOff, Dumbbell, BookOpen, Shield, Sparkles, Scroll, ChevronDown, ChevronUp } from 'lucide-react';
 import Link from 'next/link';
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
 import { getGamificationCopy } from '@/lib/gamification-copy';
@@ -31,6 +31,7 @@ const formatCurrency = (value: number) =>
 export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchievements, familyBalance }: HeroProfileProps) {
     const { showBalance, togglePrivacy } = usePrivacy();
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [isDetailsOpen, setIsDetailsOpen] = useState(false);
     const { mode, isClassic } = useGamificationMode();
     const heroCopy = getGamificationCopy('hero', mode);
 
@@ -163,50 +164,77 @@ export function HeroProfile({ user, profile, clan, allAchievements, unlockedAchi
                         </div>
                     )}
 
-                    {/* Attributes Grid - Only in Full Mode */}
+                    {/* Attributes Toggle */}
                     {mode === 'FULL' && (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-white/10">
-                            <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
-                                <div className="flex items-center justify-center gap-1.5 text-red-300 mb-1">
-                                    <Dumbbell className="h-3.5 w-3.5" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">Força</span>
-                                </div>
-                                <div className="text-lg font-bold">{profile.Forca || 0}</div>
-                            </div>
-                            <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
-                                <div className="flex items-center justify-center gap-1.5 text-blue-300 mb-1">
-                                    <BookOpen className="h-3.5 w-3.5" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">Sabedoria</span>
-                                </div>
-                                <div className="text-lg font-bold">{profile.Sabedoria || 0}</div>
-                            </div>
-                            <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
-                                <div className="flex items-center justify-center gap-1.5 text-green-300 mb-1">
-                                    <Shield className="h-3.5 w-3.5" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">Resistência</span>
-                                </div>
-                                <div className="text-lg font-bold">{profile.Resistencia || 0}</div>
-                            </div>
-                            <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
-                                <div className="flex items-center justify-center gap-1.5 text-amber-300 mb-1">
-                                    <Sparkles className="h-3.5 w-3.5" />
-                                    <span className="text-xs font-bold uppercase tracking-wider">Sorte</span>
-                                </div>
-                                <div className="text-lg font-bold">{profile.Sorte || 0}</div>
-                            </div>
-                        </div>
-                    )}
+                        <div className="mt-4 pt-2 border-t border-white/10">
+                            <button
+                                onClick={() => setIsDetailsOpen(!isDetailsOpen)}
+                                className="flex items-center gap-2 text-xs font-medium text-indigo-200 hover:text-white transition-colors w-full justify-center md:justify-start"
+                            >
+                                {isDetailsOpen ? (
+                                    <>
+                                        <ChevronUp className="h-3 w-3" />
+                                        Ocultar Atributos & Oráculo
+                                    </>
+                                ) : (
+                                    <>
+                                        <ChevronDown className="h-3 w-3" />
+                                        Ver Atributos & Oráculo
+                                    </>
+                                )}
+                            </button>
 
-                    {/* Oracle Insight */}
-                    {mode === 'FULL' && profile.insight && (
-                        <div className="mt-4 p-3 bg-indigo-950/40 border border-indigo-400/20 rounded-lg backdrop-blur-sm">
-                            <div className="flex gap-2 items-start">
-                                <Scroll className="h-4 w-4 text-indigo-300 mt-0.5 shrink-0" />
-                                <div>
-                                    <p className="text-xs font-bold text-indigo-300 uppercase tracking-wider mb-0.5">Oráculo</p>
-                                    <p className="text-sm text-indigo-100 italic">"{profile.insight}"</p>
+                            <motion.div
+                                initial={false}
+                                animate={{ height: isDetailsOpen ? 'auto' : 0, opacity: isDetailsOpen ? 1 : 0 }}
+                                transition={{ duration: 0.3, ease: "easeInOut" }}
+                                className="overflow-hidden"
+                            >
+                                {/* Attributes Grid */}
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                                    <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
+                                        <div className="flex items-center justify-center gap-1.5 text-red-300 mb-1">
+                                            <Dumbbell className="h-3.5 w-3.5" />
+                                            <span className="text-xs font-bold uppercase tracking-wider">Força</span>
+                                        </div>
+                                        <div className="text-lg font-bold">{profile.Forca || 0}</div>
+                                    </div>
+                                    <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
+                                        <div className="flex items-center justify-center gap-1.5 text-blue-300 mb-1">
+                                            <BookOpen className="h-3.5 w-3.5" />
+                                            <span className="text-xs font-bold uppercase tracking-wider">Sabedoria</span>
+                                        </div>
+                                        <div className="text-lg font-bold">{profile.Sabedoria || 0}</div>
+                                    </div>
+                                    <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
+                                        <div className="flex items-center justify-center gap-1.5 text-green-300 mb-1">
+                                            <Shield className="h-3.5 w-3.5" />
+                                            <span className="text-xs font-bold uppercase tracking-wider">Resistência</span>
+                                        </div>
+                                        <div className="text-lg font-bold">{profile.Resistencia || 0}</div>
+                                    </div>
+                                    <div className="bg-white/5 rounded-lg p-2 text-center backdrop-blur-sm">
+                                        <div className="flex items-center justify-center gap-1.5 text-amber-300 mb-1">
+                                            <Sparkles className="h-3.5 w-3.5" />
+                                            <span className="text-xs font-bold uppercase tracking-wider">Sorte</span>
+                                        </div>
+                                        <div className="text-lg font-bold">{profile.Sorte || 0}</div>
+                                    </div>
                                 </div>
-                            </div>
+
+                                {/* Oracle Insight */}
+                                {profile.insight && (
+                                    <div className="mt-3 p-3 bg-indigo-950/40 border border-indigo-400/20 rounded-lg backdrop-blur-sm">
+                                        <div className="flex gap-2 items-start">
+                                            <Scroll className="h-4 w-4 text-indigo-300 mt-0.5 shrink-0" />
+                                            <div>
+                                                <p className="text-xs font-bold text-indigo-300 uppercase tracking-wider mb-0.5">Oráculo</p>
+                                                <p className="text-sm text-indigo-100 italic">"{profile.insight}"</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </motion.div>
                         </div>
                     )}
                 </div>
