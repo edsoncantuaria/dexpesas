@@ -1,17 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthForm } from '@/components/auth/auth-form';
 import { Logo } from '@/components/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { OnboardingScreen } from '@/components/onboarding/onboarding-screen';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
 export default function LoginPage() {
   const [showLogin, setShowLogin] = useState(false);
+
+  useEffect(() => {
+    console.log('[LoginPage] showLogin state changed:', showLogin);
+  }, [showLogin]);
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background p-4">
@@ -45,9 +49,9 @@ export default function LoginPage() {
 
       {!showLogin ? (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
           className="w-full flex flex-col items-center relative z-10"
         >
           <div className="mb-8">
@@ -57,9 +61,9 @@ export default function LoginPage() {
         </motion.div>
       ) : (
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
           className="w-full max-w-md mx-auto space-y-6 relative z-10"
         >
           <div className="flex flex-col items-center gap-6">

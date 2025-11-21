@@ -65,27 +65,36 @@ export function OnboardingScreen({ onLoginClick }: OnboardingScreenProps) {
 
     // Auto-play logic
     useEffect(() => {
-        if (isPaused) return;
+        if (isPaused) {
+            progressValue.set(100); // Fill progress when paused
+            return;
+        }
 
         const duration = 5000;
-        const startTime = Date.now();
+        let startTime = Date.now();
+        let animationFrameId: number;
 
-        const animateProgress = () => {
-            if (isPaused) return;
+        const animate = () => {
             const elapsed = Date.now() - startTime;
             const progress = Math.min((elapsed / duration) * 100, 100);
             progressValue.set(progress);
 
-            if (progress < 100) {
-                requestAnimationFrame(animateProgress);
-            } else {
-                nextSlide();
+            if (elapsed < duration) {
+                animationFrameId = requestAnimationFrame(animate);
             }
         };
 
-        const animationFrame = requestAnimationFrame(animateProgress);
+        animationFrameId = requestAnimationFrame(animate);
 
-        return () => cancelAnimationFrame(animationFrame);
+        // Set timeout to advance slide
+        const timeoutId = setTimeout(() => {
+            nextSlide();
+        }, duration);
+
+        return () => {
+            cancelAnimationFrame(animationFrameId);
+            clearTimeout(timeoutId);
+        };
     }, [currentSlide, isPaused, nextSlide, progressValue]);
 
     const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {

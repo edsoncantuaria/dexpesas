@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/contexts/UserContext";
@@ -21,28 +21,24 @@ const STEPS: Step[] = [
         position: "center",
     },
     {
-        targetId: "smart-summary",
         title: "Resumo Inteligente",
-        content: "Aqui você tem uma visão geral da sua saúde financeira, com saldo, receitas e despesas do mês.",
-        position: "bottom",
+        content: "No topo do dashboard você tem uma visão geral da sua saúde financeira, com saldo, receitas e despesas do mês.",
+        position: "center",
     },
     {
-        targetId: "mission-board",
         title: "Missões e Conquistas",
         content: "Complete missões semanais para ganhar XP e subir de nível. A gamificação torna suas finanças divertidas!",
-        position: "bottom",
+        position: "center",
     },
     {
-        targetId: "add-transaction-btn",
         title: "Adicionar Transação",
-        content: "Toque aqui para registrar rapidamente uma nova receita ou despesa.",
-        position: "top",
+        content: "Use o botão '+' para registrar rapidamente uma nova receita ou despesa.",
+        position: "center",
     },
     {
-        targetId: "sidebar-trigger", // Assuming there's a trigger or just point to left
         title: "Menu Principal",
-        content: "Acesse relatórios, perfil, configurações e outras áreas através do menu lateral.",
-        position: "right",
+        content: "Acesse relatórios, perfil, configurações e outras áreas através do menu lateral. Aproveite o Dexpesas!",
+        position: "center",
     },
 ];
 
@@ -50,49 +46,33 @@ export function TutorialOverlay() {
     const { user, fetchUser } = useUser();
     const [currentStepIndex, setCurrentStepIndex] = useState(0);
     const [isVisible, setIsVisible] = useState(false);
-    const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
+    const isProcessingRef = useRef(false);
 
-    // Check if tutorial should run
+    // Check if tutorial should run - with localStorage backup
     useEffect(() => {
-        if (user && !user.hasCompletedTutorial) {
-            // Small delay to ensure UI is mounted
+        if (!user) return;
+
+        // Check localStorage first as a fast cache
+        const tutorialCompleted = localStorage.getItem('tutorialCompleted') === 'true';
+
+        console.log('[Tutorial] User hasCompletedTutorial:', user.hasCompletedTutorial);
+        console.log('[Tutorial] localStorage tutorialCompleted:', tutorialCompleted);
+
+        // Show tutorial only if BOTH user.hasCompletedTutorial is false AND localStorage is not 'true'
+        if (!user.hasCompletedTutorial && !tutorialCompleted && !isVisible && !isProcessingRef.current) {
+            console.log('[Tutorial] Showing tutorial');
             const timer = setTimeout(() => setIsVisible(true), 1000);
             return () => clearTimeout(timer);
+        } else if ((user.hasCompletedTutorial || tutorialCompleted) && isVisible) {
+            console.log('[Tutorial] Tutorial completed, hiding');
+            setIsVisible(false);
         }
-    }, [user]);
+    }, [user, isVisible]);
 
     const currentStep = STEPS[currentStepIndex];
 
-    const updateTargetRect = useCallback(() => {
-        if (currentStep.targetId) {
-            const element = document.getElementById(currentStep.targetId);
-            if (element) {
-                const rect = element.getBoundingClientRect();
-                setTargetRect(rect);
-                // Scroll element into view if needed
-                element.scrollIntoView({ behavior: "smooth", block: "center" });
-            } else {
-                // If element not found, fallback to center or skip
-                setTargetRect(null);
-            }
-        } else {
-            setTargetRect(null);
-        }
-    }, [currentStep]);
-
-    useEffect(() => {
-        if (isVisible) {
-            updateTargetRect();
-            window.addEventListener("resize", updateTargetRect);
-            window.addEventListener("scroll", updateTargetRect);
-            return () => {
-                window.removeEventListener("resize", updateTargetRect);
-                window.removeEventListener("scroll", updateTargetRect);
-            };
-        }
-    }, [isVisible, currentStepIndex, updateTargetRect]);
-
     const handleNext = () => {
+        console.log('[Tutorial] Next clicked, current step:', currentStepIndex);
         if (currentStepIndex < STEPS.length - 1) {
             setCurrentStepIndex((prev) => prev + 1);
         } else {
@@ -101,60 +81,54 @@ export function TutorialOverlay() {
     };
 
     const handleComplete = async () => {
+        if (isProcessingRef.current) {
+            console.log('[Tutorial] Already processing, skipping');
+            return;
+        }
+
+        isProcessingRef.current = true;
+        console.log('[Tutorial] Marking tutorial as complete...');
+
+        // Immediately save to localStorage to prevent re-showing
+        localStorage.setItem('tutorialCompleted', 'true');
+        console.log('[Tutorial] Saved to localStorage');
+
+        // Hide immediately
         setIsVisible(false);
+
         try {
-            await api.put("/user/preferences", { hasCompletedTutorial: true });
+            const response = await api.put("/user/preferences", { hasCompletedTutorial: true });
+            console.log('[Tutorial] API response:', response.data);
             await fetchUser();
+            console.log('[Tutorial] User data refreshed successfully');
         } catch (error) {
-            console.error("Failed to mark tutorial as complete", error);
+            console.error("[Tutorial] Failed to mark tutorial as complete", error);
+        } finally {
+            isProcessingRef.current = false;
         }
     };
 
     const handleSkip = async () => {
-        handleComplete();
+        console.log('[Tutorial] Skip clicked');
+        await handleComplete();
     };
 
     if (!isVisible) return null;
-
-    const isSpotlight = !!targetRect;
 
     return (
         <AnimatePresence>
             {isVisible && (
                 <div className="fixed inset-0 z-[100] overflow-hidden">
-                    {/* Backdrop / Spotlight */}
-                    {isSpotlight ? (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="absolute inset-0 pointer-events-none"
-                        >
-                            {/* This div creates the spotlight effect using a massive box-shadow */}
-                            <div
-                                className="absolute rounded-lg transition-all duration-500 ease-in-out"
-                                style={{
-                                    top: targetRect.top - 4, // Add some padding
-                                    left: targetRect.left - 4,
-                                    width: targetRect.width + 8,
-                                    height: targetRect.height + 8,
-                                    boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.75)",
-                                }}
-                            />
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-                        />
-                    )}
+                    {/* Backdrop */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+                    />
 
-                    {/* Content Card */}
+                    {/* Content Card - Always Centered */}
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                        {/* We use absolute positioning for spotlight steps, and flex center for others */}
                         <motion.div
                             key={currentStepIndex}
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
@@ -162,10 +136,6 @@ export function TutorialOverlay() {
                                 opacity: 1,
                                 y: 0,
                                 scale: 1,
-                                top: isSpotlight ? getTooltipPosition(targetRect, currentStep.position).top : undefined,
-                                left: isSpotlight ? getTooltipPosition(targetRect, currentStep.position).left : undefined,
-                                position: isSpotlight ? "absolute" : "relative",
-                                transform: isSpotlight ? "none" : undefined
                             }}
                             exit={{ opacity: 0, y: -10, scale: 0.95 }}
                             transition={{ duration: 0.3 }}
@@ -248,7 +218,19 @@ function getTooltipPosition(rect: DOMRect | null, position: Step["position"] = "
     if (left < 16) left = 16;
     if (left + tooltipWidth > window.innerWidth - 16) left = window.innerWidth - tooltipWidth - 16;
     if (top < 16) top = 16;
-    // if (top + tooltipHeight > window.innerHeight - 16) top = window.innerHeight - tooltipHeight - 16;
+
+    // Estimate tooltip height for better positioning
+    const tooltipHeight = 200;
+    if (top + tooltipHeight > window.innerHeight - 16) {
+        // If tooltip would be off-screen at bottom, position it above the target instead
+        if (position === 'bottom' && rect) {
+            top = rect.top - gap - tooltipHeight;
+            // Re-check if it's now off-screen at top
+            if (top < 16) top = 16;
+        } else {
+            top = window.innerHeight - tooltipHeight - 16;
+        }
+    }
 
     return { top, left };
 }
