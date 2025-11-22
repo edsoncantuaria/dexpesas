@@ -25,7 +25,7 @@ export function AccountsStep({ onComplete, onBack, initialData }: AccountsStepPr
     const [accounts, setAccounts] = useState(initialData || [{
         nome: '',
         instituicao: '',
-        tipo: 'corrente' as 'corrente' | 'poupanca' | 'investimento',
+        tipo: 'corrente' as 'corrente' | 'poupanca',
         saldoInicial: 0,
         accountNumber: '',
         agencyNumber: '',
@@ -222,9 +222,11 @@ export function AccountsStep({ onComplete, onBack, initialData }: AccountsStepPr
                                     <SelectContent>
                                         <SelectItem value="corrente">Conta Corrente</SelectItem>
                                         <SelectItem value="poupanca">Poupança</SelectItem>
-                                        <SelectItem value="investimento">Investimento</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Investimentos serão adicionados na próxima etapa
+                                </p>
                             </div>
                             <div>
                                 <Label>Saldo Atual (R$) *</Label>

@@ -21,7 +21,7 @@ export type User = {
     avatarUrl?: string | null;
     firstOpen: boolean;
     hasCompletedTutorial: boolean;
-    hasCompletedMigration: number; // 0 = não completou, 1 = completou, 2 = pulou temporário
+    hasCompletedMigration: number; // 0 = não iniciado, 1 = concluído, 2 = pulado
     futureProjectionCount: number; // Renomeado de recorrenciaPadrao
     daysUntilDueReminder: number;
     enableAchievementNotifications: boolean;
@@ -139,6 +139,7 @@ export type Card = {
     limite: number;
     diaFechamento: number;
     diaVencimento: number;
+    closingDayGap?: number;
     bandeira: 'visa' | 'mastercard' | 'elo' | 'amex';
     status: 'ACTIVE' | 'BLOCKED' | 'CANCELLED';
     billingCurrency: 'BRL' | 'USD';

@@ -1,7 +1,7 @@
 // backend/src/controllers/migrationController.js
 import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-import { format, parse, setDate } from 'date-fns';
+const { PrismaClient, PaymentMethod } = pkg;
+import { format, parse, setDate, subMonths, subDays } from 'date-fns';
 import CardBalanceService from '../services/cardBalanceService.js';
 import AuditService from '../services/auditService.js';
 
@@ -29,7 +29,7 @@ class MigrationController {
                 select: { hasCompletedMigration: true },
             });
 
-            if (user.hasCompletedMigration === 1) {
+            if (user.hasCompletedMigration) {
                 return res.status(400).json({
                     message: 'Migração já foi concluída anteriormente.'
                 });
@@ -55,7 +55,7 @@ class MigrationController {
                 select: { hasCompletedMigration: true },
             });
 
-            if (user.hasCompletedMigration === 1) {
+            if (user.hasCompletedMigration) {
                 return res.status(400).json({
                     message: 'Migração já foi concluída. Não é possível adicionar contas por este fluxo.'
                 });
@@ -116,7 +116,7 @@ class MigrationController {
                 select: { hasCompletedMigration: true },
             });
 
-            if (user.hasCompletedMigration === 1) {
+            if (user.hasCompletedMigration) {
                 return res.status(400).json({
                     message: 'Migração já foi concluída. Não é possível adicionar cartões por este fluxo.'
                 });
@@ -131,6 +131,7 @@ class MigrationController {
                             limite: parseFloat(card.limite),
                             diaFechamento: card.diaFechamento,
                             diaVencimento: card.diaVencimento,
+                            closingDayGap: card.closingDayGap ?? 7,
                             bandeira: card.bandeira || 'visa',
                             status: 'ACTIVE',
                             billingCurrency: card.billingCurrency || 'BRL',
@@ -179,7 +180,7 @@ class MigrationController {
                 select: { hasCompletedMigration: true },
             });
 
-            if (user.hasCompletedMigration === 1) {
+            if (user.hasCompletedMigration) {
                 return res.status(400).json({
                     message: 'Migração já foi concluída. Não é possível adicionar histórico por este fluxo.'
                 });
@@ -200,28 +201,62 @@ class MigrationController {
                 // Categoria para despesas de migração (pode ser "Outros" ou criar uma específica)
                 const migrationCategoryId = categoryMap.get('Outros') || categoryMap.values().next().value;
 
-                const transactionPromises = history.map(month => {
-                    // Parse month string (YYYY-MM) e criar data no dia de vencimento
-                    const monthDate = parse(month.month, 'yyyy-MM', new Date());
-                    const transactionDate = setDate(monthDate, card.diaVencimento);
+                const transactionPromises = [];
 
-                    return tx.transaction.create({
-                        data: {
-                            userId,
-                            cardId,
-                            descricao: `Fatura ${format(monthDate, 'MMM/yyyy')} - Migração`,
-                            valor: parseFloat(month.totalAmount),
-                            tipo: 'despesa',
-                            data: transactionDate,
-                            categoryId: migrationCategoryId,
-                            metodoPagamento: 'credito',
-                            currency: card.billingCurrency,
-                            status: month.isPaid ? 'POSTED' : (month.isClosed ? 'PENDING' : 'PENDING'),
-                            pago: month.isPaid,
-                            notes: 'Transação criada via migração inicial',
-                        },
-                    });
-                });
+                for (const month of history) {
+                    // Parse month string (YYYY-MM)
+                    const monthDate = parse(month.month, 'yyyy-MM', new Date());
+
+                    // Calcular data da transação para cair na fatura correta
+                    // Usando a nova lógica de gap: Data = Vencimento - Gap (Data de Fechamento)
+                    // Isso garante que a transação caia exatamente no dia do fechamento, pertencendo à fatura.
+                    const gap = card.closingDayGap ?? 7;
+                    const dueDate = setDate(monthDate, card.diaVencimento);
+                    const transactionDate = subDays(dueDate, gap);
+
+                    // 1. Criar a despesa da fatura
+                    transactionPromises.push(
+                        tx.transaction.create({
+                            data: {
+                                userId,
+                                cardId,
+                                descricao: `Fatura ${format(monthDate, 'MMM/yyyy')} - Migração`,
+                                valor: parseFloat(month.totalAmount),
+                                tipo: 'despesa',
+                                data: transactionDate,
+                                categoryId: migrationCategoryId,
+                                metodoPagamento: PaymentMethod.credito,
+                                currency: card.billingCurrency,
+                                status: month.isPaid ? 'POSTED' : (month.isClosed ? 'PENDING' : 'PENDING'),
+                                pago: month.isPaid,
+                                notes: 'Transação criada via migração inicial',
+                            },
+                        })
+                    );
+
+                    // 2. Se já foi pago, criar a transação de pagamento (receita) para abater
+                    if (month.isPaid) {
+                        transactionPromises.push(
+                            tx.transaction.create({
+                                data: {
+                                    userId,
+                                    cardId,
+                                    descricao: `Pagamento Fatura ${format(monthDate, 'MMM/yyyy')}`,
+                                    valor: parseFloat(month.totalAmount),
+                                    tipo: 'receita',
+                                    data: transactionDate, // Data do pagamento
+                                    categoryId: migrationCategoryId,
+                                    metodoPagamento: PaymentMethod.debito, // Assumindo pagamento via conta (débito)
+                                    currency: card.billingCurrency,
+                                    status: 'POSTED',
+                                    pago: true,
+                                    isInvoicePayment: true, // Importante para o cálculo de saldo
+                                    notes: 'Pagamento gerado automaticamente via migração',
+                                },
+                            })
+                        );
+                    }
+                }
 
                 return Promise.all(transactionPromises);
             });
@@ -255,33 +290,43 @@ class MigrationController {
      * Marca a migração como concluída (seta flag hasCompletedMigration)
      */
     async completeMigration(req, res, next) {
-        const userId = req.user.id;
-
         try {
-            const updatedUser = await prisma.user.update({
+            const userId = req.user.id;
+
+            // Verificar se já foi completada
+            const user = await prisma.user.findUnique({
                 where: { id: userId },
-                data: { hasCompletedMigration: 1 }, // 1 = completou
-                select: {
-                    id: true,
-                    hasCompletedMigration: true,
-                },
+                select: { hasCompletedMigration: true },
             });
 
+            if (user.hasCompletedMigration === 1) {
+                return res.status(400).json({
+                    message: 'Migração já foi concluída anteriormente.',
+                });
+            }
+
+            // Marcar como concluída (1)
+            await prisma.user.update({
+                where: { id: userId },
+                data: { hasCompletedMigration: 1 },
+            });
+
+            // Audit log
             await AuditService.log({
                 userId,
-                action: 'COMPLETE_MIGRATION',
+                action: 'MIGRATION_COMPLETED',
                 entity: 'USER',
                 entityId: userId,
-                details: { hasCompletedMigration: true },
+                details: { hasCompletedMigration: 1, timestamp: new Date() },
                 ipAddress: req.ip,
             });
 
             res.json({
                 message: 'Migração concluída com sucesso!',
-                user: updatedUser,
             });
         } catch (error) {
-            next(error);
+            console.error('Error completing migration:', error);
+            res.status(500).json({ message: 'Erro ao concluir migração.' });
         }
     }
 
@@ -290,16 +335,13 @@ class MigrationController {
      * Marca migração como concluída sem importar dados (usuário escolheu fazer manualmente)
      */
     async skipMigration(req, res, next) {
-        const userId = req.user.id;
-
         try {
-            const updatedUser = await prisma.user.update({
+            const userId = req.user.id;
+
+            // Marcar como pulada (2 = postponed)
+            await prisma.user.update({
                 where: { id: userId },
-                data: { hasCompletedMigration: 1 }, // 1 = completou (pulou definitivo)
-                select: {
-                    id: true,
-                    hasCompletedMigration: true,
-                },
+                data: { hasCompletedMigration: 2 },
             });
 
             await AuditService.log({
@@ -307,13 +349,12 @@ class MigrationController {
                 action: 'SKIP_MIGRATION',
                 entity: 'USER',
                 entityId: userId,
-                details: { hasCompletedMigration: 1, skipped: true },
+                details: { hasCompletedMigration: 2, skipped: true },
                 ipAddress: req.ip,
             });
 
             res.json({
-                message: 'Você optou por fazer a migração manualmente.',
-                user: updatedUser,
+                message: 'Migração adiada. Você pode retomá-la depois.',
             });
         } catch (error) {
             next(error);
@@ -321,34 +362,41 @@ class MigrationController {
     }
 
     /**
-     * POST /api/migration/postpone
-     * Marca migração como postergada (status 2) - aparece card em serviços
+     * POST /api/migration/resume
+     * Retoma a migração (muda status de 2 para 0)
      */
-    async postponeMigration(req, res, next) {
-        const userId = req.user.id;
-
+    async resumeMigration(req, res, next) {
         try {
-            const updatedUser = await prisma.user.update({
+            const userId = req.user.id;
+
+            const user = await prisma.user.findUnique({
                 where: { id: userId },
-                data: { hasCompletedMigration: 2 }, // 2 = postergou
-                select: {
-                    id: true,
-                    hasCompletedMigration: true,
-                },
+                select: { hasCompletedMigration: true },
+            });
+
+            if (user.hasCompletedMigration !== 2) {
+                return res.status(400).json({
+                    message: 'Migração não está no estado "adiada".',
+                });
+            }
+
+            // Resetar para 0 (não iniciado)
+            await prisma.user.update({
+                where: { id: userId },
+                data: { hasCompletedMigration: 0 },
             });
 
             await AuditService.log({
                 userId,
-                action: 'POSTPONE_MIGRATION',
+                action: 'RESUME_MIGRATION',
                 entity: 'USER',
                 entityId: userId,
-                details: { hasCompletedMigration: 2, postponed: true },
+                details: { hasCompletedMigration: 0, resumed: true },
                 ipAddress: req.ip,
             });
 
             res.json({
-                message: 'Migração postergada. Você pode retomar depois.',
-                user: updatedUser,
+                message: 'Migração retomada. O wizard será exibido.',
             });
         } catch (error) {
             next(error);

@@ -23,11 +23,14 @@ import {
     Swords,
     TrendingUp,
     Shield,
-    TriangleAlert
+    TriangleAlert,
+    Calendar
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
 import { useUser } from '@/contexts/UserContext';
+import { MigrationResumeCard } from '@/components/migration/migration-resume-card';
+import { useRouter } from 'next/navigation';
 
 type ServiceItem = {
     href: string;
@@ -53,6 +56,13 @@ const baseServiceItems: ServiceItem[] = [
         description: 'Acompanhe seus cartões de crédito',
         Icon: CreditCard,
         iconBgClass: 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
+    },
+    {
+        href: '/dashboard/servicos/parcelas',
+        title: 'Parcelas Futuras',
+        description: 'Visualize todas as parcelas e recorrências',
+        Icon: Calendar,
+        iconBgClass: 'bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400'
     },
     {
         href: '/dashboard/metas',
@@ -132,6 +142,7 @@ const baseServiceItems: ServiceItem[] = [
 export default function ServicosPage() {
     const { isClassic, isLite } = useGamificationMode();
     const { toast } = useToast();
+    const router = useRouter();
 
     const serviceItems = useMemo(() => {
         const liteOverrides: Record<string, Pick<ServiceItem, 'title' | 'description'>> = {
@@ -160,7 +171,7 @@ export default function ServicosPage() {
             });
     }, [isClassic, isLite]);
 
-    const { user } = useUser();
+    const { user, fetchUser } = useUser();
     const finalServiceItems = useMemo(() => {
         const items = [...serviceItems];
         if (user?.isAdmin) {
@@ -183,6 +194,11 @@ export default function ServicosPage() {
         });
     };
 
+    const handleMigrationResume = async () => {
+        await fetchUser(); // Atualiza o user context
+        router.refresh(); // Força refresh da página para mostrar o wizard
+    };
+
     const lockedRoutes = [
         '/dashboard/cells',
         '/dashboard/investimentos', // Corrected from '/dashboard/investments' to match baseServiceItems
@@ -191,6 +207,8 @@ export default function ServicosPage() {
         '/dashboard/automacoes',
         '/dashboard/reconcile'
     ];
+
+    const showMigrationCard = user?.hasCompletedMigration === 2;
 
     return (
         <div className="space-y-6">
@@ -201,6 +219,10 @@ export default function ServicosPage() {
                     <p className="text-muted-foreground">Todas as ferramentas para sua jornada financeira em um só lugar.</p>
                 </div>
             </div>
+
+            {showMigrationCard && (
+                <MigrationResumeCard onResume={handleMigrationResume} />
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {finalServiceItems.map((item) => {

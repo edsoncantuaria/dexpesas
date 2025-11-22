@@ -46,6 +46,7 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^7.0.10",
     "ofx-js": "^0.2.0",
+    "pdfkit": "^0.17.2",
     "string-similarity": "^4.0.4",
     "string-similarity-js": "^1.0.4",
     "wav": "^1.0.2",

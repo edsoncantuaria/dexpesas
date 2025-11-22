@@ -165,22 +165,56 @@ export function PreviewStep({ migrationData, onEdit, onConfirm, onBack }: Previe
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-3">
-                            {migrationData.cards.map((card: any, index: number) => (
-                                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                                    <div>
-                                        <p className="font-medium">{card.nome}</p>
-                                        <p className="text-sm text-muted-foreground capitalize">
-                                            {card.bandeira} • Fecha dia {card.diaFechamento} • Vence dia {card.diaVencimento}
-                                        </p>
+                            {migrationData.cards.map((card: any, index: number) => {
+                                // Calculate used limit based on unpaid history
+                                const cardHistory = migrationData.cardHistory?.[index] || [];
+                                const usedLimit = cardHistory
+                                    .filter((h: any) => !h.isPaid)
+                                    .reduce((sum: number, h: any) => sum + h.totalAmount, 0);
+                                const remainingLimit = card.limite - usedLimit;
+
+                                return (
+                                    <div key={index} className="flex flex-col gap-2 p-3 border rounded-lg">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="font-medium">{card.nome}</p>
+                                                <p className="text-sm text-muted-foreground capitalize">
+                                                    {card.bandeira} • Fecha dia {card.diaFechamento} • Vence dia {card.diaVencimento}
+                                                </p>
+                                            </div>
+                                            <Badge variant="secondary">
+                                                Limite: {new Intl.NumberFormat('pt-BR', {
+                                                    style: 'currency',
+                                                    currency: 'BRL'
+                                                }).format(card.limite)}
+                                            </Badge>
+                                        </div>
+
+                                        {usedLimit > 0 && (
+                                            <div className="text-sm text-muted-foreground bg-muted/50 p-2 rounded">
+                                                <div className="flex justify-between mb-1">
+                                                    <span>Em uso (Estimado):</span>
+                                                    <span className="font-medium text-red-500">
+                                                        {new Intl.NumberFormat('pt-BR', {
+                                                            style: 'currency',
+                                                            currency: 'BRL'
+                                                        }).format(usedLimit)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span>Disponível (Estimado):</span>
+                                                    <span className="font-medium text-green-600">
+                                                        {new Intl.NumberFormat('pt-BR', {
+                                                            style: 'currency',
+                                                            currency: 'BRL'
+                                                        }).format(remainingLimit)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <Badge variant="secondary">
-                                        Limite: {new Intl.NumberFormat('pt-BR', {
-                                            style: 'currency',
-                                            currency: 'BRL'
-                                        }).format(card.limite)}
-                                    </Badge>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>

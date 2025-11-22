@@ -27,7 +27,7 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
         diaFechamento: 1,
         diaVencimento: 10,
         bandeira: 'visa' as 'visa' | 'mastercard' | 'elo' | 'amex',
-        paymentAccountId: '',
+        paymentAccountId: 'none',
         notes: '',
     }]);
 
@@ -37,13 +37,25 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
             const validCards = cards.filter(card => card.nome && card.limite > 0);
 
             // Check for invalid date combinations
-            const invalidDateCards = validCards.filter(
-                card => card.diaVencimento <= card.diaFechamento
-            );
+            const invalidDateCards = validCards.filter(card => {
+                // Calcular diferença considerando virada de mês
+                let daysDiff;
+                if (card.diaVencimento > card.diaFechamento) {
+                    // Mesmo mês: vence depois do fechamento
+                    daysDiff = card.diaVencimento - card.diaFechamento;
+                } else {
+                    // Mês seguinte: fecha dia X, vence dia Y do próximo mês
+                    // Ex: fecha dia 30, vence dia 7 = 30 dias até fim do mês + 7 dias = 7 dias úteis
+                    daysDiff = (30 - card.diaFechamento) + card.diaVencimento;
+                }
+
+                // Mínimo 7 dias entre fechamento e vencimento
+                return daysDiff < 7;
+            });
 
             if (invalidDateCards.length > 0) {
                 alert(
-                    'Atenção: O dia de vencimento deve ser DEPOIS do dia de fechamento. ' +
+                    'Atenção: Deve haver no mínimo 7 dias entre o fechamento e o vencimento. ' +
                     'Por favor, corrija os cartões destacados.'
                 );
                 return;
@@ -62,7 +74,14 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
     };
 
     const hasInvalidDates = (card: any) => {
-        return card.diaVencimento <= card.diaFechamento;
+        // Calcular diferença considerando virada de mês
+        let daysDiff;
+        if (card.diaVencimento > card.diaFechamento) {
+            daysDiff = card.diaVencimento - card.diaFechamento;
+        } else {
+            daysDiff = (30 - card.diaFechamento) + card.diaVencimento;
+        }
+        return daysDiff < 7;
     };
 
     const hasInvalidLimit = (card: any) => {
@@ -93,7 +112,10 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                     <Button
                         size="lg"
                         variant="outline"
-                        onClick={() => setHasCards(false)}
+                        onClick={() => {
+                            setHasCards(false);
+                            onComplete([]); // Skip direto
+                        }}
                         className="h-24"
                     >
                         Não tenho cartões
@@ -134,7 +156,7 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                                     diaFechamento: 1,
                                     diaVencimento: 10,
                                     bandeira: 'visa' as const,
-                                    paymentAccountId: '',
+                                    paymentAccountId: 'none',
                                     notes: '',
                                 }
                             ));
@@ -229,13 +251,16 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent className="max-h-[200px]">
-                                            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                                            {Array.from({ length: 30 }, (_, i) => i + 1).map(day => (
                                                 <SelectItem key={day} value={String(day)}>
                                                     Dia {day}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Máximo dia 30 (nem todo mês tem 31)
+                                    </p>
                                 </div>
 
                                 <div>
@@ -257,7 +282,7 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                                     </Select>
                                     {invalidDates && (
                                         <p className="text-xs text-red-600 mt-1">
-                                            Vencimento deve ser DEPOIS do fechamento
+                                            Mínimo 7 dias entre fechamento e vencimento
                                         </p>
                                     )}
                                 </div>
@@ -274,7 +299,7 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                                             <SelectValue placeholder="Selecione uma conta..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">Nenhuma</SelectItem>
+                                            <SelectItem value="none">Nenhuma</SelectItem>
                                             {accounts.map((account: any, idx: number) => (
                                                 <SelectItem key={idx} value={String(idx)}>
                                                     {account.nome} ({account.instituicao})
@@ -307,8 +332,8 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                                 <Alert className="border-red-500">
                                     <AlertTriangle className="h-4 w-4 text-red-600" />
                                     <AlertDescription>
-                                        <strong>Data inválida:</strong> O vencimento deve ocorrer DEPOIS do fechamento.
-                                        Exemplo: Fecha dia 15, vence dia 25.
+                                        <strong>Prazo insuficiente:</strong> Deve haver no mínimo 7 dias entre o fechamento e o vencimento.
+                                        Exemplo válido: Fecha dia 25, vence dia 5 (do mês seguinte) = 10 dias.
                                     </AlertDescription>
                                 </Alert>
                             )}

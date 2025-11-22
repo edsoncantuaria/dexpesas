@@ -33,7 +33,7 @@ async function createTransactionLogic(tx, userId, data) {
         withInterest, interestRate, recurrenceType, attachmentUrl, notes,
         tags
     } = data;
-    
+
     const valorOriginal = parseFloat(valor);
     const transactionDate = new Date(transactionDateStr);
 
@@ -43,13 +43,13 @@ async function createTransactionLogic(tx, userId, data) {
         err.statusCode = 404;
         throw err;
     }
-    
+
     let finalCategoryId = categoryId;
-    
+
     if (!finalCategoryId && tipo === 'despesa') {
         const categoryNameFromRule = await CategorizationService.applyRulesAndGetName(userId, descricao);
-        if(categoryNameFromRule) {
-            const category = await tx.category.findFirst({ where: { nome: categoryNameFromRule }});
+        if (categoryNameFromRule) {
+            const category = await tx.category.findFirst({ where: { nome: categoryNameFromRule } });
             if (category) finalCategoryId = category.id;
         }
     }
@@ -67,7 +67,7 @@ async function createTransactionLogic(tx, userId, data) {
 
     let accountId = ['debito', 'pix', 'dinheiro'].includes(metodoPagamento) ? contaCartaoId : (tipo === 'receita' ? contaCartaoId : null);
     let cardId = metodoPagamento === 'credito' ? contaCartaoId : undefined;
-    
+
     const tagsToConnect = tags && tags.length > 0 ? { connect: tags.map((tagId) => ({ id: tagId })) } : undefined;
 
     // **NOVO**: Validação de Saldo para qualquer despesa de débito/pix
@@ -81,9 +81,9 @@ async function createTransactionLogic(tx, userId, data) {
             throw { statusCode: 400, message: `Saldo insuficiente na conta "${account.nome}".` };
         }
     }
-    
+
     if (metodoPagamento === 'credito' && tipo === 'despesa') {
-        const card = await tx.card.findFirst({ where: { id: contaCartaoId, userId: userId }});
+        const card = await tx.card.findFirst({ where: { id: contaCartaoId, userId: userId } });
         if (!card) {
             const error = new Error('Cartão de crédito não encontrado.'); error.statusCode = 404; throw error;
         }
@@ -117,7 +117,7 @@ async function createTransactionLogic(tx, userId, data) {
             throw error;
         }
     }
-    
+
     if (entryType === 'recurring' && recurrenceType && recurrenceType !== 'NONE') {
         const recorrenciaId = `recur-${Date.now()}`;
         const transactionsToCreate = [];
@@ -125,7 +125,7 @@ async function createTransactionLogic(tx, userId, data) {
 
         for (let i = 0; i < projectionCount; i++) {
             let nextDate;
-            switch(recurrenceType) {
+            switch (recurrenceType) {
                 case 'WEEKLY': nextDate = addWeeks(transactionDate, i); break;
                 case 'BIWEEKLY': nextDate = addWeeks(transactionDate, i * 2); break;
                 case 'MONTHLY': nextDate = addMonths(transactionDate, i); break;
@@ -134,11 +134,11 @@ async function createTransactionLogic(tx, userId, data) {
                 case 'SEMIANNUALLY': nextDate = addMonths(transactionDate, i * 6); break;
                 default: nextDate = addMonths(transactionDate, i);
             }
-            
+
             const transactionData = {
-                descricao, valor: valorOriginal, data: nextDate, tipo, 
-                categoryId: finalCategoryId, metodoPagamento, accountId, cardId, userId, 
-                recurrenceType, recorrenciaId, 
+                descricao, valor: valorOriginal, data: nextDate, tipo,
+                categoryId: finalCategoryId, metodoPagamento, accountId, cardId, userId,
+                recurrenceType, recorrenciaId,
                 pago: i === 0 ? pago : false, // Apenas a primeira transação respeita o status do form
                 attachmentUrl: i === 0 ? attachmentUrl : null, // Anexo só na primeira
                 notes: i === 0 ? notes : null,
@@ -156,7 +156,7 @@ async function createTransactionLogic(tx, userId, data) {
         const installmentId = `inst-${Date.now()}`;
         let installmentValue = valorOriginal / totalInstallments;
         let totalComJuros = valorOriginal;
-        
+
         if (withInterest && interestRate > 0) {
             const monthlyRate = interestRate / 100;
             installmentValue = (valorOriginal * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -totalInstallments));
@@ -189,16 +189,16 @@ async function createTransactionLogic(tx, userId, data) {
                 notes,
             });
         }
-        
+
         transactionsToCreate[0].tags = tagsToConnect;
 
         await tx.transaction.createMany({
             data: transactionsToCreate,
         });
 
-        return await tx.transaction.findMany({ where: { installmentId }});
+        return await tx.transaction.findMany({ where: { installmentId } });
     } else {
-         const newTransaction = await tx.transaction.create({
+        const newTransaction = await tx.transaction.create({
             data: {
                 descricao, valor: valorOriginal, tipo, data: transactionDate, categoryId: finalCategoryId, metodoPagamento,
                 pago: pago, accountId, cardId, userId, installment: false, attachmentUrl, notes,
@@ -209,8 +209,58 @@ async function createTransactionLogic(tx, userId, data) {
     }
 }
 
-
 class TransactionController {
+
+    async getMonthlySummary(req, res, next) {
+        const userId = req.user.id;
+        try {
+            // Fetch minimal data to aggregate
+            const transactions = await prisma.transaction.findMany({
+                where: { userId },
+                select: {
+                    data: true,
+                    tipo: true,
+                    valor: true,
+                    pago: true
+                }
+            });
+
+            const summaryMap = new Map();
+
+            transactions.forEach(t => {
+                const monthKey = format(t.data, 'yyyy-MM');
+                if (!summaryMap.has(monthKey)) {
+                    summaryMap.set(monthKey, {
+                        income: 0,
+                        incomeForecast: 0,
+                        expense: 0,
+                        expenseForecast: 0
+                    });
+                }
+
+                const entry = summaryMap.get(monthKey);
+                const amount = Number(t.valor);
+
+                if (t.tipo === 'receita') {
+                    entry.incomeForecast += amount;
+                    if (t.pago) entry.income += amount;
+                } else {
+                    entry.expenseForecast += amount;
+                    if (t.pago) entry.expense += amount;
+                }
+            });
+
+            const result = Array.from(summaryMap.entries()).map(([key, val]) => ({
+                key,
+                date: new Date(`${key}-01T00:00:00`),
+                ...val
+            })).sort((a, b) => a.date - b.date);
+
+            res.json(result);
+        } catch (error) {
+            next(error);
+        }
+    }
 
     async getTransactions(req, res, next) {
         const { cardId, accountId, startDate, endDate, includePending, month, includeShared } = req.query;
@@ -219,11 +269,11 @@ class TransactionController {
 
             if (cardId) whereClause.cardId = cardId;
             if (accountId) whereClause.accountId = accountId;
-            
+
             // Otimização: A lógica de data foi simplificada para priorizar `month`
             if (month && /^\d{4}-\d{2}$/.test(month)) {
-                 const monthDate = parseISO(`${month}-01`);
-                 whereClause.data = {
+                const monthDate = parseISO(`${month}-01`);
+                whereClause.data = {
                     gte: startOfMonth(monthDate),
                     lte: endOfMonth(monthDate),
                 };
@@ -243,7 +293,7 @@ class TransactionController {
                 };
             }
 
-             if (includePending !== 'true') {
+            if (includePending !== 'true') {
                 whereClause.pago = true;
             }
 
@@ -289,16 +339,16 @@ class TransactionController {
                 }
                 const user = await prisma.user.findUnique({ where: { id: userId } });
                 if (user) {
-                  await NotificationService.createNotification(prisma, user, {
-                      title: `Nova ${req.body.tipo === 'receita' ? 'receita' : 'despesa'} registrada`,
-                      message: `${req.body.descricao} - R$ ${parseFloat(req.body.valor).toFixed(2)}`, type: 'TRANSACTION_CREATED', relatedId: newTransactions[0].id,
-                  });
+                    await NotificationService.createNotification(prisma, user, {
+                        title: `Nova ${req.body.tipo === 'receita' ? 'receita' : 'despesa'} registrada`,
+                        message: `${req.body.descricao} - R$ ${parseFloat(req.body.valor).toFixed(2)}`, type: 'TRANSACTION_CREATED', relatedId: newTransactions[0].id,
+                    });
                 }
             }
 
             res.status(202).json(newTransactions);
         } catch (error) {
-             if (error.statusCode) { return res.status(error.statusCode).json(error.details || { message: error.message }); }
+            if (error.statusCode) { return res.status(error.statusCode).json(error.details || { message: error.message }); }
             next(error);
         }
     }
@@ -306,9 +356,9 @@ class TransactionController {
     async updateTransaction(req, res, next) {
         const { id } = req.params;
         const userId = req.user.id;
-    
+
         try {
-            const originalTransaction = await prisma.transaction.findUnique({ 
+            const originalTransaction = await prisma.transaction.findUnique({
                 where: { id: id, userId: userId },
                 include: { tags: true }
             });
@@ -337,7 +387,7 @@ class TransactionController {
                         dataToUpdate.accountId
                             ? { account: { connect: { id: dataToUpdate.accountId } } }
                             : { account: { disconnect: true } }
-                      )
+                    )
                     : {};
 
                 const cardUpdate = Object.prototype.hasOwnProperty.call(dataToUpdate, 'cardId')
@@ -345,7 +395,7 @@ class TransactionController {
                         dataToUpdate.cardId
                             ? { card: { connect: { id: dataToUpdate.cardId } } }
                             : { card: { disconnect: true } }
-                      )
+                    )
                     : {};
 
                 delete dataToUpdate.accountId;
@@ -395,7 +445,7 @@ class TransactionController {
                     details: { before: originalTransaction, after: createdTransactions[0] },
                     status: 'SUCCESS', ipAddress: req.ip
                 });
-    
+
                 return createdTransactions;
             });
 
@@ -410,7 +460,7 @@ class TransactionController {
             }
 
             res.json(newTransactions);
-            
+
         } catch (error) {
             if (error.statusCode) {
                 return res.status(error.statusCode).json(error.details || { message: error.message });
@@ -423,14 +473,14 @@ class TransactionController {
         try {
             const { id } = req.params;
             const userId = req.user.id;
-            
-            const transactionToDelete = await prisma.transaction.findUnique({ where: { id, userId }});
+
+            const transactionToDelete = await prisma.transaction.findUnique({ where: { id, userId } });
             if (!transactionToDelete) { return res.status(404).json({ message: 'Transação não encontrada.' }); }
 
             await prisma.$transaction(async (tx) => {
-                 const seriesId = transactionToDelete.installmentId || transactionToDelete.recorrenciaId;
-                 if (seriesId) {
-                    await tx.transaction.deleteMany({ where: { [seriesId.startsWith('inst') ? 'installmentId' : 'recorrenciaId']: seriesId, userId }});
+                const seriesId = transactionToDelete.installmentId || transactionToDelete.recorrenciaId;
+                if (seriesId) {
+                    await tx.transaction.deleteMany({ where: { [seriesId.startsWith('inst') ? 'installmentId' : 'recorrenciaId']: seriesId, userId } });
                 } else {
                     await tx.transaction.delete({ where: { id: id, userId: userId } });
                 }
@@ -454,25 +504,25 @@ class TransactionController {
         const { id } = req.params;
         const userId = req.user.id;
         try {
-            const transaction = await prisma.transaction.findUnique({ where: { id, userId }});
+            const transaction = await prisma.transaction.findUnique({ where: { id, userId } });
             if (!transaction) { return res.status(404).json({ message: 'Transação não encontrada.' }); }
-            
+
             const wasPaid = transaction.pago;
-            
+
             const updatedTransaction = await prisma.$transaction(async (tx) => {
-                 const updated = await tx.transaction.update({
+                const updated = await tx.transaction.update({
                     where: { id }, data: { pago: !transaction.pago }
                 });
 
                 // Se a transação foi marcada como PAGA, concede XP.
                 if (!wasPaid && updated.pago) {
                     await GamificationService.triggerXpEvent(tx, userId, 'BILL_PAID', { amount: updated.valor });
-                } 
+                }
                 // Se foi desmarcada (de PAGA para NÃO PAGA), remove XP.
                 else if (wasPaid && !updated.pago) {
                     await GamificationService.triggerXpEvent(tx, userId, 'BILL_UNPAID', { amount: updated.valor });
                 }
-                
+
                 return updated;
             });
 
@@ -506,9 +556,9 @@ class TransactionController {
             const orConditions = [];
             if (accounts?.length > 0) orConditions.push({ accountId: { in: accounts } });
             if (cards?.length > 0) orConditions.push({ cardId: { in: cards } });
-            if(orConditions.length > 0) { if (!whereClause.AND) whereClause.AND = []; whereClause.AND.push({ OR: orConditions }); }
-            if(categories?.length > 0) { if (!whereClause.AND) whereClause.AND = []; whereClause.AND.push({ category: { nome: { in: categories } } }); }
-            if(methods?.length > 0) { if (!whereClause.AND) whereClause.AND = []; whereClause.AND.push({ metodoPagamento: { in: methods } }); }
+            if (orConditions.length > 0) { if (!whereClause.AND) whereClause.AND = []; whereClause.AND.push({ OR: orConditions }); }
+            if (categories?.length > 0) { if (!whereClause.AND) whereClause.AND = []; whereClause.AND.push({ category: { nome: { in: categories } } }); }
+            if (methods?.length > 0) { if (!whereClause.AND) whereClause.AND = []; whereClause.AND.push({ metodoPagamento: { in: methods } }); }
             const transactions = await prisma.transaction.findMany({
                 where: whereClause, include: { category: true, account: true, card: true }, orderBy: { data: 'desc' },
             });
@@ -549,17 +599,17 @@ class TransactionController {
                 const accountId = importedTx.reconciliation.accountId;
                 const cardId = importedTx.reconciliation.cardId;
                 const tipo = importedTx.type === 'CREDIT' ? 'receita' : 'despesa';
-                
+
                 const categoryMap = await getCategoryMap(tx);
                 let categoryId = tipo === 'receita' ? categoryMap.get('OutrasReceitas') : categoryMap.get('Outros');
 
-                if(tipo === 'despesa') {
+                if (tipo === 'despesa') {
                     const categoryNameFromRule = await CategorizationService.applyRulesAndGetName(userId, importedTx.description);
                     if (categoryNameFromRule && categoryMap.has(categoryNameFromRule)) {
                         categoryId = categoryMap.get(categoryNameFromRule);
                     } else if (user.enableReconciliationAi) {
                         const suggestion = await suggestCategoryFlow({ description: importedTx.description });
-                        if(suggestion && categoryMap.has(suggestion.category)) {
+                        if (suggestion && categoryMap.has(suggestion.category)) {
                             categoryId = categoryMap.get(suggestion.category);
                         }
                     }
@@ -590,7 +640,7 @@ class TransactionController {
                     },
                 });
 
-                 await AuditService.log({
+                await AuditService.log({
                     userId,
                     action: 'CREATE_FROM_IMPORTED',
                     entity: 'TRANSACTION',
@@ -601,7 +651,7 @@ class TransactionController {
 
                 return { transaction: newManualTx, reconciliationId: importedTx.reconciliationId };
             });
-            
+
             await ReconciliationService.updateBalanceSnapshot(result.reconciliationId);
 
             res.status(201).json(result.transaction);
@@ -610,6 +660,195 @@ class TransactionController {
             if (error.statusCode) {
                 return res.status(error.statusCode).json({ message: error.message });
             }
+            next(error);
+        }
+    }
+
+    /**
+     * GET /transactions/future-installments/summary
+     * Retorna resumo consolidado de parcelas futuras e recorrentes
+     */
+    async getFutureInstallmentsSummary(req, res, next) {
+        const userId = req.user.id;
+        const { months = 6 } = req.query; // Quantos meses para frente visualizar
+
+        try {
+            const today = new Date();
+            const futureLimit = addMonths(today, parseInt(months));
+
+            // 1. Buscar todas as parcelas futuras (installment=true, data > hoje)
+            const futureInstallments = await prisma.transaction.findMany({
+                where: {
+                    userId,
+                    installment: true,
+                    data: {
+                        gt: today,
+                        lte: futureLimit
+                    }
+                },
+                select: {
+                    id: true,
+                    descricao: true,
+                    valor: true,
+                    data: true,
+                    cardId: true,
+                    categoryId: true,
+                    installmentNumber: true,
+                    totalInstallments: true,
+                    seriesId: true,
+                    card: {
+                        select: {
+                            id: true,
+                            nome: true,
+                            bandeira: true
+                        }
+                    },
+                    categoria: {
+                        select: {
+                            id: true,
+                            nome: true,
+                            icone: true,
+                            cor: true
+                        }
+                    }
+                },
+                orderBy: { data: 'asc' }
+            });
+
+            // 2. Buscar transações recorrentes ativas que gerarão parcelas futuras
+            const recurringTransactions = await prisma.transaction.findMany({
+                where: {
+                    userId,
+                    recurrenceType: { not: null },
+                    OR: [
+                        { recurrenceEndDate: null }, // Sem fim
+                        { recurrenceEndDate: { gte: today } } // Ainda ativas
+                    ],
+                    data: { lte: today } // Primeira ocorrência já passou
+                },
+                select: {
+                    id: true,
+                    descricao: true,
+                    valor: true,
+                    data: true,
+                    cardId: true,
+                    categoryId: true,
+                    recurrenceType: true,
+                    recurrenceEndDate: true,
+                    card: {
+                        select: {
+                            id: true,
+                            nome: true,
+                            bandeira: true
+                        }
+                    },
+                    categoria: {
+                        select: {
+                            id: true,
+                            nome: true,
+                            icone: true,
+                            cor: true
+                        }
+                    }
+                }
+            });
+
+            // 3. Projetar as próximas ocorrências de recorrentes
+            const projectedRecurrents = [];
+            for (const rec of recurringTransactions) {
+                let nextDate = new Date(rec.data);
+
+                // Avançar até a próxima ocorrência futura
+                while (nextDate <= today) {
+                    if (rec.recurrenceType === 'MONTHLY') {
+                        nextDate = addMonths(nextDate, 1);
+                    } else if (rec.recurrenceType === 'WEEKLY') {
+                        nextDate = addWeeks(nextDate, 1);
+                    }
+                }
+
+                // Gerar ocorrências futuras até o limite
+                while (nextDate <= futureLimit) {
+                    // Verificar se não ultrapassa data de fim
+                    if (rec.recurrenceEndDate && nextDate > new Date(rec.recurrenceEndDate)) {
+                        break;
+                    }
+
+                    projectedRecurrents.push({
+                        id: `recurring-${rec.id}-${format(nextDate, 'yyyy-MM-dd')}`,
+                        descricao: rec.descricao,
+                        valor: rec.valor,
+                        data: nextDate,
+                        cardId: rec.cardId,
+                        categoryId: rec.categoryId,
+                        card: rec.card,
+                        categoria: rec.categoria,
+                        isRecurring: true,
+                        originalTransactionId: rec.id
+                    });
+
+                    // Avançar para próxima
+                    if (rec.recurrenceType === 'MONTHLY') {
+                        nextDate = addMonths(nextDate, 1);
+                    } else if (rec.recurrenceType === 'WEEKLY') {
+                        nextDate = addWeeks(nextDate, 1);
+                    }
+                }
+            }
+
+            // 4. Combinar parcelas e recorrentes
+            const allFutureTransactions = [
+                ...futureInstallments.map(t => ({ ...t, isRecurring: false })),
+                ...projectedRecurrents
+            ];
+
+            // 5. Agrupar por mês
+            const groupedByMonth = {};
+            allFutureTransactions.forEach(t => {
+                const monthKey = format(t.data, 'yyyy-MM');
+                if (!groupedByMonth[monthKey]) {
+                    groupedByMonth[monthKey] = {
+                        month: monthKey,
+                        date: new Date(`${monthKey}-01`),
+                        total: 0,
+                        transactions: [],
+                        byCard: {}
+                    };
+                }
+
+                groupedByMonth[monthKey].total += Number(t.valor);
+                groupedByMonth[monthKey].transactions.push(t);
+
+                // Agrupar por cartão também
+                if (t.card) {
+                    const cardKey = t.card.id;
+                    if (!groupedByMonth[monthKey].byCard[cardKey]) {
+                        groupedByMonth[monthKey].byCard[cardKey] = {
+                            card: t.card,
+                            total: 0,
+                            count: 0
+                        };
+                    }
+                    groupedByMonth[monthKey].byCard[cardKey].total += Number(t.valor);
+                    groupedByMonth[monthKey].byCard[cardKey].count += 1;
+                }
+            });
+
+            // 6. Converter para array e ordenar
+            const summary = Object.values(groupedByMonth)
+                .map(month => ({
+                    ...month,
+                    byCard: Object.values(month.byCard)
+                }))
+                .sort((a, b) => a.date - b.date);
+
+            res.json({
+                summary,
+                totalTransactions: allFutureTransactions.length,
+                monthsAhead: parseInt(months)
+            });
+
+        } catch (error) {
             next(error);
         }
     }

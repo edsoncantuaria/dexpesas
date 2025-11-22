@@ -11,17 +11,24 @@ import { Info } from 'lucide-react';
 interface InvestmentsStepProps {
     onComplete: (investments: any[]) => void;
     onBack: () => void;
+    initialData?: any[];
 }
 
-export function InvestmentsStep({ onComplete, onBack }: InvestmentsStepProps) {
-    const [hasInvestments, setHasInvestments] = useState<boolean | null>(null);
-    const [investmentCount, setInvestmentCount] = useState(1);
-    const [investments, setInvestments] = useState([{
-        nome: '',
-        instituicao: '',
-        tipo: 'investimento' as const,
-        saldoInicial: 0
-    }]);
+export function InvestmentsStep({ onComplete, onBack, initialData }: InvestmentsStepProps) {
+    const [hasInvestments, setHasInvestments] = useState<boolean | null>(
+        initialData && initialData.length > 0 ? true : null
+    );
+    const [investmentCount, setInvestmentCount] = useState(initialData?.length || 1);
+    const [investments, setInvestments] = useState(
+        initialData && initialData.length > 0
+            ? initialData
+            : [{
+                nome: '',
+                instituicao: '',
+                tipo: 'investimento' as const,
+                saldoInicial: 0
+            }]
+    );
 
     const handleSubmit = () => {
         if (hasInvestments) {
@@ -64,7 +71,10 @@ export function InvestmentsStep({ onComplete, onBack }: InvestmentsStepProps) {
                     <Button
                         size="lg"
                         variant="outline"
-                        onClick={() => setHasInvestments(false)}
+                        onClick={() => {
+                            setHasInvestments(false);
+                            onComplete([]); // Skip direto
+                        }}
                         className="h-24"
                     >
                         Não tenho investimentos

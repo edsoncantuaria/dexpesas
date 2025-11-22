@@ -286,7 +286,7 @@ model User {
   firstOpen                          Boolean          @default(true)
   futureProjectionCount              Int              @default(3)
   hasCompletedTutorial               Boolean          @default(false)
-  hasCompletedMigration              Int              @default(0) // 0 = não completou, 1 = completou, 2 = pulou (temporário)
+  hasCompletedMigration              Int              @default(0) // 0 = não iniciado, 1 = concluído, 2 = pulado
   daysUntilDueReminder               Int              @default(3)
   enableAchievementNotifications     Boolean          @default(true)
   enableBudgetNotifications          Boolean          @default(true)
@@ -348,6 +348,7 @@ model User {
   auditLogs                     AuditLog[]
   aiAnalyses                    AiAnalysis[]
   tags                          Tag[]
+  migrationDraft                MigrationDraft?
   categories                    Category[]
   userMissions                  UserMission[]
   inventoryItems                UserItem[]
@@ -767,6 +768,7 @@ model Card {
   limite                Decimal       @db.Decimal(18, 4)
   diaFechamento         Int
   diaVencimento         Int
+  closingDayGap         Int              @default(7) // Dias entre fechamento e vencimento
   bandeira              CardBrand
   status                CardStatus    @default(ACTIVE)
   rewardsType           String?
@@ -1238,6 +1240,23 @@ model AuditLog {
 
   // --- Relações ---
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Modelo para armazenar progresso da migração inicial
+model MigrationDraft {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  currentStep   String?  // 'choice' | 'accounts' | 'investments' | 'cards' | 'card-history' | 'preview'
+  accounts      Json?    @default("[]") // Array de contas
+  cards         Json?    @default("[]") // Array de cartões
+  cardHistory   Json?    @default("{}") // Objeto com histórico por índice de cartão
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([userId])
 }
 
 model AiAnalysis {

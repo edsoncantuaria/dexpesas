@@ -74,29 +74,14 @@ export function MonthlySummary({ transactionsForMonth, selectedDate, onDateChang
   useEffect(() => {
     const fetchMonths = async () => {
       try {
-        const response = await api.get('/transactions?month=all');
-        const transactions: Transaction[] = response.data;
-        const summaryMap = new Map<string, MonthlySummaryEntry>();
+        const response = await api.get('/transactions/summary');
+        const summaries: MonthlySummaryEntry[] = response.data.map((s: any) => ({
+          ...s,
+          date: new Date(s.date),
+        }));
 
-        transactions.forEach((t) => {
-          const transactionDate = new Date(t.data);
-          const key = format(transactionDate, 'yyyy-MM');
-          const existing = summaryMap.get(key) ?? buildEmptySummary(transactionDate);
-          const updated = { ...existing };
-          const amount = Number(t.valor);
-          if (t.tipo === 'receita') {
-            updated.incomeForecast += amount;
-            if (t.pago) {
-              updated.income += amount;
-            }
-          } else {
-            updated.expenseForecast += amount;
-            if (t.pago) {
-              updated.expense += amount;
-            }
-          }
-          summaryMap.set(key, updated);
-        });
+        const summaryMap = new Map<string, MonthlySummaryEntry>();
+        summaries.forEach(s => summaryMap.set(s.key, s));
 
         const ensureMonth = (date: Date) => {
           const key = format(date, 'yyyy-MM');
@@ -105,14 +90,21 @@ export function MonthlySummary({ transactionsForMonth, selectedDate, onDateChang
           }
         };
 
-        let lastDate = transactions.length
-          ? new Date(Math.max(...transactions.map((t) => new Date(t.data).getTime())))
+        // Ensure we have at least the range from the earliest transaction to +2 months from now
+        let lastDate = summaries.length
+          ? new Date(Math.max(...summaries.map((s) => s.date.getTime())))
           : new Date();
+
+        const today = new Date();
+        if (lastDate < addMonths(today, 2)) {
+          lastDate = addMonths(today, 2);
+        }
 
         ensureMonth(lastDate);
         ensureMonth(addMonths(lastDate, 1));
         ensureMonth(addMonths(lastDate, 2));
         ensureMonth(selectedDate);
+        ensureMonth(today);
 
         const sortedSummaries = Array.from(summaryMap.values()).sort((a, b) => a.date.getTime() - b.date.getTime());
         setMonthlySummaries(sortedSummaries);

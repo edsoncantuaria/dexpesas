@@ -13,7 +13,7 @@ async function recalculateCardSummary(cardId, prismaClient = prisma) {
   if (!card) return;
   const period = getInvoicePeriod(card, new Date());
 
-  const [despesas, receitas] = await Promise.all([
+  const [despesas, receitas, futureExpenses] = await Promise.all([
     client.transaction.aggregate({
       _sum: { valor: true },
       where: {
@@ -32,12 +32,27 @@ async function recalculateCardSummary(cardId, prismaClient = prisma) {
         data: { gte: period.start, lte: period.end },
       },
     }),
+    // Calculate future unpaid expenses (installments)
+    client.transaction.aggregate({
+      _sum: { valor: true },
+      where: {
+        cardId,
+        tipo: 'despesa',
+        metodoPagamento: 'credito',
+        data: { gt: period.end }, // Everything after current invoice
+        pago: false,
+      },
+    }),
   ]);
 
   const totalDespesas = Number(despesas._sum.valor || 0);
   const totalReceitas = Number(receitas._sum.valor || 0);
+  const futureUsedLimit = Number(futureExpenses._sum.valor || 0);
+
   const currentInvoiceAmount = totalDespesas - totalReceitas;
-  const availableLimit = Number(card.limite) - currentInvoiceAmount;
+
+  // Available limit = Total Limit - (Current Invoice Balance + Future Unpaid Installments)
+  const availableLimit = Number(card.limite) - (currentInvoiceAmount + futureUsedLimit);
 
   await client.card.update({
     where: { id: cardId },

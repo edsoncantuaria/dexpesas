@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { AnimatePresence } from 'framer-motion';
 import { MigrationChoiceStep } from './migration-choice-step';
 import { AccountsStep } from './accounts-step';
@@ -60,19 +60,23 @@ export function MigrationWizard({ isOpen, onComplete }: MigrationWizardProps) {
 
     // Load saved data on mount
     useEffect(() => {
-        if (isLoaded && isOpen) {
-            const saved = loadData();
-            if (saved) {
-                setMigrationData({
-                    accounts: saved.accounts || [],
-                    cards: saved.cards || [],
-                    cardHistory: saved.cardHistory || {},
-                });
-                if (saved.currentStep && saved.currentStep !== 'choice') {
-                    setCurrentStep(saved.currentStep as MigrationStep);
+        const loadSavedData = async () => {
+            if (isLoaded && isOpen) {
+                const saved = await loadData();
+                if (saved) {
+                    setMigrationData({
+                        accounts: saved.accounts || [],
+                        cards: saved.cards || [],
+                        cardHistory: saved.cardHistory || {},
+                    });
+                    if (saved.currentStep && saved.currentStep !== 'choice') {
+                        setCurrentStep(saved.currentStep as MigrationStep);
+                    }
                 }
             }
-        }
+        };
+
+        loadSavedData();
     }, [isLoaded, isOpen]);
 
     // Save data whenever it changes
@@ -154,11 +158,14 @@ export function MigrationWizard({ isOpen, onComplete }: MigrationWizardProps) {
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={() => { }}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
-                <VisuallyHidden>
-                    <DialogTitle>Assistente de Migração de Dados</DialogTitle>
-                </VisuallyHidden>
+        <Dialog open={isOpen} onOpenChange={() => { }} modal>
+            <DialogContent
+                className="max-w-4xl max-h-[90vh] overflow-y-auto p-0"
+                hideClose
+                onEscapeKeyDown={(e) => e.preventDefault()}
+                onPointerDownOutside={(e) => e.preventDefault()}
+            >
+                <DialogTitle className="sr-only">Migração Inicial de Dados Financeiros</DialogTitle>
                 <div className="p-6">
                     {currentStep !== 'choice' && currentStep !== 'completion' && currentStep !== 'preview' && (
                         <MigrationProgress
@@ -177,7 +184,11 @@ export function MigrationWizard({ isOpen, onComplete }: MigrationWizardProps) {
                                 key="accounts"
                                 onComplete={handleAccountsComplete}
                                 onBack={handleBack}
-                                initialData={migrationData.accounts.length > 0 ? migrationData.accounts : undefined}
+                                initialData={
+                                    migrationData.accounts.length > 0
+                                        ? migrationData.accounts.filter(acc => acc.tipo !== 'investimento')
+                                        : undefined
+                                }
                             />
                         )}
 
@@ -186,6 +197,11 @@ export function MigrationWizard({ isOpen, onComplete }: MigrationWizardProps) {
                                 key="investments"
                                 onComplete={handleInvestmentsComplete}
                                 onBack={handleBack}
+                                initialData={
+                                    migrationData.accounts.length > 0
+                                        ? migrationData.accounts.filter(acc => acc.tipo === 'investimento')
+                                        : undefined
+                                }
                             />
                         )}
 
@@ -205,6 +221,7 @@ export function MigrationWizard({ isOpen, onComplete }: MigrationWizardProps) {
                                 cards={migrationData.cards}
                                 onComplete={handleCardHistoryComplete}
                                 onBack={handleBack}
+                                initialData={migrationData.cardHistory}
                             />
                         )}
 

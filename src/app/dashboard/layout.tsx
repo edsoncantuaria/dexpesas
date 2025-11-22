@@ -18,10 +18,10 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
     if (user) {
       // Mostra wizard se:
       // 1. Completou o tutorial OU não é primeiro acesso
-      // 2. Ainda não completou a migração
+      // 2. Status de migração é 0 (não iniciado)
       const shouldShowMigration =
         (user.hasCompletedTutorial === true || user.firstOpen === false) &&
-        user.hasCompletedMigration === false;
+        user.hasCompletedMigration === 0;
 
       setShowMigrationWizard(shouldShowMigration);
     }

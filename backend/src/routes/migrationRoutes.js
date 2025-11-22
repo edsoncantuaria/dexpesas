@@ -1,8 +1,6 @@
-
-// backend/src/routes/migrationRoutes.js
 import express from 'express';
 import migrationController from '../controllers/migrationController.js';
-import { completeMigrationSchema } from '../validators/migrationSchema.js';
+import migrationDraftController from '../controllers/migrationDraftController.js';
 import authMiddleware from '../middlewares/authMiddleware.js';
 import validate from '../middlewares/validate.js';
 import {
@@ -15,6 +13,11 @@ const router = express.Router();
 
 // Todas as rotas requerem autenticação
 router.use(authMiddleware);
+
+// Draft management
+router.get('/draft', migrationDraftController.getDraft);
+router.post('/draft', migrationDraftController.saveDraft);
+router.delete('/draft', migrationDraftController.deleteDraft);
 
 // Iniciar processo de migração
 router.post('/start', migrationController.startMigration);
@@ -32,7 +35,9 @@ router.post('/card-history', validate(cardHistorySchema), migrationController.cr
 router.post('/complete', migrationController.completeMigration);
 
 // Pular migração (usuário escolhe fazer manualmente)
-router.post('/skip', authMiddleware, validate(completeMigrationSchema), migrationController.skipMigration);
-router.post('/postpone', authMiddleware, validate(completeMigrationSchema), migrationController.postponeMigration);
+router.post('/skip', migrationController.skipMigration);
+
+// Retomar migração
+router.post('/resume', migrationController.resumeMigration);
 
 export default router;
