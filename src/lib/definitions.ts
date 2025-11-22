@@ -21,6 +21,7 @@ export type User = {
     avatarUrl?: string | null;
     firstOpen: boolean;
     hasCompletedTutorial: boolean;
+    hasCompletedMigration: number; // 0 = não completou, 1 = completou, 2 = pulou temporário
     futureProjectionCount: number; // Renomeado de recorrenciaPadrao
     daysUntilDueReminder: number;
     enableAchievementNotifications: boolean;

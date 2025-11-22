@@ -286,6 +286,7 @@ model User {
   firstOpen                          Boolean          @default(true)
   futureProjectionCount              Int              @default(3)
   hasCompletedTutorial               Boolean          @default(false)
+  hasCompletedMigration              Int              @default(0) // 0 = não completou, 1 = completou, 2 = pulou (temporário)
   daysUntilDueReminder               Int              @default(3)
   enableAchievementNotifications     Boolean          @default(true)
   enableBudgetNotifications          Boolean          @default(true)

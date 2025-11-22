@@ -26,6 +26,8 @@ export const updatePreferencesSchema = z.object({
   enableReconciliationAi: z.boolean().optional(),
   enableGoalProjection: z.boolean().optional(),
   habilitarDescricaoInteligente: z.boolean().optional(),
+  hasCompletedMigration: z.number().int().min(0).max(2).optional(), // 0, 1 ou 2
+  gamificationMode: z.enum(['FULL', 'LITE', 'OFF']).optional(),
   dashboardLayout: z.any().optional(),
   favoriteCategoryIds: z.array(z.string()).optional(),
   dashboardPreferences: z.record(z.any()).optional(),

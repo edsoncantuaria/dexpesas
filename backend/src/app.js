@@ -21,7 +21,7 @@ import itemRoutes from './routes/itemRoutes.js';
 import bossRoutes from './routes/bossRoutes.js';
 import rankingRoutes from './routes/rankingRoutes.js';
 import gameEventRoutes from './routes/gameEventRoutes.js';
-import auditRoutes from './routes/auditRoutes.js'; 
+import auditRoutes from './routes/auditRoutes.js';
 import tagRoutes from './routes/tagRoutes.js';
 import sugestoesRoutes from './routes/sugestoesRoutes.js';
 import errorHandler from './middlewares/errorHandler.js';
@@ -30,6 +30,7 @@ import healthRoutes from './routes/healthRoutes.js';
 import requestMetrics from './middlewares/requestMetrics.js';
 import categoryAdminRoutes from './routes/categoryAdminRoutes.js';
 import investmentRoutes from './routes/investmentRoutes.js';
+import migrationRoutes from './routes/migrationRoutes.js';
 
 const app = express();
 
@@ -103,11 +104,12 @@ app.use('/api/bosses', bossRoutes);
 app.use('/api/rankings', rankingRoutes);
 app.use('/api/events', gameEventRoutes);
 app.use('/api/achievements', achievementRoutes);
-app.use('/api/audit', auditRoutes); 
+app.use('/api/audit', auditRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/sugestoes', sugestoesRoutes);
 app.use('/api/admin/categories', categoryAdminRoutes);
 app.use('/api/investments', investmentRoutes);
+app.use('/api/migration', migrationRoutes);
 app.use('/api', dataRoutes);
 app.use('/api/health', healthRoutes);
 

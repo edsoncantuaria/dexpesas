@@ -56,6 +56,7 @@ class UserController {
                     dashboardPreferences: true,
                     hideFamilyMode: true,
                     hasCompletedTutorial: true,
+                    hasCompletedMigration: true,
                     phoneNumber: true,
                     phoneVerified: true,
                     twoFactorEnabled: true,
@@ -141,6 +142,7 @@ class UserController {
             hideFamilyMode,
             gamificationMode,
             hasCompletedTutorial,
+            hasCompletedMigration,
         } = req.body;
         const userId = req.user.id;
 
@@ -163,6 +165,9 @@ class UserController {
 
             if (typeof hasCompletedTutorial === 'boolean') {
                 dataToUpdate.hasCompletedTutorial = hasCompletedTutorial;
+            }
+            if (typeof hasCompletedMigration === 'boolean') {
+                dataToUpdate.hasCompletedMigration = hasCompletedMigration;
             }
             if (typeof hideFamilyMode === 'boolean') {
                 dataToUpdate.hideFamilyMode = hideFamilyMode;
@@ -230,6 +235,7 @@ class UserController {
                         gamificationMode: true,
                         hideFamilyMode: true,
                         hasCompletedTutorial: true,
+                        hasCompletedMigration: true,
                     },
                 });
             });
