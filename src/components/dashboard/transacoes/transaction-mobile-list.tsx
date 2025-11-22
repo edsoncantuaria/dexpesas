@@ -17,8 +17,10 @@ import {
   CreditCard,
   Banknote,
   Check,
-  X
+  X,
+  Link as LinkIcon
 } from 'lucide-react';
+import { LinkInstallmentsDialog } from './link-installments-dialog';
 import type { MouseEvent } from 'react';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Separator } from '@/components/ui/separator';
@@ -102,7 +104,8 @@ const SwipeableTransactionCard = ({
   onTogglePaidStatus,
   accountsAndCardsMap,
   isEven,
-  handlePreviewClick
+  handlePreviewClick,
+  onLinkInstallments
 }: {
   transaction: Transaction,
   onEdit: (t: Transaction) => void,
@@ -110,7 +113,8 @@ const SwipeableTransactionCard = ({
   onTogglePaidStatus: (id: string) => void,
   accountsAndCardsMap: Map<string, string>,
   isEven: boolean,
-  handlePreviewClick: (e: MouseEvent, url: string) => void
+  handlePreviewClick: (e: MouseEvent, url: string) => void,
+  onLinkInstallments: (t: Transaction) => void
 }) => {
   const x = useMotionValue(0);
   const controls = useMotionValue(0);
@@ -174,21 +178,29 @@ const SwipeableTransactionCard = ({
         whileTap={{ cursor: "grabbing" }}
       >
         <div className="flex items-center p-4 gap-3" onClick={() => onEdit(transaction)}>
-          <button
-            onClick={(e) => { e.stopPropagation(); onTogglePaidStatus(transaction.id); }}
-            className={cn(
-              "flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center transition-all duration-300 z-10",
-              isPaid
-                ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            )}
-          >
-            {isPaid ? (
-              <CheckCircle2 className="h-5 w-5" />
-            ) : (
-              <Circle className="h-5 w-5" />
-            )}
-          </button>
+          {transaction.tipo === 'despesa' && transaction.metodoPagamento === 'credito' ? (
+            <div
+              className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center bg-primary/10 text-primary"
+            >
+              <CreditCard className="h-5 w-5" />
+            </div>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); onTogglePaidStatus(transaction.id); }}
+              className={cn(
+                "flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center transition-all duration-300 z-10",
+                isPaid
+                  ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              )}
+            >
+              {isPaid ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <Circle className="h-5 w-5" />
+              )}
+            </button>
+          )}
 
           <div className="flex-1 min-w-0 space-y-1 pointer-events-none">
             <div className="flex justify-between items-start gap-2">
@@ -259,7 +271,36 @@ const SwipeableTransactionCard = ({
                   </PopoverContent>
                 </Popover>
               )}
-              {interestPerInstallment > 0 && <Info className="h-3 w-3 text-muted-foreground/50 mt-2" />}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground/50">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(transaction); }}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Editar
+                  </DropdownMenuItem>
+
+                  {transaction.tipo === 'despesa' && transaction.metodoPagamento === 'credito' && !transaction.installment && (
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onLinkInstallments(transaction); }}>
+                      <LinkIcon className="mr-2 h-4 w-4" />
+                      Vincular Parcelas
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                    onClick={(e) => { e.stopPropagation(); onDelete(transaction.id); }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
@@ -372,6 +413,7 @@ export function TransactionMobileList({
 }: TransactionMobileListProps) {
   const [viewingAttachment, setViewingAttachment] = useState<string | null>(null);
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [linkingTransaction, setLinkingTransaction] = useState<Transaction | null>(null);
   const [visibleCount, setVisibleCount] = useState(MOBILE_PAGE_SIZE);
   const accountsAndCardsMap = new Map([...accounts, ...cards].map(item => [item.id, item.nome]));
 
@@ -429,6 +471,7 @@ export function TransactionMobileList({
                     accountsAndCardsMap={accountsAndCardsMap}
                     isEven={itemIndex % 2 === 0}
                     handlePreviewClick={handlePreviewClick}
+                    onLinkInstallments={setLinkingTransaction}
                   />
                 ))}
               </div>
@@ -454,6 +497,15 @@ export function TransactionMobileList({
           }
         }}
         transactionDescription={deletingTransaction?.descricao || ''}
+      />
+
+      <LinkInstallmentsDialog
+        transaction={linkingTransaction}
+        open={!!linkingTransaction}
+        onOpenChange={(open) => !open && setLinkingTransaction(null)}
+        onSuccess={() => {
+          window.location.reload();
+        }}
       />
 
       {/* Dialog para visualização de anexo */}

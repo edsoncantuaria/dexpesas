@@ -15,11 +15,12 @@ import { Loader2 } from 'lucide-react';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Separator } from '@/components/ui/separator';
 import api from '@/lib/api';
+import { CardClosingInfoDialog } from './card-closing-info-dialog';
 
 const formSchema = z.object({
     nome: z.string().min(3, { message: 'O nome do cartão deve ter pelo menos 3 caracteres.' }),
     limite: z.coerce.number().positive({ message: 'O limite deve ser um número positivo.' }),
-    closingDayGap: z.coerce.number().min(1).max(20, { message: 'O intervalo deve ser entre 1 e 20 dias.' }),
+    closingDayGap: z.coerce.number().min(7, { message: 'Mínimo de 7 dias.' }).max(14, { message: 'Máximo de 14 dias.' }),
     diaFechamento: z.coerce.number().optional(), // Mantido para compatibilidade, calculado no submit
     diaVencimento: z.coerce.number().min(1).max(31, { message: 'Dia inválido.' }),
     bandeira: z.enum(['visa', 'mastercard', 'elo', 'amex'], { required_error: 'Selecione a bandeira.' }),
@@ -132,8 +133,33 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting, cancelLabe
                     <FormField control={form.control} name="jurosRotativo" render={({ field }) => (<FormItem><FormLabel>Juros do Rotativo (%)</FormLabel><FormControl><Input type="number" step="0.1" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>)} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="diaVencimento" render={({ field }) => (<FormItem><FormLabel>Dia do Vencimento</FormLabel><FormControl><Input type="number" min={1} max={31} {...field} /></FormControl><FormMessage /></FormItem>)} />
-                    <FormField control={form.control} name="closingDayGap" render={({ field }) => (<FormItem><FormLabel>Dias antes do vencimento (Fechamento)</FormLabel><FormControl><Input type="number" min={1} max={20} {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name="diaVencimento" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Dia do Vencimento da Fatura</FormLabel>
+                            <FormControl>
+                                <Input type="number" min={1} max={31} {...field} />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Dia em que a fatura vence (1 a 31)
+                            </p>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                    <FormField control={form.control} name="closingDayGap" render={({ field }) => (
+                        <FormItem>
+                            <div className="flex items-center gap-2">
+                                <FormLabel>Quantos dias antes fecha?</FormLabel>
+                                <CardClosingInfoDialog />
+                            </div>
+                            <FormControl>
+                                <Input type="number" min={7} max={14} {...field} />
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Dias antes do vencimento que a fatura fecha (7 a 14)
+                            </p>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="status" render={({ field }) => (

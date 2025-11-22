@@ -272,6 +272,20 @@ enum InvestmentContributionSource {
   AI_SUGGESTION
 }
 
+enum AlertType {
+  DUE_DATE
+  LIMIT_WARNING
+  UNUSUAL_SPENDING
+  OVERDUE
+  PAYMENT_SUCCESS
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
 model User {
   id                                 String           @id @default(cuid())
   name                               String
@@ -1200,6 +1214,8 @@ model Reconciliation {
   accountId               String?
   cardId                  String?
   importTemplateId        String?
+  invoiceMonth            String?              // Formato: YYYY-MM, usado para reconciliação de faturas
+  replaceMode             Boolean              @default(false) // Se true, delete & replace; se false, match individual
 
   // --- Relações ---
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1220,6 +1236,7 @@ model ImportedTransaction {
   reconciliationId    String
   manualTransactionId String?                   @unique
   similarityScore     Int?
+  metadata            Json?
 
   // --- Relações ---
   reconciliation    Reconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)

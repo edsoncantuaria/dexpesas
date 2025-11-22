@@ -2,6 +2,7 @@
 import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
 import { addMonths, format, startOfMonth, endOfMonth, parseISO, addWeeks, addDays, isBefore } from 'date-fns';
+import crypto from 'crypto';
 import NotificationService from '../services/notificationService.js';
 import AutomationService from '../services/automationService.js';
 import CategorizationService from '../services/categorizationService.js';
@@ -507,6 +508,13 @@ class TransactionController {
             const transaction = await prisma.transaction.findUnique({ where: { id, userId } });
             if (!transaction) { return res.status(404).json({ message: 'Transação não encontrada.' }); }
 
+            // Bloquear alteração de status para despesas de cartão de crédito
+            if (transaction.tipo === 'despesa' && transaction.metodoPagamento === 'credito') {
+                return res.status(400).json({
+                    message: 'Despesas de cartão de crédito não podem ter o status de pagamento alterado individualmente. Elas são pagas ao quitar a fatura do cartão.'
+                });
+            }
+
             const wasPaid = transaction.pago;
 
             const updatedTransaction = await prisma.$transaction(async (tx) => {
@@ -695,7 +703,7 @@ class TransactionController {
                     categoryId: true,
                     installmentNumber: true,
                     totalInstallments: true,
-                    seriesId: true,
+
                     card: {
                         select: {
                             id: true,
@@ -703,12 +711,12 @@ class TransactionController {
                             bandeira: true
                         }
                     },
-                    categoria: {
+                    category: {
                         select: {
                             id: true,
                             nome: true,
-                            icone: true,
-                            cor: true
+                            icon: true,
+                            label: true
                         }
                     }
                 },
@@ -720,10 +728,6 @@ class TransactionController {
                 where: {
                     userId,
                     recurrenceType: { not: null },
-                    OR: [
-                        { recurrenceEndDate: null }, // Sem fim
-                        { recurrenceEndDate: { gte: today } } // Ainda ativas
-                    ],
                     data: { lte: today } // Primeira ocorrência já passou
                 },
                 select: {
@@ -734,7 +738,6 @@ class TransactionController {
                     cardId: true,
                     categoryId: true,
                     recurrenceType: true,
-                    recurrenceEndDate: true,
                     card: {
                         select: {
                             id: true,
@@ -742,12 +745,12 @@ class TransactionController {
                             bandeira: true
                         }
                     },
-                    categoria: {
+                    category: {
                         select: {
                             id: true,
                             nome: true,
-                            icone: true,
-                            cor: true
+                            icon: true,
+                            label: true
                         }
                     }
                 }
@@ -758,41 +761,46 @@ class TransactionController {
             for (const rec of recurringTransactions) {
                 let nextDate = new Date(rec.data);
 
-                // Avançar até a próxima ocorrência futura
-                while (nextDate <= today) {
-                    if (rec.recurrenceType === 'MONTHLY') {
-                        nextDate = addMonths(nextDate, 1);
-                    } else if (rec.recurrenceType === 'WEEKLY') {
-                        nextDate = addWeeks(nextDate, 1);
+                // Helper para avançar data baseado no tipo
+                const advanceDate = (date, type) => {
+                    switch (type) {
+                        case 'WEEKLY': return addWeeks(date, 1);
+                        case 'BIWEEKLY': return addWeeks(date, 2);
+                        case 'MONTHLY': return addMonths(date, 1);
+                        case 'BIMONTHLY': return addMonths(date, 2);
+                        case 'TRIMONTHLY': return addMonths(date, 3);
+                        case 'SEMIANNUALLY': return addMonths(date, 6);
+                        case 'ANNUALLY': return addMonths(date, 12);
+                        default: return addMonths(date, 1);
                     }
+                };
+
+                // Avançar até a próxima ocorrência futura
+                let safetyCounter = 0;
+                while (nextDate <= today && safetyCounter < 1000) {
+                    nextDate = advanceDate(nextDate, rec.recurrenceType);
+                    safetyCounter++;
                 }
 
                 // Gerar ocorrências futuras até o limite
-                while (nextDate <= futureLimit) {
-                    // Verificar se não ultrapassa data de fim
-                    if (rec.recurrenceEndDate && nextDate > new Date(rec.recurrenceEndDate)) {
-                        break;
-                    }
-
+                safetyCounter = 0;
+                while (nextDate <= futureLimit && safetyCounter < 100) {
                     projectedRecurrents.push({
                         id: `recurring-${rec.id}-${format(nextDate, 'yyyy-MM-dd')}`,
                         descricao: rec.descricao,
                         valor: rec.valor,
-                        data: nextDate,
+                        data: new Date(nextDate), // Ensure it's a new Date object
                         cardId: rec.cardId,
                         categoryId: rec.categoryId,
                         card: rec.card,
-                        categoria: rec.categoria,
+                        categoria: rec.category,
                         isRecurring: true,
                         originalTransactionId: rec.id
                     });
 
                     // Avançar para próxima
-                    if (rec.recurrenceType === 'MONTHLY') {
-                        nextDate = addMonths(nextDate, 1);
-                    } else if (rec.recurrenceType === 'WEEKLY') {
-                        nextDate = addWeeks(nextDate, 1);
-                    }
+                    nextDate = advanceDate(nextDate, rec.recurrenceType);
+                    safetyCounter++;
                 }
             }
 
@@ -850,6 +858,242 @@ class TransactionController {
 
         } catch (error) {
             next(error);
+        }
+    }
+
+    /**
+     * Cancela uma série de recorrência (apaga todas as futuras)
+     * POST /transactions/installments/:id/cancel-series
+     */
+    async cancelRecurringSeries(req, res, next) {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        try {
+            const transaction = await prisma.transaction.findUnique({
+                where: { id, userId }
+            });
+
+            if (!transaction) {
+                return res.status(404).json({ message: 'Transação não encontrada' });
+            }
+
+            if (!transaction.recorrenciaId) {
+                return res.status(400).json({ message: 'Esta transação não faz parte de uma série recorrente' });
+            }
+
+            // Apagar todas as transações futuras com o mesmo recorrenciaId
+            // Incluindo a própria se ela for futura, ou mantendo se for passada?
+            // Geralmente "cancelar recorrência" significa parar as próximas.
+            // Vamos apagar as que têm data >= hoje OU data > data da transação selecionada?
+            // Assumindo que o usuário clicou em uma transação futura para cancelar a série a partir dali.
+
+            const result = await prisma.transaction.deleteMany({
+                where: {
+                    userId,
+                    recorrenciaId: transaction.recorrenciaId,
+                    data: {
+                        gte: transaction.data // Apaga desta em diante
+                    }
+                }
+            });
+
+            await AuditService.log({
+                userId,
+                action: 'CANCEL_RECURRENCE',
+                entity: 'TRANSACTION',
+                entityId: id,
+                details: {
+                    recorrenciaId: transaction.recorrenciaId,
+                    deletedCount: result.count
+                },
+                ipAddress: req.ip
+            });
+
+            res.json({ message: 'Série recorrente cancelada com sucesso', count: result.count });
+
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * Antecipa uma parcela futura para a data atual
+     * POST /transactions/installments/:id/pay-early
+     */
+    async anticipateInstallment(req, res, next) {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        try {
+            const transaction = await prisma.transaction.findUnique({
+                where: { id, userId }
+            });
+
+            if (!transaction) {
+                return res.status(404).json({ message: 'Transação não encontrada' });
+            }
+
+            if (!transaction.installmentId) {
+                return res.status(400).json({ message: 'Esta transação não é uma parcela' });
+            }
+
+            // Atualizar data para hoje
+            const today = new Date();
+            const updatedTransaction = await prisma.transaction.update({
+                where: { id },
+                data: {
+                    data: today,
+                    descricao: `${transaction.descricao} (Antecipada)`
+                }
+            });
+
+            // Se for cartão de crédito, isso fará ela cair na fatura atual automaticamente
+            // pois a fatura é calculada baseada na data da transação.
+
+            await AuditService.log({
+                userId,
+                action: 'ANTICIPATE_INSTALLMENT',
+                entity: 'TRANSACTION',
+                entityId: id,
+                details: {
+                    originalDate: transaction.data,
+                    newDate: today
+                },
+                ipAddress: req.ip
+            });
+
+            // Recalcular saldo do cartão se necessário (embora seja calculado on-the-fly)
+            if (transaction.cardId) {
+                await CardBalanceService.recalculateCardSummary(transaction.cardId);
+            }
+
+            res.json({ message: 'Parcela antecipada com sucesso', transaction: updatedTransaction });
+
+        } catch (error) {
+            next(error);
+        }
+    }
+    async getInstallmentCandidates(req, res) {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        try {
+            const pivot = await prisma.transaction.findUnique({ where: { id, userId } });
+            if (!pivot) return res.status(404).json({ message: 'Transação não encontrada.' });
+
+            if (!pivot.cardId) {
+                return res.status(400).json({ message: 'Apenas transações de cartão de crédito podem ser vinculadas.' });
+            }
+
+            // Define range de busca (12 meses antes e depois)
+            const startDate = new Date(pivot.data);
+            startDate.setMonth(startDate.getMonth() - 12);
+            const endDate = new Date(pivot.data);
+            endDate.setMonth(endDate.getMonth() + 12);
+
+            // Define range de valor (tolerância de 0.05)
+            const pivotValue = Number(pivot.valor);
+            const minValue = pivotValue - 0.05;
+            const maxValue = pivotValue + 0.05;
+
+            // Normaliza descrição para busca (remove números de parcela ex: 01/10)
+            // Ex: "Compra Loja 01/10" -> "Compra Loja"
+            const cleanDescription = pivot.descricao.replace(/\s+\d{1,2}\/\d{1,2}$/, '').trim();
+
+            const candidates = await prisma.transaction.findMany({
+                where: {
+                    userId,
+                    cardId: pivot.cardId,
+                    tipo: 'despesa',
+                    id: { not: id }, // Exclui a própria transação
+                    data: {
+                        gte: startDate,
+                        lte: endDate
+                    },
+                    valor: {
+                        gte: minValue,
+                        lte: maxValue
+                    },
+                    // Busca por descrição similar (contém a parte limpa)
+                    descricao: {
+                        contains: cleanDescription
+                    }
+                },
+                orderBy: {
+                    data: 'asc'
+                }
+            });
+
+            res.json(candidates);
+        } catch (error) {
+            console.error('Erro ao buscar candidatos:', error);
+            res.status(500).json({ message: 'Erro ao buscar candidatos a parcelamento.' });
+        }
+    }
+
+    async linkInstallments(req, res) {
+        const { id } = req.params;
+        const { linkedTransactions, totalInstallments } = req.body;
+        const userId = req.user.id;
+
+        if (!linkedTransactions || !Array.isArray(linkedTransactions) || !totalInstallments) {
+            return res.status(400).json({ message: 'Dados inválidos.' });
+        }
+
+        try {
+            const pivot = await prisma.transaction.findUnique({ where: { id, userId } });
+            if (!pivot) return res.status(404).json({ message: 'Transação não encontrada.' });
+
+            // Gera um novo ID de grupo de parcelas
+            const installmentId = crypto.randomUUID();
+
+            // Prepara lista de atualizações (incluindo o pivô)
+            // O frontend deve enviar o pivô dentro de linkedTransactions também, ou tratamos aqui?
+            // Vamos assumir que o frontend manda TUDO que deve ser vinculado, incluindo o pivô com seu número correto.
+
+            // Validação de segurança: garantir que todas as transações pertencem ao usuário
+            const transactionIds = linkedTransactions.map(t => t.id);
+            const count = await prisma.transaction.count({
+                where: {
+                    id: { in: transactionIds },
+                    userId
+                }
+            });
+
+            if (count !== transactionIds.length) {
+                return res.status(403).json({ message: 'Uma ou mais transações não pertencem ao usuário.' });
+            }
+
+            await prisma.$transaction(async (tx) => {
+                for (const item of linkedTransactions) {
+                    await tx.transaction.update({
+                        where: { id: item.id },
+                        data: {
+                            installment: true,
+                            installmentId: installmentId,
+                            totalInstallments: Number(totalInstallments),
+                            installmentNumber: Number(item.installmentNumber),
+                            // Opcional: Padronizar descrição? Por enquanto mantém a original.
+                        }
+                    });
+                }
+            });
+
+            await AuditService.log({
+                userId,
+                action: 'LINK_INSTALLMENTS',
+                entity: 'TRANSACTION',
+                entityId: installmentId,
+                details: { count: linkedTransactions.length, totalInstallments },
+                status: 'SUCCESS',
+                ipAddress: req.ip
+            });
+
+            res.json({ message: 'Parcelas vinculadas com sucesso.', installmentId });
+        } catch (error) {
+            console.error('Erro ao vincular parcelas:', error);
+            res.status(500).json({ message: 'Erro ao vincular parcelas.' });
         }
     }
 }

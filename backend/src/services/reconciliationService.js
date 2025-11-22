@@ -9,16 +9,16 @@ import minioClient from '../config/minioClient.js';
 import config from '../config/config.js';
 
 const findBestStringMatch =
-  similarityPkg?.findBestMatch ||
-  ((source, target) => {
-    const baseScore =
-      typeof similarityPkg?.getStringSimilarity === 'function'
-        ? similarityPkg.getStringSimilarity(source, target)
-        : source === target
-          ? 1
-          : 0;
-    return { bestMatch: { rating: baseScore } };
-  });
+    similarityPkg?.findBestMatch ||
+    ((source, target) => {
+        const baseScore =
+            typeof similarityPkg?.getStringSimilarity === 'function'
+                ? similarityPkg.getStringSimilarity(source, target)
+                : source === target
+                    ? 1
+                    : 0;
+        return { bestMatch: { rating: baseScore } };
+    });
 
 
 const prisma = new PrismaClient();
@@ -99,7 +99,7 @@ class ReconciliationService {
             throw error;
         }
     }
-    
+
     /**
      * Processa um arquivo CSV, mapeia as colunas e importa as transações.
      */
@@ -125,7 +125,7 @@ class ReconciliationService {
 
         const timezone = mapping.timezone || reconciliation.statementTimezone || DEFAULT_TIMEZONE;
 
-        const importedTransactionsToCreate = records.map((r, index) => 
+        const importedTransactionsToCreate = records.map((r, index) =>
             this.mapCsvTransaction(r, reconciliation.id, mapping, index, timezone)
         ).filter(Boolean);
 
@@ -144,10 +144,10 @@ class ReconciliationService {
      */
     static mapCsvTransaction(record, reconciliationId, mapping, index, timezone) {
         const { date, description, amount, date_format, type, credit_value, debit_value } = mapping;
-        
+
         const dateStr = record[date];
         const amountStrInput = record[amount] || '0';
-        
+
         // Lógica de parsing de valor mais robusta
         let amountStr = amountStrInput.replace(/[R$\s]/g, '');
         if (amountStr.includes(',') && amountStr.includes('.')) {
@@ -167,12 +167,12 @@ class ReconciliationService {
                 break;
             }
         }
-        
+
         if (!parsedDate || !isValid(parsedDate) || isNaN(parsedAmount)) {
             console.warn(`Linha ${index + 2} do CSV ignorada devido a formato inválido.`);
             return null;
         }
-        
+
         const normalizedDate = convertDateToUtc(parsedDate, timezone);
 
         let resolvedType = parsedAmount >= 0 ? 'CREDIT' : 'DEBIT';
@@ -196,7 +196,7 @@ class ReconciliationService {
             fitId: `csv-${reconciliationId}-${index}`,
         };
     }
-    
+
     /**
      * Processa um arquivo OFX, extrai os dados e importa as transações.
      */
@@ -206,18 +206,18 @@ class ReconciliationService {
             .replace(/&/g, '&amp;') // Escapa o ampersand
             .replace(/<[A-Z0-9_]*>./g, (match) => match.replace(/&/g, '')) // Remove '&' dentro de tags
             .split('<OFX>')[1]; // Remove o cabeçalho
-        
+
         if (!ofxContent) {
             console.warn(`Arquivo OFX vazio ou inválido para reconciliação ${reconciliation.id}.`);
             await prisma.reconciliation.update({ where: { id: reconciliation.id }, data: { status: 'FAILED' } });
             return { count: 0 };
         }
-        
+
         const ofxParsed = await parseOfx(`<OFX>${ofxContent}`);
 
         const bankStatement = ofxParsed?.OFX?.BANKMSGSRSV1?.STMTTRNRS?.STMTRS;
         const creditCardStatement = ofxParsed?.OFX?.CREDITCARDMSGSRSV1?.CCSTMTTRNRS?.CCSTMTRS;
-        
+
         const statement = bankStatement || creditCardStatement;
 
         if (!statement) {
@@ -225,7 +225,7 @@ class ReconciliationService {
             await prisma.reconciliation.update({ where: { id: reconciliation.id }, data: { status: 'FAILED' } });
             return { count: 0 };
         }
-        
+
         const transactionList = statement.BANKTRANLIST || statement;
         const transactions = Array.isArray(transactionList?.STMTTRN)
             ? transactionList.STMTTRN
@@ -257,10 +257,20 @@ class ReconciliationService {
                 statementCurrency: currency || reconciliation.statementCurrency,
             },
         });
-        
+
         await this.saveAndMatchTransactions(reconciliation.id, importedTransactionsToCreate, reconciliation);
 
         return { count: importedTransactionsToCreate.length };
+    }
+
+    static slugify(text) {
+        return text
+            .toString()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)+/g, '');
     }
 
     /**
@@ -274,6 +284,39 @@ class ReconciliationService {
         const day = parseInt(dateString.substring(6, 8), 10);
         const postDate = convertDateToUtc(new Date(year, month, day), timezone);
 
+        const description = t.MEMO;
+        let metadata = null;
+
+        // Regex para detectar "Parcela X/Y"
+        // Aceita "Parcela X/Y", "X/Y", "Parc X/Y"
+        const installmentMatch = description.match(/(?:Parcela|Parc\.?|)\s*(\d+)\s*\/\s*(\d+)/i);
+
+        if (installmentMatch) {
+            const currentInstallment = parseInt(installmentMatch[1], 10);
+            const totalInstallments = parseInt(installmentMatch[2], 10);
+
+            // Limpar nome da loja para gerar ID do grupo
+            // Remove "Parcela X/Y" e prefixos comuns
+            let cleanDesc = description
+                .replace(/(?:Parcela|Parc\.?|)\s*(\d+)\s*\/\s*(\d+)/i, '') // Remove a parte da parcela
+                .replace(/^(Zp|Mp|Cp|Ifd|Mercadopago|Mercadolivre)\s*\*?/i, '') // Remove prefixos
+                .trim();
+
+            // Se ficou vazio (ex: só tinha prefixo e parcela), usa a descrição original limpa
+            if (!cleanDesc) {
+                cleanDesc = description.replace(/(?:Parcela|Parc\.?|)\s*(\d+)\s*\/\s*(\d+)/i, '').trim();
+            }
+
+            const storeSlug = ReconciliationService.slugify(cleanDesc);
+            const installmentGroupId = `${storeSlug}-${totalInstallments}`;
+
+            metadata = {
+                installmentNumber: currentInstallment,
+                totalInstallments: totalInstallments,
+                installmentGroupId: installmentGroupId
+            };
+        }
+
         return {
             reconciliationId,
             date: postDate,
@@ -281,9 +324,10 @@ class ReconciliationService {
             type: amount >= 0 ? 'CREDIT' : 'DEBIT',
             description: t.MEMO,
             fitId: t.FITID,
+            metadata: metadata
         };
     }
-    
+
     /**
      * Salva as transações importadas no banco e executa o algoritmo de matching.
      */
@@ -337,7 +381,7 @@ class ReconciliationService {
         } else if (reconciliation.cardId) {
             whereClause.cardId = reconciliation.cardId;
         }
-        
+
         const manualTransactions = await prisma.transaction.findMany({ where: whereClause });
 
         await prisma.$transaction(async (tx) => {
@@ -368,7 +412,7 @@ class ReconciliationService {
 
             await tx.reconciliation.update({
                 where: { id: reconciliationId },
-                data: { 
+                data: {
                     status: 'PENDING_REVIEW',
                     startDate,
                     endDate,
@@ -393,7 +437,7 @@ class ReconciliationService {
             const importedIsCredit = importedTx.type === 'CREDIT';
             const manualIsCredit = manualTx.tipo === 'receita';
             if (importedIsCredit !== manualIsCredit) continue;
-            
+
             const manualValue = parseFloat(manualTx.valor);
             const valueDifference = Math.abs(Math.abs(importedTx.amount) - manualValue);
             const valueScore = valueDifference <= MATCH_VALUE_TOLERANCE
@@ -415,7 +459,7 @@ class ReconciliationService {
                 bestMatch = manualTx;
             }
         }
-        
+
         if (bestMatch) {
             return { match: bestMatch, score: Math.round(highestScore) };
         }

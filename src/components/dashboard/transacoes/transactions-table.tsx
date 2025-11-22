@@ -21,6 +21,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -59,17 +60,20 @@ type TransactionsTableProps = {
   cards: CardType[];
 };
 
-export function TransactionsTable({ 
-    data, 
-    onEdit, 
-    onDelete, 
-    onTogglePaidStatus,
-    accounts,
-    cards
+import { LinkInstallmentsDialog } from './link-installments-dialog';
+
+export function TransactionsTable({
+  data,
+  onEdit,
+  onDelete,
+  onTogglePaidStatus,
+  accounts,
+  cards
 }: TransactionsTableProps) {
   const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null);
+  const [linkingTransaction, setLinkingTransaction] = useState<Transaction | null>(null);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 25 });
-  
+
   useEffect(() => {
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   }, [data]);
@@ -81,7 +85,30 @@ export function TransactionsTable({
       id: 'status',
       header: '',
       cell: ({ row }) => {
-        const isPaid = row.original.pago;
+        const transaction = row.original;
+        const isPaid = transaction.pago;
+        const isCreditCard = transaction.tipo === 'despesa' && transaction.metodoPagamento === 'credito';
+
+        // Se for cartão de crédito, mostra ícone de cartão ao invés da bolinha
+        if (isCreditCard) {
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center justify-center h-8 w-8">
+                    <CreditCard className="h-4 w-4 text-primary" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Despesa de Cartão de Crédito</p>
+                  <p className="text-xs text-muted-foreground">Paga ao quitar a fatura</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          );
+        }
+
+        // Para outras transações, mostra o toggle normal
         return (
           <TooltipProvider>
             <Tooltip>
@@ -90,7 +117,7 @@ export function TransactionsTable({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  onClick={() => onTogglePaidStatus(row.original.id)}
+                  onClick={() => onTogglePaidStatus(transaction.id)}
                 >
                   {isPaid ? (
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -129,55 +156,55 @@ export function TransactionsTable({
         const totalInstallments = transaction.totalInstallments || 1;
         const valueWithoutInterestPerInstallment = valorTotalOriginal > 0 ? valorTotalOriginal / totalInstallments : 0;
         const interestPerInstallment = transaction.withInterest ? installmentValue - valueWithoutInterestPerInstallment : 0;
-        
+
         return (
-            <div className="font-medium">
-                 <div className='flex items-center gap-2'>
-                    <span className='truncate max-w-[200px]'>{row.getValue('descricao')}</span>
-                     {isInstallment && (
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger>
-                                    <Badge variant="outline" className="font-normal">
-                                    {transaction.installmentNumber}/{transaction.totalInstallments}
-                                    </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                   <p>Parcela {transaction.installmentNumber} de {transaction.totalInstallments}.
-                                   { interestPerInstallment > 0 && 
-                                    ` Juros da parcela: ${interestPerInstallment.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-                                   }
-                                   </p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                     )}
-                     {transaction.notes && (
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger>
-                                    <MessageSquareText className="h-4 w-4 text-muted-foreground" />
-                                </TooltipTrigger>
-                                <TooltipContent className="max-w-xs">
-                                   <p className="whitespace-pre-wrap">{transaction.notes}</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                     )}
-                 </div>
-                 {/* Exibição das Tags */}
-                {transaction.tags && transaction.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                        {transaction.tags.map(tag => (
-                            <Badge key={tag.id} variant="secondary" className="font-normal">{tag.name}</Badge>
-                        ))}
-                    </div>
-                )}
+          <div className="font-medium">
+            <div className='flex items-center gap-2'>
+              <span className='truncate max-w-[200px]'>{row.getValue('descricao')}</span>
+              {isInstallment && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Badge variant="outline" className="font-normal">
+                        {transaction.installmentNumber}/{transaction.totalInstallments}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Parcela {transaction.installmentNumber} de {transaction.totalInstallments}.
+                        {interestPerInstallment > 0 &&
+                          ` Juros da parcela: ${interestPerInstallment.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                        }
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {transaction.notes && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p className="whitespace-pre-wrap">{transaction.notes}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
+            {/* Exibição das Tags */}
+            {transaction.tags && transaction.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1">
+                {transaction.tags.map(tag => (
+                  <Badge key={tag.id} variant="secondary" className="font-normal">{tag.name}</Badge>
+                ))}
+              </div>
+            )}
+          </div>
         )
       },
     },
-     {
+    {
       id: 'source',
       header: 'Conta/Cartão',
       cell: ({ row }) => {
@@ -187,8 +214,8 @@ export function TransactionsTable({
         const Icon = transaction.cardId ? CreditCard : Banknote;
         return (
           <div className="flex items-center gap-2 text-muted-foreground">
-             <Icon className="h-4 w-4 shrink-0" />
-             <span className='truncate max-w-[120px]'>{sourceName}</span>
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className='truncate max-w-[120px]'>{sourceName}</span>
           </div>
         );
       },
@@ -209,8 +236,8 @@ export function TransactionsTable({
         const amount = parseFloat(row.getValue('valor'));
         const isReceita = row.original.tipo === 'receita';
         const formatted = amount.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
+          style: 'currency',
+          currency: 'BRL',
         });
 
         return (
@@ -223,7 +250,7 @@ export function TransactionsTable({
     {
       accessorKey: 'categoria',
       header: 'Categoria',
-      cell: ({row}) => (
+      cell: ({ row }) => (
         <Badge variant="outline">{row.original.category?.label || row.getValue('categoria')}</Badge>
       )
     },
@@ -240,6 +267,7 @@ export function TransactionsTable({
       id: 'actions',
       cell: ({ row }) => {
         const transaction = row.original;
+        const isCreditCard = transaction.tipo === 'despesa' && transaction.metodoPagamento === 'credito';
         return (
           <div className="text-right">
             <DropdownMenu>
@@ -255,8 +283,16 @@ export function TransactionsTable({
                   <Pencil className="mr-2 h-4 w-4" />
                   Editar
                 </DropdownMenuItem>
+
+                {isCreditCard && !transaction.installment && (
+                  <DropdownMenuItem onClick={() => setLinkingTransaction(transaction)}>
+                    <LinkIcon className="mr-2 h-4 w-4" />
+                    Vincular Parcelas
+                  </DropdownMenuItem>
+                )}
+
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="text-destructive focus:text-destructive focus:bg-destructive/10"
                   onClick={() => setDeletingTransaction(transaction)}
                 >
@@ -302,9 +338,9 @@ export function TransactionsTable({
                           {header.isPlaceholder
                             ? null
                             : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
                         </TableHead>
                       );
                     })}
@@ -330,7 +366,7 @@ export function TransactionsTable({
                 ) : (
                   <TableRow>
                     <TableCell colSpan={columns.length} className="h-96 text-center">
-                        Nenhuma transação encontrada.
+                      Nenhuma transação encontrada.
                     </TableCell>
                   </TableRow>
                 )}
@@ -381,17 +417,30 @@ export function TransactionsTable({
           </div>
         </CardContent>
       </Card>
-      
-      <DeleteTransactionDialog
-        isOpen={!!deletingTransaction}
-        onClose={() => setDeletingTransaction(null)}
-        onConfirm={() => {
-          if (deletingTransaction) {
+
+      {deletingTransaction && (
+        <DeleteTransactionDialog
+          transaction={deletingTransaction}
+          open={!!deletingTransaction}
+          onOpenChange={(open) => !open && setDeletingTransaction(null)}
+          onConfirm={() => {
             onDelete(deletingTransaction.id);
             setDeletingTransaction(null);
-          }
+          }}
+        />
+      )}
+
+      <LinkInstallmentsDialog
+        transaction={linkingTransaction}
+        open={!!linkingTransaction}
+        onOpenChange={(open) => !open && setLinkingTransaction(null)}
+        onSuccess={() => {
+          // Recarregar dados? A tabela deve atualizar via props 'data'
+          // Se necessário, o pai deve saber que houve mudança.
+          // Como 'onSuccess' é void, talvez precisemos de um callback 'onRefresh' nas props da tabela
+          // ou confiar que o usuário vai dar refresh manual por enquanto, ou usar router.refresh()
+          window.location.reload(); // Solução rápida para garantir atualização
         }}
-        transactionDescription={deletingTransaction?.descricao || ''}
       />
     </>
   );

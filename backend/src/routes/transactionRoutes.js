@@ -16,11 +16,13 @@ router.post('/export', transactionController.exportTransactions);
 
 // Aplica o middleware de validação antes do controller
 router.post('/', validate(transactionSchema), transactionController.createTransaction);
-router.post('/create-from-import', transactionController.createFromImported);
-
+router.put('/:id/toggle-paid', transactionController.togglePaidStatus);
+router.post('/installments/:id/cancel-series', transactionController.cancelRecurringSeries);
+router.post('/installments/:id/pay-early', transactionController.anticipateInstallment);
 router.put('/:id', validate(transactionSchema), transactionController.updateTransaction);
-
 router.delete('/:id', transactionController.deleteTransaction);
-router.patch('/:id/toggle-paid', transactionController.togglePaidStatus);
+router.get('/:id/installment-candidates', authMiddleware, (req, res) => transactionController.getInstallmentCandidates(req, res));
+router.post('/:id/link-installments', authMiddleware, (req, res) => transactionController.linkInstallments(req, res));
+router.patch('/:id/toggle-paid-status', authMiddleware, (req, res) => transactionController.togglePaidStatus(req, res));
 
 export default router;

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import type { Card as CardType } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, ChevronLeft, ChevronRight, DollarSign } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, DollarSign, Download, FileCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, addMonths, subMonths, setDate } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -19,6 +19,9 @@ type FaturaSummaryCardProps = {
   valorPago: number;
   saldoDevedor: number;
   onPayBill: () => void;
+  onDownloadPDF: () => void;
+  onReconcile: () => void;
+  isReconciled?: boolean;
   period: { start: Date; end: Date };
   dueDate: Date;
 };
@@ -33,6 +36,9 @@ export function FaturaSummaryCard({
   valorPago,
   saldoDevedor,
   onPayBill,
+  onDownloadPDF,
+  onReconcile,
+  isReconciled = false,
   period,
   dueDate,
 }: FaturaSummaryCardProps) {
@@ -101,8 +107,8 @@ export function FaturaSummaryCard({
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="flex flex-col flex-grow justify-between relative p-4 sm:p-6">
-        <AnimatePresence initial={false} custom={direction} mode="wait">
+      <CardContent className="flex-1 flex flex-col pb-4 sm:pb-6">
+        <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={selectedMonth.toISOString()}
             custom={direction}
@@ -112,26 +118,25 @@ export function FaturaSummaryCard({
             exit="exit"
             transition={{
               x: { type: "spring", stiffness: 300, damping: 30 },
-              opacity: { duration: 0.2 }
+              opacity: { duration: 0.2 },
             }}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={1}
             onDragEnd={(e, { offset, velocity }) => {
               const swipe = swipePower(offset.x, velocity.x);
-
               if (swipe < -swipeConfidenceThreshold) {
                 paginate(1);
               } else if (swipe > swipeConfidenceThreshold) {
                 paginate(-1);
               }
             }}
-            className="space-y-4 sm:space-y-6 w-full"
+            className="flex-1 flex flex-col"
           >
-            <div className="text-center space-y-2 p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 shadow-inner">
-              <p className="text-xs sm:text-sm text-muted-foreground font-medium uppercase tracking-wider">Saldo Devedor</p>
+            <div className="bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl p-4 sm:p-6 mb-3 sm:mb-4 border border-primary/20 shadow-inner">
+              <p className="text-xs sm:text-sm text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Saldo Devedor</p>
               <p className={cn(
-                "text-4xl sm:text-5xl font-bold tracking-tighter break-words",
+                "text-2xl sm:text-3xl md:text-4xl font-bold truncate",
                 saldoDevedor > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
               )}>
                 {formatCurrency(saldoDevedor)}
@@ -151,7 +156,7 @@ export function FaturaSummaryCard({
           </motion.div>
         </AnimatePresence>
 
-        <div className="text-center pt-4 sm:pt-6 z-10 mt-auto">
+        <div className="flex flex-col gap-2 pt-4 sm:pt-6 z-10 mt-auto">
           <Button
             className="w-full shadow-lg shadow-primary/20 h-12 text-base font-medium"
             disabled={saldoDevedor <= 0}
@@ -159,6 +164,37 @@ export function FaturaSummaryCard({
           >
             <DollarSign className="mr-2 h-5 w-5" />
             Pagar ou Amortizar
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full h-10 text-sm font-medium"
+            onClick={onDownloadPDF}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Baixar PDF
+          </Button>
+          <Button
+            variant="outline"
+            className={cn(
+              "w-full h-10 text-sm font-medium",
+              isReconciled
+                ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400"
+                : "border-primary/50 hover:bg-primary/10"
+            )}
+            onClick={onReconcile}
+            disabled={isReconciled}
+          >
+            {isReconciled ? (
+              <>
+                <FileCheck className="mr-2 h-4 w-4" />
+                Fatura Reconciliada ✓
+              </>
+            ) : (
+              <>
+                <FileCheck className="mr-2 h-4 w-4" />
+                Reconciliar com OFX
+              </>
+            )}
           </Button>
         </div>
       </CardContent>

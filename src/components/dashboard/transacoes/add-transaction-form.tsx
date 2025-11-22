@@ -760,16 +760,33 @@ export function AddTransactionForm({
                 <FormField
                   control={form.control}
                   name="pago"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm bg-card/50">
-                      <div className="space-y-0.5">
-                        <FormLabel>{field.value ? 'Operação Efetuada' : 'Operação Pendente'}</FormLabel>
-                      </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const isCreditCard = watchTipo === 'despesa' && watchMetodo === 'credito';
+                    return (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm bg-card/50">
+                        <div className="space-y-0.5">
+                          <FormLabel>
+                            {isCreditCard
+                              ? 'Cartão de Crédito - Pago com a Fatura'
+                              : field.value ? 'Operação Efetuada' : 'Operação Pendente'
+                            }
+                          </FormLabel>
+                          {isCreditCard && (
+                            <p className="text-xs text-muted-foreground">
+                              Despesas de crédito são pagas ao quitar a fatura
+                            </p>
+                          )}
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            disabled={isCreditCard}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
             </OptionalSection>

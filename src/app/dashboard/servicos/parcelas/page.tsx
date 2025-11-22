@@ -11,7 +11,25 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, CreditCard, TrendingUp, Package, ArrowRight, Filter, X } from 'lucide-react';
+import { Calendar, CreditCard, TrendingUp, Package, ArrowRight, Filter, X, MoreVertical, Ban, FastForward } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import api from '@/lib/api';
 import { handleApiError } from '@/lib/error-handler';
 
@@ -70,11 +88,18 @@ export default function ParcelasPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [monthsAhead, setMonthsAhead] = useState('6');
   const [selectedCard, setSelectedCard] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [cards, setCards] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+
+  // Action states
+  const [transactionToCancel, setTransactionToCancel] = useState<FutureTransaction | null>(null);
+  const [transactionToAnticipate, setTransactionToAnticipate] = useState<FutureTransaction | null>(null);
 
   useEffect(() => {
     fetchData();
     fetchCards();
+    fetchCategories();
   }, [monthsAhead]);
 
   const fetchCards = async () => {
@@ -83,6 +108,15 @@ export default function ParcelasPage() {
       setCards(response.data);
     } catch (error) {
       console.error('Erro ao buscar cartões', error);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get('/categories');
+      setCategories(response.data);
+    } catch (error) {
+      console.error('Erro ao buscar categorias', error);
     }
   };
 
@@ -98,20 +132,50 @@ export default function ParcelasPage() {
     }
   };
 
+  const handleCancelSeries = async () => {
+    if (!transactionToCancel) return;
+    try {
+      await api.post(`/transactions/installments/${transactionToCancel.id}/cancel-series`);
+      toast({ title: 'Série cancelada', description: 'As parcelas futuras foram removidas.' });
+      fetchData();
+    } catch (error) {
+      handleApiError(error, toast, 'Erro ao cancelar série');
+    } finally {
+      setTransactionToCancel(null);
+    }
+  };
+
+  const handleAnticipate = async () => {
+    if (!transactionToAnticipate) return;
+    try {
+      await api.post(`/transactions/installments/${transactionToAnticipate.id}/pay-early`);
+      toast({ title: 'Parcela antecipada', description: 'A parcela foi movida para a data de hoje.' });
+      fetchData();
+    } catch (error) {
+      handleApiError(error, toast, 'Erro ao antecipar parcela');
+    } finally {
+      setTransactionToAnticipate(null);
+    }
+  };
+
   const filteredData = data ? {
     ...data,
-    summary: data.summary.map(month => ({
-      ...month,
-      transactions: selectedCard === 'all'
-        ? month.transactions
-        : month.transactions.filter(t => t.cardId === selectedCard),
-      byCard: selectedCard === 'all'
-        ? month.byCard
-        : month.byCard.filter(c => c.card.id === selectedCard),
-      total: selectedCard === 'all'
-        ? month.total
-        : month.transactions.filter(t => t.cardId === selectedCard).reduce((sum, t) => sum + Number(t.valor), 0)
-    })).filter(month => month.transactions.length > 0)
+    summary: data.summary.map(month => {
+      const filteredTransactions = month.transactions.filter(t => {
+        const matchesCard = selectedCard === 'all' || t.cardId === selectedCard;
+        const matchesCategory = selectedCategory === 'all' || t.categoryId === selectedCategory;
+        return matchesCard && matchesCategory;
+      });
+
+      return {
+        ...month,
+        transactions: filteredTransactions,
+        // Recalculate totals based on filtered transactions
+        total: filteredTransactions.reduce((sum, t) => sum + Number(t.valor), 0),
+        byCard: month.byCard // Keep original byCard summary or filter it too? Let's keep it simple for now or filter if needed.
+          .filter(c => selectedCard === 'all' || c.card.id === selectedCard)
+      };
+    }).filter(month => month.transactions.length > 0)
   } : null;
 
   if (isLoading) {
@@ -200,6 +264,21 @@ export default function ParcelasPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="flex-1 min-w-[200px]">
+              <label className="text-sm font-medium mb-2 block">Categoria</label>
+              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as categorias</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -244,15 +323,14 @@ export default function ParcelasPage() {
                   {month.transactions.map((transaction) => (
                     <div
                       key={transaction.id}
-                      className="p-4 hover:bg-muted/50 transition-colors cursor-pointer"
-                      onClick={() => {
-                        if (!transaction.isRecurring && transaction.cardId) {
-                          router.push(`/dashboard/fatura/${transaction.cardId}`);
-                        }
-                      }}
+                      className="p-4 hover:bg-muted/50 transition-colors"
                     >
                       <div className="flex justify-between items-start">
-                        <div className="flex-1">
+                        <div className="flex-1 cursor-pointer" onClick={() => {
+                          if (!transaction.isRecurring && transaction.cardId) {
+                            router.push(`/dashboard/fatura/${transaction.cardId}`);
+                          }
+                        }}>
                           <div className="flex items-center gap-2">
                             <span className="font-medium">{transaction.descricao}</span>
                             {transaction.isRecurring && (
@@ -282,10 +360,42 @@ export default function ParcelasPage() {
                           </div>
                         </div>
 
-                        <div className="text-right">
-                          <div className="text-lg font-bold text-red-600">
-                            R$ {Number(transaction.valor).toFixed(2)}
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-red-600">
+                              R$ {Number(transaction.valor).toFixed(2)}
+                            </div>
                           </div>
+
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              {transaction.isRecurring && (
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:text-red-600 cursor-pointer"
+                                  onClick={() => setTransactionToCancel(transaction)}
+                                >
+                                  <Ban className="mr-2 h-4 w-4" />
+                                  Cancelar Série
+                                </DropdownMenuItem>
+                              )}
+                              {transaction.installmentNumber && (
+                                <DropdownMenuItem
+                                  className="cursor-pointer"
+                                  onClick={() => setTransactionToAnticipate(transaction)}
+                                >
+                                  <FastForward className="mr-2 h-4 w-4" />
+                                  Antecipar Parcela
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     </div>
@@ -306,6 +416,40 @@ export default function ParcelasPage() {
           </div>
         </Card>
       )}
+
+      <AlertDialog open={!!transactionToCancel} onOpenChange={(open) => !open && setTransactionToCancel(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancelar Série Recorrente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso irá remover todas as transações futuras desta série ({transactionToCancel?.descricao}). As transações passadas não serão afetadas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelSeries} className="bg-red-600 hover:bg-red-700">
+              Confirmar Cancelamento
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!transactionToAnticipate} onOpenChange={(open) => !open && setTransactionToAnticipate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Antecipar Parcela?</AlertDialogTitle>
+            <AlertDialogDescription>
+              A parcela {transactionToAnticipate?.installmentNumber}/{transactionToAnticipate?.totalInstallments} de {transactionToAnticipate?.descricao} será movida para a data de hoje e entrará na sua fatura atual.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Voltar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAnticipate}>
+              Confirmar Antecipação
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

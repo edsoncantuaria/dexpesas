@@ -23,6 +23,7 @@ import { SmartSummary } from '@/components/dashboard/smart-summary';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { PrivacyProvider } from '@/contexts/PrivacyContext';
 import { TutorialOverlay } from '@/components/dashboard/tutorial/tutorial-overlay';
+import { FutureInstallmentsWidget } from '@/components/dashboard/widgets/future-installments-widget';
 
 const cardComponents: { [key: string]: React.ComponentType<any> } = {
   account_book: AccountBookCard,
@@ -330,12 +331,17 @@ function DashboardPageContent() {
             )
           })}
         </div>
-        {isGamificationEnabled && !isLiteMode && (
-          <div className="lg:col-span-1 space-y-6">
-            <MonthlyMissionBoard />
-            <TimelineCard logs={timelineLogs} />
-          </div>
-        )}
+
+        <div className="lg:col-span-1 space-y-6">
+          <FutureInstallmentsWidget />
+
+          {isGamificationEnabled && !isLiteMode && (
+            <>
+              <MonthlyMissionBoard />
+              <TimelineCard logs={timelineLogs} />
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import CardBalanceService from '../services/cardBalanceService.js';
 import AuditService from '../services/auditService.js';
 
 const prisma = new PrismaClient();
+import { getInvoicePeriod } from '../utils/date-helpers.js';
 
 /**
  * Helper para obter mapa de categoria
@@ -208,11 +209,18 @@ class MigrationController {
                     const monthDate = parse(month.month, 'yyyy-MM', new Date());
 
                     // Calcular data da transação para cair na fatura correta
-                    // Usando a nova lógica de gap: Data = Vencimento - Gap (Data de Fechamento)
-                    // Isso garante que a transação caia exatamente no dia do fechamento, pertencendo à fatura.
-                    const gap = card.closingDayGap ?? 7;
+                    // Usamos o getInvoicePeriod para garantir que a data seja exatamente o fechamento da fatura
                     const dueDate = setDate(monthDate, card.diaVencimento);
-                    const transactionDate = subDays(dueDate, gap);
+
+                    // Ajuste: Se o vencimento for menor que o fechamento, a fatura fecha no mês anterior.
+                    // Precisamos passar uma data de referência no mês do fechamento (ou anterior) para pegar o período correto.
+                    let refDate = dueDate;
+                    if (card.diaVencimento < card.diaFechamento) {
+                        refDate = subMonths(dueDate, 1);
+                    }
+
+                    const { end } = getInvoicePeriod(card, refDate);
+                    const transactionDate = end;
 
                     // 1. Criar a despesa da fatura
                     transactionPromises.push(

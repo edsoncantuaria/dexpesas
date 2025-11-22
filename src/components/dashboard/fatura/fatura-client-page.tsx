@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { addMonths, setDate } from 'date-fns';
+import { addMonths, setDate, format } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import type { Transaction, Card as CardType, Account, Category } from '@/lib/definitions';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,11 @@ import { PayBillDialog } from './pay-bill-dialog';
 import { getInvoicePeriod } from '@/lib/date-helpers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CardLimitStatus } from './card-limit-status';
+import { InvoiceHistorySelector } from './invoice-history-selector';
 import { handleApiError } from '@/lib/error-handler';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CardAnalyticsTab } from './analytics/card-analytics-tab';
+import { InvoiceReconciliationDialog } from './invoice-reconciliation-dialog';
 
 interface FaturaClientPageProps {
   cardId: string;
@@ -40,6 +44,9 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isPayDialogOpen, setIsPayDialogOpen] = useState(false);
+  const [isDownloadingPDF, setIsDownloadingPDF] = useState(false);
+  const [isReconciliationDialogOpen, setIsReconciliationDialogOpen] = useState(false);
+  const [isMonthReconciled, setIsMonthReconciled] = useState(false);
 
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
@@ -76,6 +83,61 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
     }
   }, [cardId, router, toast]);
 
+  // Verificar se o mês atual já foi reconciliado
+  const checkIfReconciled = useCallback(async () => {
+    if (!card || !selectedMonth) return;
+
+    try {
+      const month = format(selectedMonth, 'yyyy-MM');
+      const response = await api.get(`/cards/${cardId}/invoice/reconciliation-status?month=${month}`);
+
+      // Se retornar uma reconciliação COMPLETED, o mês já foi reconciliado
+      if (response.data && response.data.status === 'COMPLETED') {
+        setIsMonthReconciled(true);
+      } else {
+        setIsMonthReconciled(false);
+      }
+    } catch (error) {
+      // Se der 404, significa que não há reconciliação para este mês
+      setIsMonthReconciled(false);
+    }
+  }, [card, selectedMonth, cardId]);
+
+  useEffect(() => {
+    checkIfReconciled();
+  }, [checkIfReconciled]);
+
+  const handleDownloadPDF = async () => {
+    if (!card || !selectedMonth) return;
+
+    try {
+      setIsDownloadingPDF(true);
+      const month = selectedMonth.toISOString().slice(0, 7); // YYYY-MM
+      const response = await api.get(`/cards/${cardId}/invoice/pdf?month=${month}`, {
+        responseType: 'blob',
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `fatura-${card.nome}-${month}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'PDF gerado!',
+        description: 'Sua fatura foi baixada com sucesso.',
+      });
+    } catch (error) {
+      handleApiError(error, toast, 'Erro ao gerar PDF');
+    } finally {
+      setIsDownloadingPDF(false);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -91,12 +153,21 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
   useEffect(() => {
     if (card && !selectedMonth) {
       const today = new Date();
-      // Se hoje já passou do fechamento, a fatura aberta é a do próximo mês
+      let targetDate = today;
+
+      // Se hoje já passou do fechamento, a fatura aberta é a do próximo ciclo
       if (today.getDate() > card.diaFechamento) {
-        setSelectedMonth(addMonths(today, 1));
-      } else {
-        setSelectedMonth(today);
+        targetDate = addMonths(today, 1);
       }
+
+      // Se o vencimento é antes do fechamento (ex: Vence dia 7, Fecha dia 30),
+      // a fatura que fecha neste mês na verdade vence no mês seguinte.
+      // Então adicionamos +1 mês para exibir o mês de vencimento correto.
+      if (card.diaVencimento < card.diaFechamento) {
+        targetDate = addMonths(targetDate, 1);
+      }
+
+      setSelectedMonth(targetDate);
     }
   }, [card, selectedMonth]);
 
@@ -104,7 +175,15 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
     if (!card || !selectedMonth) return { invoiceTransactions: [], period: { start: new Date(), end: new Date() }, dueDate: new Date() };
 
     // A data de referência para a fatura é sempre o mês selecionado pelo usuário.
-    const period = getInvoicePeriod(card, selectedMonth);
+    // MAS, se o dia do vencimento for menor que o dia do fechamento, significa que a fatura
+    // fecha no mês anterior ao vencimento.
+    // Ex: Vence 07/Jan, Fecha 30/Dez. Se selectedMonth é Jan, referenceDate deve ser Dez.
+    let referenceDate = selectedMonth;
+    if (card.diaVencimento < card.diaFechamento) {
+      referenceDate = addMonths(selectedMonth, -1);
+    }
+
+    const period = getInvoicePeriod(card, referenceDate);
 
     // Calcular data de vencimento baseada no fechamento
     // Se vencimento < fechamento, é no mês seguinte ao fechamento.
@@ -152,10 +231,10 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
     }
   };
 
-  const handlePayment = async (amount: number, accountId: string, paymentDate: Date) => {
+  const handlePayment = async (amount: number, accountId: string, paymentDate: Date, paymentType: string) => {
     if (!card) return;
     try {
-      await api.post(`/cards/${cardId}/pay`, { amount, accountId, paymentDate });
+      await api.post(`/cards/${cardId}/pay`, { amount, accountId, paymentDate, paymentType });
       await fetchData();
       toast({ title: 'Pagamento Registrado!', description: `O pagamento da fatura do cartão ${card.nome} foi registrado.` });
       setIsPayDialogOpen(false);
@@ -191,6 +270,9 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
             valorPago={valorPago}
             saldoDevedor={saldoDevedor}
             onPayBill={() => setIsPayDialogOpen(true)}
+            onDownloadPDF={handleDownloadPDF}
+            onReconcile={() => setIsReconciliationDialogOpen(true)}
+            isReconciled={isMonthReconciled}
             period={period}
             dueDate={dueDate}
           />
@@ -204,87 +286,114 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
         </div>
       </div>
 
+      <Tabs defaultValue="invoice" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsTrigger value="invoice">Fatura</TabsTrigger>
+          <TabsTrigger value="analytics">Análises</TabsTrigger>
+        </TabsList>
 
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <h2 className="text-2xl font-bold font-headline">Transações da Fatura</h2>
-          <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Filter className="mr-2 h-4 w-4" />
-                Filtrar
-              </Button>
-            </SheetTrigger>
-            <SheetContent className="w-full sm:max-w-sm">
-              <TransactionFilters
-                accounts={[]} cards={[]} categories={categories} tags={[]}
-                currentFilters={filters} onFilterChange={setFilters}
-              />
-            </SheetContent>
-          </Sheet>
-        </div>
-        {filteredTransactions.filter(t => t.tipo === 'despesa').length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-6 py-20 text-center rounded-3xl border-2 border-dashed bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm">
-            <div className="p-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/10">
-              <Receipt className="h-16 w-16 text-primary" />
-            </div>
-            <div className="space-y-2">
-              <h3 className='text-2xl font-bold font-headline'>Nenhuma despesa nesta fatura</h3>
-              <p className="text-muted-foreground max-w-md">
-                Não há transações de despesa para este mês. <br /> Que tal adicionar uma agora?
-              </p>
-            </div>
-            <Button size="lg" onClick={() => openForm()} className="shadow-lg shadow-primary/20">
-              <PlusCircle className="mr-2 h-5 w-5" />
-              Adicionar Despesa
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div className="block md:hidden">
-              <TransactionMobileList
-                data={filteredTransactions.filter(t => t.tipo === 'despesa')}
-                onEdit={handleOpenForm}
-                onDelete={handleDeleteTransaction}
-                onTogglePaidStatus={() => { }}
-                accounts={accounts}
-                cards={[card]}
-              />
-            </div>
-            <div className="hidden md:block">
-              <TransactionsTable
-                data={filteredTransactions.filter(t => t.tipo === 'despesa')}
-                onEdit={handleOpenForm}
-                onDelete={handleDeleteTransaction}
-                onTogglePaidStatus={() => { }}
-                accounts={accounts}
-                cards={[card]}
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      {
-        futureInstallments.length > 0 && (
-          <Card className="shadow-xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10">
+        <TabsContent value="invoice" className="space-y-6">
+          {/* Invoice History Selector */}
+          <Card>
             <CardHeader>
-              <CardTitle className="text-xl bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
-                Lançamentos Futuros
-              </CardTitle>
-              <CardDescription>Estas são as parcelas que entrarão nas próximas faturas.</CardDescription>
+              <CardTitle className="text-lg">Histórico de Faturas</CardTitle>
+              <CardDescription>Navegue entre os meses para ver faturas anteriores</CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="block md:hidden">
-                <TransactionMobileList data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => { }} accounts={accounts} cards={[card]} />
-              </div>
-              <div className="hidden md:block">
-                <TransactionsTable data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => { }} accounts={accounts} cards={[card]} />
-              </div>
+            <CardContent>
+              <InvoiceHistorySelector
+                cardId={cardId}
+                selectedMonth={selectedMonth}
+                onMonthSelect={setSelectedMonth}
+              />
             </CardContent>
           </Card>
-        )
-      }
+
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold font-headline">Transações da Fatura</h2>
+              <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Filter className="mr-2 h-4 w-4" />
+                    Filtrar
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-sm">
+                  <TransactionFilters
+                    accounts={[]} cards={[]} categories={categories} tags={[]}
+                    currentFilters={filters} onFilterChange={setFilters}
+                  />
+                </SheetContent>
+              </Sheet>
+            </div>
+            {filteredTransactions.filter(t => t.tipo === 'despesa').length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-6 py-20 text-center rounded-3xl border-2 border-dashed bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm">
+                <div className="p-6 rounded-full bg-gradient-to-br from-primary/20 to-primary/10">
+                  <Receipt className="h-16 w-16 text-primary" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className='text-2xl font-bold font-headline'>Nenhuma despesa nesta fatura</h3>
+                  <p className="text-muted-foreground max-w-md">
+                    Não há transações de despesa para este mês. <br /> Que tal adicionar uma agora?
+                  </p>
+                </div>
+                <Button size="lg" onClick={() => openForm()} className="shadow-lg shadow-primary/20">
+                  <PlusCircle className="mr-2 h-5 w-5" />
+                  Adicionar Despesa
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="block md:hidden">
+                  <TransactionMobileList
+                    data={filteredTransactions.filter(t => t.tipo === 'despesa')}
+                    onEdit={handleOpenForm}
+                    onDelete={handleDeleteTransaction}
+                    onTogglePaidStatus={() => { }}
+                    accounts={accounts}
+                    cards={[card]}
+                  />
+                </div>
+                <div className="hidden md:block">
+                  <TransactionsTable
+                    data={filteredTransactions.filter(t => t.tipo === 'despesa')}
+                    onEdit={handleOpenForm}
+                    onDelete={handleDeleteTransaction}
+                    onTogglePaidStatus={() => { }}
+                    accounts={accounts}
+                    cards={[card]}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {
+            futureInstallments.length > 0 && (
+              <Card className="shadow-xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-xl bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+                    Lançamentos Futuros
+                  </CardTitle>
+                  <CardDescription>Estas são as parcelas que entrarão nas próximas faturas.</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="block md:hidden">
+                    <TransactionMobileList data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => { }} accounts={accounts} cards={[card]} />
+                  </div>
+                  <div className="hidden md:block">
+                    <TransactionsTable data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => { }} accounts={accounts} cards={[card]} />
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <CardAnalyticsTab cardId={cardId} limit={Number(card.limite)} />
+        </TabsContent>
+      </Tabs>
 
       <PayBillDialog
         isOpen={isPayDialogOpen}
@@ -293,6 +402,18 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
         accounts={accounts.filter(a => a.tipo === 'corrente')}
         card={card}
         faturaTotal={saldoDevedor}
+      />
+
+      <InvoiceReconciliationDialog
+        isOpen={isReconciliationDialogOpen}
+        onClose={() => setIsReconciliationDialogOpen(false)}
+        cardId={cardId}
+        invoiceMonth={selectedMonth}
+        invoiceTotalExpenses={faturaTotal}
+        onComplete={() => {
+          setIsReconciliationDialogOpen(false);
+          fetchData(); // Atualizar dados após reconciliação
+        }}
       />
     </div >
   );

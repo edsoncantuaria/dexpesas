@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CreditCard, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { CardClosingInfoDialog } from '@/components/dashboard/cartoes/card-closing-info-dialog';
 
 interface CardsStepProps {
     onComplete: (cards: any[]) => void;
@@ -24,7 +25,7 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
     const [cards, setCards] = useState(initialData || [{
         nome: '',
         limite: 0,
-        diaFechamento: 1,
+        closingDayGap: 7,
         diaVencimento: 10,
         bandeira: 'visa' as 'visa' | 'mastercard' | 'elo' | 'amex',
         paymentAccountId: 'none',
@@ -36,32 +37,32 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
             // Validate cards
             const validCards = cards.filter(card => card.nome && card.limite > 0);
 
-            // Check for invalid date combinations
-            const invalidDateCards = validCards.filter(card => {
-                // Calcular diferença considerando virada de mês
-                let daysDiff;
-                if (card.diaVencimento > card.diaFechamento) {
-                    // Mesmo mês: vence depois do fechamento
-                    daysDiff = card.diaVencimento - card.diaFechamento;
-                } else {
-                    // Mês seguinte: fecha dia X, vence dia Y do próximo mês
-                    // Ex: fecha dia 30, vence dia 7 = 30 dias até fim do mês + 7 dias = 7 dias úteis
-                    daysDiff = (30 - card.diaFechamento) + card.diaVencimento;
-                }
-
-                // Mínimo 7 dias entre fechamento e vencimento
-                return daysDiff < 7;
+            // Check for invalid closing gap (minimum 7 days)
+            const invalidCards = validCards.filter(card => {
+                return card.closingDayGap < 7 || card.closingDayGap > 14;
             });
 
-            if (invalidDateCards.length > 0) {
+            if (invalidCards.length > 0) {
                 alert(
-                    'Atenção: Deve haver no mínimo 7 dias entre o fechamento e o vencimento. ' +
+                    'Atenção: O período de fechamento deve ser entre 7 e 14 dias antes do vencimento. ' +
                     'Por favor, corrija os cartões destacados.'
                 );
                 return;
             }
 
-            onComplete(validCards);
+            // Calcular diaFechamento para cada cartão antes de enviar
+            const cardsWithClosingDay = validCards.map(card => {
+                let calculatedClosingDay = card.diaVencimento - card.closingDayGap;
+                if (calculatedClosingDay <= 0) {
+                    calculatedClosingDay += 30;
+                }
+                return {
+                    ...card,
+                    diaFechamento: calculatedClosingDay
+                };
+            });
+
+            onComplete(cardsWithClosingDay);
         } else {
             onComplete([]);
         }
@@ -73,15 +74,8 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
         setCards(newCards);
     };
 
-    const hasInvalidDates = (card: any) => {
-        // Calcular diferença considerando virada de mês
-        let daysDiff;
-        if (card.diaVencimento > card.diaFechamento) {
-            daysDiff = card.diaVencimento - card.diaFechamento;
-        } else {
-            daysDiff = (30 - card.diaFechamento) + card.diaVencimento;
-        }
-        return daysDiff < 7;
+    const hasInvalidClosingGap = (card: any) => {
+        return card.closingDayGap < 7 || card.closingDayGap > 14;
     };
 
     const hasInvalidLimit = (card: any) => {
@@ -153,7 +147,7 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                                 cards[i] || {
                                     nome: '',
                                     limite: 0,
-                                    diaFechamento: 1,
+                                    closingDayGap: 7,
                                     diaVencimento: 10,
                                     bandeira: 'visa' as const,
                                     paymentAccountId: 'none',
@@ -176,9 +170,9 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                 </div>
 
                 {cards.map((card, index) => {
-                    const invalidDates = hasInvalidDates(card);
+                    const invalidClosingGap = hasInvalidClosingGap(card);
                     const invalidLimit = hasInvalidLimit(card);
-                    const hasErrors = invalidDates || invalidLimit;
+                    const hasErrors = invalidClosingGap || invalidLimit;
 
                     return (
                         <motion.div
@@ -242,29 +236,7 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                                 </div>
 
                                 <div>
-                                    <Label>Dia de Fechamento *</Label>
-                                    <Select
-                                        value={String(card.diaFechamento)}
-                                        onValueChange={(v) => updateCard(index, 'diaFechamento', Number(v))}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="max-h-[200px]">
-                                            {Array.from({ length: 30 }, (_, i) => i + 1).map(day => (
-                                                <SelectItem key={day} value={String(day)}>
-                                                    Dia {day}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Máximo dia 30 (nem todo mês tem 31)
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <Label>Dia de Vencimento *</Label>
+                                    <Label>Dia do Vencimento da Fatura *</Label>
                                     <Select
                                         value={String(card.diaVencimento)}
                                         onValueChange={(v) => updateCard(index, 'diaVencimento', Number(v))}
@@ -280,9 +252,37 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {invalidDates && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Dia em que a fatura vence (1 a 31)
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <Label>Quantos dias antes fecha? *</Label>
+                                        <CardClosingInfoDialog />
+                                    </div>
+                                    <Select
+                                        value={String(card.closingDayGap || 7)}
+                                        onValueChange={(v) => updateCard(index, 'closingDayGap', Number(v))}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-[200px]">
+                                            {Array.from({ length: 8 }, (_, i) => i + 7).map(days => (
+                                                <SelectItem key={days} value={String(days)}>
+                                                    {days} dias antes
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Dias antes do vencimento que a fatura fecha (7 a 14)
+                                    </p>
+                                    {invalidClosingGap && (
                                         <p className="text-xs text-red-600 mt-1">
-                                            Mínimo 7 dias entre fechamento e vencimento
+                                            Entre 7 e 14 dias
                                         </p>
                                     )}
                                 </div>
@@ -328,12 +328,12 @@ export function CardsStep({ onComplete, onBack, initialData, accounts = [] }: Ca
                                 </p>
                             </div>
 
-                            {invalidDates && (
+                            {invalidClosingGap && (
                                 <Alert className="border-red-500">
                                     <AlertTriangle className="h-4 w-4 text-red-600" />
                                     <AlertDescription>
-                                        <strong>Prazo insuficiente:</strong> Deve haver no mínimo 7 dias entre o fechamento e o vencimento.
-                                        Exemplo válido: Fecha dia 25, vence dia 5 (do mês seguinte) = 10 dias.
+                                        <strong>Período inválido:</strong> O período de fechamento deve ser entre 7 e 14 dias antes do vencimento.
+                                        Exemplo: Se vence dia 15 e fecha 7 dias antes, a fatura fecha no dia 8.
                                     </AlertDescription>
                                 </Alert>
                             )}

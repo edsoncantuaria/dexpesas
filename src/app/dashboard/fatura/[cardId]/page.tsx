@@ -6,7 +6,7 @@ import { FaturaClientPage } from "@/components/dashboard/fatura/fatura-client-pa
  * Responsável por receber os parâmetros da rota do servidor e passá-los
  * para o componente cliente que cuidará da renderização e interatividade.
  */
-export default function FaturaPage({ params }: { params: { cardId: string } }) {
-  const { cardId } = params;
+export default async function FaturaPage({ params }: { params: Promise<{ cardId: string }> }) {
+  const { cardId } = await params;
   return <FaturaClientPage cardId={cardId} />;
 }
