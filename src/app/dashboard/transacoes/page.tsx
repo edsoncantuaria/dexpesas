@@ -21,6 +21,7 @@ import { format, parseISO } from 'date-fns';
 import { FilteredSummary } from '@/components/dashboard/transacoes/filtered-summary';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { handleApiError } from '@/lib/error-handler';
 
 
 function TransactionsPageContent() {
@@ -78,7 +79,7 @@ function TransactionsPageContent() {
       setCategories(catRes.data);
       setTags(tagsRes.data);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao buscar dados de suporte' });
+      handleApiError(error, toast, 'Erro ao buscar dados de suporte');
     }
   }, [toast]);
 
@@ -95,7 +96,7 @@ function TransactionsPageContent() {
         setTransactions(response.data);
       }
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao buscar transações' });
+      handleApiError(error, toast, 'Erro ao buscar transações');
     } finally {
       if (!silent) {
         setIsLoadingTransactions(false);
@@ -211,7 +212,7 @@ function TransactionsPageContent() {
         variant: 'destructive',
       });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao excluir' });
+      handleApiError(error, toast, 'Erro ao excluir');
     }
   };
 
@@ -224,7 +225,7 @@ function TransactionsPageContent() {
       }
       toast({ title: 'Status da transação atualizado!' });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao atualizar status' });
+      handleApiError(error, toast, 'Erro ao atualizar status');
     }
   };
 

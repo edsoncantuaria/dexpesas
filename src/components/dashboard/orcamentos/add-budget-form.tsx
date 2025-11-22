@@ -18,6 +18,7 @@ import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
+import { handleApiError } from '@/lib/error-handler';
 
 type AddBudgetFormProps = {
   budget?: Budget | null;
@@ -86,7 +87,7 @@ export function AddBudgetForm({ budget, categories, budgetsForMonth, onSuccess, 
       toast({ title: "Sugestão da IA aplicada!", description: `Valor de ${suggestedAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} sugerido.` });
 
     } catch (error) {
-      toast({ variant: "destructive", title: "Erro na IA", description: "Não foi possível gerar uma sugestão." });
+      handleApiError(error, toast, "Erro na IA");
     } finally {
       setIsSuggesting(false);
     }

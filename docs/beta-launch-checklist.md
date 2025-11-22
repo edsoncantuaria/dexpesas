@@ -4,7 +4,7 @@ Este documento reúne o que falta para lançar uma versão beta estável do *dex
 
 ## 1. Produto & Experiência do Usuário
 - [ ] Definir proposta clara da beta (público-alvo, objetivos, métricas de sucesso).
-- [ ] Finalizar fluxo de onboarding (landing, cadastro/login, recuperação de senha, confirmação por e-mail).
+- [x] Finalizar fluxo de onboarding (landing, cadastro/login, recuperação de senha, confirmação por e-mail).
 - [x] Garantir responsividade mobile-first em todas as telas (dashboard, transações, relatórios, perfil).
 - [x] Revisar microcopy, traduções e mensagens de erro em português consistente.
 - [x] Implementar walkthrough ou tutorial inicial opcional no primeiro acesso.

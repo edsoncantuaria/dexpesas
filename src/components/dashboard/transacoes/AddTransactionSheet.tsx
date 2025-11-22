@@ -4,6 +4,7 @@ import { AddTransactionForm } from './add-transaction-form';
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 
 type AddTransactionSheetProps = {
   isOpen: boolean;
@@ -61,8 +62,7 @@ export function AddTransactionSheet({ isOpen, onClose, transaction }: AddTransac
         window.dispatchEvent(new CustomEvent('transaction-updated'));
       }
     } catch (error) {
-      console.error(error);
-      toast({ variant: 'destructive', title: 'Erro ao salvar transação' });
+      handleApiError(error, toast, 'Erro ao salvar transação');
     } finally {
       setIsSubmitting(false);
     }

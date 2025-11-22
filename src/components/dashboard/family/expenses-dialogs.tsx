@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { Clan, CellSharedAccount, Category, Account, CellSharedExpense } from '@/lib/definitions';
 import { parseAmount, toCurrency } from './utils';
 import { Loader2 } from 'lucide-react';
@@ -81,9 +82,9 @@ export function NewSharedExpenseDialog({
                 if (!active) return;
                 setCategories(response.data || []);
             })
-            .catch(() => {
+            .catch((error) => {
                 if (!active) return;
-                toast({ variant: 'destructive', title: 'Erro ao carregar categorias.' });
+                handleApiError(error, toast, 'Erro ao carregar categorias');
             })
             .finally(() => {
                 if (active) setIsLoadingCategories(false);
@@ -164,7 +165,7 @@ export function NewSharedExpenseDialog({
             await onSuccess();
             onOpenChange(false);
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao criar despesa', description: error?.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao criar despesa');
         } finally {
             setIsSubmitting(false);
         }
@@ -372,7 +373,7 @@ export function SettleSharedExpenseDialog({
             toast({ title: 'Pagamento registrado!' });
             await onSuccess();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao registrar pagamento', description: error?.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao registrar pagamento');
         } finally {
             setIsSubmitting(false);
         }

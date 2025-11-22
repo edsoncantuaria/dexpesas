@@ -7,7 +7,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Rotas públicas que não exigem autenticação
-  const publicPaths = ['/', '/register'];
+  const publicPaths = ['/', '/register', '/verify-email', '/forgot-password', '/reset-password'];
   const isPublicPath = publicPaths.includes(pathname);
 
   // Se o usuário está tentando acessar uma rota pública
@@ -23,7 +23,7 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
-  
+
   return NextResponse.next();
 }
 

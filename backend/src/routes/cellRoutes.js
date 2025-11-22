@@ -1,6 +1,6 @@
 // backend/src/routes/cellRoutes.js
 import express from 'express';
-import authMiddleware from '../middlewares/authMiddleware.js';
+import authMiddleware, { requireVerification } from '../middlewares/authMiddleware.js';
 import cellController from '../controllers/cellController.js';
 import validate from '../middlewares/validate.js';
 import {
@@ -23,6 +23,7 @@ import {
 const router = express.Router();
 
 router.use(authMiddleware);
+router.use(requireVerification);
 
 router.get('/', cellController.listCells);
 router.post('/', validate(cellSchema), cellController.createCell);

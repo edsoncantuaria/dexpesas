@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 
 // Mapeia categorias para ícones para uma identificação visual rápida.
 const categoryIcons: Record<string, LucideIcon> = {
@@ -49,11 +50,7 @@ export function TransactionCard({ transaction, onEdit, onDeleteSuccess }: Transa
       });
       onDeleteSuccess();
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao excluir',
-        description: 'Não foi possível remover a transação.',
-      });
+      handleApiError(error, toast, 'Erro ao excluir transação');
     }
   };
 
@@ -72,12 +69,12 @@ export function TransactionCard({ transaction, onEdit, onDeleteSuccess }: Transa
       </div>
       <div className="flex items-center space-x-2">
         <div className="text-right">
-            <p className={cn('font-bold', isIncome ? 'text-green-500' : 'text-foreground')}>
+          <p className={cn('font-bold', isIncome ? 'text-green-500' : 'text-foreground')}>
             {isIncome ? '+' : '-'} {transaction.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </p>
-            <p className={cn("text-xs", transaction.pago ? "text-green-600" : "text-amber-600")}>
-                {transaction.pago ? 'Pago' : 'Pendente'}
-            </p>
+          </p>
+          <p className={cn("text-xs", transaction.pago ? "text-green-600" : "text-amber-600")}>
+            {transaction.pago ? 'Pago' : 'Pendente'}
+          </p>
         </div>
 
         <DropdownMenu>

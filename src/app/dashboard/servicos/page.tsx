@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { useMemo } from 'react';
+import { useToast } from "@/hooks/use-toast";
 import {
     Grid3x3,
     Landmark,
@@ -21,7 +22,8 @@ import {
     Users,
     Swords,
     TrendingUp,
-    Shield
+    Shield,
+    TriangleAlert
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
@@ -129,6 +131,8 @@ const baseServiceItems: ServiceItem[] = [
 
 export default function ServicosPage() {
     const { isClassic, isLite } = useGamificationMode();
+    const { toast } = useToast();
+
     const serviceItems = useMemo(() => {
         const liteOverrides: Record<string, Pick<ServiceItem, 'title' | 'description'>> = {
             '/dashboard/progresso': {
@@ -171,6 +175,22 @@ export default function ServicosPage() {
         return items;
     }, [serviceItems, user]);
 
+    const handleLockedClick = () => {
+        toast({
+            title: "Acesso Restrito",
+            description: "Confirme seu e-mail para desbloquear este recurso.",
+            variant: "destructive",
+        });
+    };
+
+    const lockedRoutes = [
+        '/dashboard/cells',
+        '/dashboard/investimentos', // Corrected from '/dashboard/investments' to match baseServiceItems
+        '/dashboard/regras',
+        '/dashboard/habitos',
+        '/dashboard/automacoes',
+        '/dashboard/reconcile'
+    ];
 
     return (
         <div className="space-y-6">
@@ -183,20 +203,49 @@ export default function ServicosPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {finalServiceItems.map((item) => (
-                    <Link href={item.href} key={item.href} className="group">
-                        <div className="bg-card p-4 rounded-lg border flex items-center gap-4 transition-all group-hover:border-primary group-hover:bg-primary/5 h-full">
-                            <div className={`p-3 rounded-lg ${item.iconBgClass}`}>
-                                <item.Icon className="h-6 w-6" />
+                {finalServiceItems.map((item) => {
+                    const isLocked = !user?.emailVerified && lockedRoutes.some(route => item.href.includes(route));
+
+                    if (isLocked) {
+                        return (
+                            <div
+                                key={item.href}
+                                className="group relative cursor-pointer"
+                                onClick={handleLockedClick}
+                            >
+                                <div className="bg-card p-4 rounded-lg border flex items-center gap-4 h-full opacity-60 grayscale transition-all hover:opacity-80">
+                                    <div className={`p - 3 rounded - lg ${item.iconBgClass} `}>
+                                        <item.Icon className="h-6 w-6" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="font-semibold">{item.title}</h3>
+                                        <p className="text-sm text-muted-foreground">{item.description}</p>
+                                    </div>
+                                    <div className="absolute inset-0 flex items-center justify-center bg-background/10 backdrop-blur-[1px] rounded-lg group-hover:backdrop-blur-none transition-all">
+                                        <div className="bg-background/80 p-2 rounded-full shadow-sm border group-hover:scale-110 transition-transform">
+                                            <TriangleAlert className="h-6 w-6 text-muted-foreground" />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex-1">
-                                <h3 className="font-semibold">{item.title}</h3>
-                                <p className="text-sm text-muted-foreground">{item.description}</p>
+                        );
+                    }
+
+                    return (
+                        <Link href={item.href} key={item.href} className="group">
+                            <div className="bg-card p-4 rounded-lg border flex items-center gap-4 transition-all group-hover:border-primary group-hover:bg-primary/5 h-full">
+                                <div className={`p - 3 rounded - lg ${item.iconBgClass} `}>
+                                    <item.Icon className="h-6 w-6" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="font-semibold">{item.title}</h3>
+                                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                                </div>
+                                <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
                             </div>
-                            <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
-                        </div>
-                    </Link>
-                ))}
+                        </Link>
+                    );
+                })}
             </div>
         </div>
     );

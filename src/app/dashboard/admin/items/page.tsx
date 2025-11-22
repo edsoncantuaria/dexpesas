@@ -8,6 +8,7 @@ import { PlusCircle, Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Item } from '@/lib/definitions';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { ItemsTable } from '@/components/dashboard/admin/items/items-table';
 import { EditItemForm } from '@/components/dashboard/admin/items/edit-item-form';
@@ -27,7 +28,7 @@ export default function AdminItemsPage() {
             const response = await api.get('/items');
             setItems(response.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar itens' });
+            handleApiError(error, toast, 'Erro ao buscar itens');
         } finally {
             setIsLoading(false);
         }
@@ -41,7 +42,7 @@ export default function AdminItemsPage() {
         setEditingItem(item || null);
         setIsDialogOpen(true);
     }
-    
+
     const handleCloseDialog = () => {
         setEditingItem(null);
         setIsDialogOpen(false);
@@ -59,7 +60,7 @@ export default function AdminItemsPage() {
             fetchItems();
             handleCloseDialog();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: `Erro ao ${isEditing ? 'atualizar' : 'criar'} item`, description: error.response?.data?.message });
+            handleApiError(error, toast, `Erro ao ${isEditing ? 'atualizar' : 'criar'} item`);
         } finally {
             setIsSubmitting(false);
         }
@@ -71,7 +72,7 @@ export default function AdminItemsPage() {
             toast({ title: 'Item excluído!', variant: 'destructive' });
             fetchItems();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao excluir');
         }
     };
 
@@ -91,7 +92,7 @@ export default function AdminItemsPage() {
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
-                         <Button onClick={() => handleOpenDialog()}>
+                        <Button onClick={() => handleOpenDialog()}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Novo Item
                         </Button>
@@ -103,7 +104,7 @@ export default function AdminItemsPage() {
                                 Preencha os detalhes do item que será usado como recompensa.
                             </DialogDescription>
                         </DialogHeader>
-                        <EditItemForm 
+                        <EditItemForm
                             item={editingItem}
                             isSubmitting={isSubmitting}
                             onSave={handleSave}

@@ -8,6 +8,7 @@ import { PlusCircle, Shield, Trophy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Achievement } from '@/lib/definitions';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { AchievementsTable } from '@/components/dashboard/admin/achievements/achievements-table';
 import { EditAchievementForm } from '@/components/dashboard/admin/achievements/edit-achievement-form';
@@ -26,7 +27,7 @@ export default function AdminAchievementsPage() {
             const response = await api.get('/achievements');
             setAchievements(response.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar conquistas' });
+            handleApiError(error, toast, 'Erro ao buscar conquistas');
         } finally {
             setIsLoading(false);
         }
@@ -40,7 +41,7 @@ export default function AdminAchievementsPage() {
         setEditingAchievement(achievement || null);
         setIsDialogOpen(true);
     }
-    
+
     const handleCloseDialog = () => {
         setEditingAchievement(null);
         setIsDialogOpen(false);
@@ -58,7 +59,7 @@ export default function AdminAchievementsPage() {
             fetchAchievements();
             handleCloseDialog();
         } catch (error) {
-            toast({ variant: 'destructive', title: `Erro ao ${isEditing ? 'atualizar' : 'criar'} conquista` });
+            handleApiError(error, toast, `Erro ao ${isEditing ? 'atualizar' : 'criar'} conquista`);
         } finally {
             setIsSubmitting(false);
         }
@@ -70,7 +71,7 @@ export default function AdminAchievementsPage() {
             toast({ title: 'Conquista excluída!', variant: 'destructive' });
             fetchAchievements();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao excluir');
         }
     };
 
@@ -90,7 +91,7 @@ export default function AdminAchievementsPage() {
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
-                         <Button onClick={() => handleOpenDialog()}>
+                        <Button onClick={() => handleOpenDialog()}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Nova Conquista
                         </Button>
@@ -102,7 +103,7 @@ export default function AdminAchievementsPage() {
                                 Preencha os detalhes para a nova conquista que os jogadores poderão desbloquear.
                             </DialogDescription>
                         </DialogHeader>
-                        <EditAchievementForm 
+                        <EditAchievementForm
                             achievement={editingAchievement}
                             isSubmitting={isSubmitting}
                             onSave={handleSave}

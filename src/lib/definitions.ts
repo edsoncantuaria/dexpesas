@@ -55,6 +55,7 @@ export type User = {
     }[];
     phoneNumber?: string | null;
     phoneVerified?: boolean;
+    emailVerified?: boolean;
     twoFactorEnabled?: boolean;
     lastSecurityNotificationAt?: string | null;
     gamificationMode?: GamificationMode;

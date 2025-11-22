@@ -34,7 +34,7 @@ class AuthController {
 
             const verification = generateTokenPayload(24); // 24h para confirmar e-mail
             const hashedPassword = await bcrypt.hash(password, 10);
-            
+
             const user = await prisma.$transaction(async (tx) => {
                 // 1. Cria o novo usuário
                 const normalizedMode = gamificationMode && typeof gamificationMode === 'string'
@@ -67,12 +67,12 @@ class AuthController {
                     data: defaultCategories,
                     skipDuplicates: true, // Não falha se a categoria já existir
                 });
-                
+
                 console.log(`✨ Usuário ${newUser.id} criado com sucesso. Categorias padrão verificadas.`);
 
                 return newUser;
             }, {
-              timeout: 20000, // Timeout da transação
+                timeout: 20000, // Timeout da transação
             });
 
             // Dispara o e-mail de confirmação sem bloquear a resposta.
@@ -83,7 +83,7 @@ class AuthController {
             res.status(201).json({ message: 'Usuário registrado com sucesso!', userId: user.id });
         } catch (error) {
             if (error.code === 'P2002') {
-                 return res.status(409).json({ message: `O ${error.meta.target.includes('email') ? 'email' : 'usuário'} já está em uso.` });
+                return res.status(409).json({ message: `O ${error.meta.target.includes('email') ? 'email' : 'usuário'} já está em uso.` });
             }
             console.error("Erro no registro:", error);
             next(error);
@@ -112,7 +112,7 @@ class AuthController {
             }
 
             const token = jwt.sign(
-                { id: user.id, email: user.email },
+                { id: user.id, email: user.email, emailVerified: user.emailVerified },
                 config.jwtSecret,
                 { expiresIn: '1d' }
             );
@@ -125,10 +125,10 @@ class AuthController {
             res.json({
                 message: 'Login bem-sucedido!',
                 token,
-                user: { 
-                    id: user.id, 
-                    name: user.name, 
-                    email: user.email, 
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
                     emailVerified: user.emailVerified,
                     firstOpen: user.firstOpen // Retorna a flag de onboarding
                 }
@@ -248,7 +248,25 @@ class AuthController {
                 }
             });
 
-            res.json({ message: 'E-mail verificado com sucesso.' });
+            console.log(`✅ E-mail verificado para usuário: ${user.email} (ID: ${user.id})`);
+
+            const jwtToken = jwt.sign(
+                { id: user.id, email: user.email, emailVerified: true },
+                config.jwtSecret,
+                { expiresIn: '1d' }
+            );
+
+            res.json({
+                message: 'E-mail verificado com sucesso.',
+                token: jwtToken,
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    emailVerified: true,
+                    firstOpen: user.firstOpen
+                }
+            });
         } catch (error) {
             next(error);
         }
@@ -288,4 +306,4 @@ class AuthController {
 
 export default new AuthController();
 
-    
+

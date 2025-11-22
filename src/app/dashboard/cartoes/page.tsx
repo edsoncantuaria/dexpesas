@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Card } from "@/lib/definitions";
 import { useToast } from "@/hooks/use-toast";
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
@@ -37,11 +38,7 @@ export default function CartoesPage() {
             const response = await api.get('/cards');
             setCards(response.data);
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao buscar cartões',
-                description: 'Não foi possível carregar a lista de cartões.'
-            });
+            handleApiError(error, toast, 'Erro ao buscar cartões');
         } finally {
             setIsLoading(false);
         }
@@ -79,7 +76,7 @@ export default function CartoesPage() {
             toast({ title: `Cartão ${isEditing ? 'atualizado' : 'adicionado'}!` });
             handleCloseForm();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao salvar cartão', description: error.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao salvar cartão');
         } finally {
             setIsSubmitting(false);
         }
@@ -97,11 +94,7 @@ export default function CartoesPage() {
                     variant: 'destructive'
                 });
             } catch (error) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Erro ao excluir cartão',
-                    description: 'Não foi possível remover o cartão.'
-                });
+                handleApiError(error, toast, 'Erro ao excluir cartão');
             }
         }
     };

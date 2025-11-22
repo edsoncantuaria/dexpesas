@@ -8,6 +8,7 @@ import { PlusCircle, Target } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Mission, Item } from '@/lib/definitions';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { MissionsTable } from '@/components/dashboard/admin/missions/missions-table';
 import { EditMissionForm } from '@/components/dashboard/admin/missions/edit-mission-form';
@@ -27,12 +28,12 @@ export default function AdminMissionsPage() {
             // No futuro, teremos uma rota para buscar missões de admin, por agora, a pública serve.
             const [missionsRes, itemsRes] = await Promise.all([
                 api.get('/missions/available'), // Reutilizando endpoint existente por enquanto
-                api.get('/items') 
+                api.get('/items')
             ]);
             setMissions(missionsRes.data);
             setItems(itemsRes.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar dados' });
+            handleApiError(error, toast, 'Erro ao buscar dados');
         } finally {
             setIsLoading(false);
         }
@@ -46,7 +47,7 @@ export default function AdminMissionsPage() {
         setEditingMission(mission || null);
         setIsDialogOpen(true);
     }
-    
+
     const handleCloseDialog = () => {
         setEditingMission(null);
         setIsDialogOpen(false);
@@ -64,7 +65,7 @@ export default function AdminMissionsPage() {
             fetchMissions();
             handleCloseDialog();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: `Erro ao ${isEditing ? 'atualizar' : 'criar'} missão`, description: error.response?.data?.message });
+            handleApiError(error, toast, `Erro ao ${isEditing ? 'atualizar' : 'criar'} missão`);
         } finally {
             setIsSubmitting(false);
         }
@@ -76,7 +77,7 @@ export default function AdminMissionsPage() {
             toast({ title: 'Missão excluída!', variant: 'destructive' });
             fetchMissions();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao excluir');
         }
     };
 
@@ -96,7 +97,7 @@ export default function AdminMissionsPage() {
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
-                         <Button onClick={() => handleOpenDialog()}>
+                        <Button onClick={() => handleOpenDialog()}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Nova Missão
                         </Button>
@@ -108,7 +109,7 @@ export default function AdminMissionsPage() {
                                 Preencha os detalhes e a condição para completar a missão.
                             </DialogDescription>
                         </DialogHeader>
-                        <EditMissionForm 
+                        <EditMissionForm
                             mission={editingMission}
                             items={items}
                             isSubmitting={isSubmitting}

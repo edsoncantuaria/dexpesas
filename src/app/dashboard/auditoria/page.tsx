@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { AuditLog } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,7 +41,7 @@ export default function AuditoriaPage() {
             setLogs(response.data.data);
             setPagination(response.data.pagination);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao carregar auditoria' });
+            handleApiError(error, toast, 'Erro ao carregar auditoria');
         } finally {
             setIsLoading(false);
         }
@@ -61,7 +62,7 @@ export default function AuditoriaPage() {
             setPage(page - 1);
         }
     };
-    
+
     const renderContent = () => {
         if (isLoading) {
             return (
@@ -71,20 +72,20 @@ export default function AuditoriaPage() {
             );
         }
         if (logs.length === 0) {
-             return <p className="text-center text-muted-foreground py-8">Nenhum registro de auditoria encontrado.</p>;
+            return <p className="text-center text-muted-foreground py-8">Nenhum registro de auditoria encontrado.</p>;
         }
-        
+
         if (isMobile) {
             return <AuditLogMobileList logs={logs} />;
         }
-        
+
         return <AuditLogTable logs={logs} />;
     }
 
     return (
         <div className="space-y-6">
             <div className="flex items-center gap-4">
-                 <Button variant="outline" size="icon" asChild>
+                <Button variant="outline" size="icon" asChild>
                     <Link href="/dashboard/configuracoes">
                         <ChevronLeft className="h-4 w-4" />
                     </Link>
@@ -127,5 +128,4 @@ export default function AuditoriaPage() {
         </div>
     );
 }
-    
-    
+

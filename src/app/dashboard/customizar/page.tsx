@@ -6,6 +6,7 @@ import type { User } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Reorder } from 'framer-motion';
 import { CustomizationCard } from '@/components/dashboard/customizar/customization-card';
@@ -49,13 +50,13 @@ export default function CustomizarPage() {
         };
     }, [prefersFinancialCopy]);
 
-     const fetchUser = useCallback(async () => {
+    const fetchUser = useCallback(async () => {
         setIsLoading(true);
         try {
             const response = await api.get('/user');
             setUser(response.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao carregar dados do usuário' });
+            handleApiError(error, toast, 'Erro ao carregar dados do usuário');
         }
     }, [toast]);
 
@@ -65,7 +66,7 @@ export default function CustomizarPage() {
 
     const initializeLayout = useCallback(() => {
         if (!user) return;
-        
+
         let userLayout: string[] = [];
         // Garante que o layout do usuário seja um array
         if (typeof user.dashboardLayout === 'string' && user.dashboardLayout.startsWith('[')) {
@@ -80,7 +81,7 @@ export default function CustomizarPage() {
         }
 
         const enabledCardIds = new Set(userLayout);
-        
+
         const initialCards: DashboardCard[] = cardDefinitions.map(config => ({
             ...config,
             enabled: enabledCardIds.has(config.id),
@@ -94,13 +95,13 @@ export default function CustomizarPage() {
             if (indexB === -1) return -1;
             return indexA - indexB;
         });
-        
+
         setCards(initialCards);
         setIsLoading(false);
     }, [user, cardDefinitions]);
 
     useEffect(() => {
-        if(user) {
+        if (user) {
             initializeLayout();
         }
     }, [user, initializeLayout]);
@@ -110,23 +111,23 @@ export default function CustomizarPage() {
             const layoutToSave = newCards
                 .filter(card => card.enabled)
                 .map(card => card.id);
-                
+
             // Correção: Garante que o layout seja sempre salvo como string JSON
             await api.put('/user/preferences', { dashboardLayout: JSON.stringify(layoutToSave) });
             toast({ title: 'Layout salvo!', description: layoutCopy.toastDescription });
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao salvar layout' });
+            handleApiError(error, toast, 'Erro ao salvar layout');
             initializeLayout(); // Reverte em caso de erro
         }
     };
-    
+
     const handleReorder = (newOrder: DashboardCard[]) => {
         setCards(newOrder);
         saveLayout(newOrder);
     };
 
     const handleToggle = (cardId: string, enabled: boolean) => {
-        const newCards = cards.map(card => 
+        const newCards = cards.map(card =>
             card.id === cardId ? { ...card, enabled } : card
         );
         setCards(newCards);
@@ -139,12 +140,12 @@ export default function CustomizarPage() {
 
     return (
         <div className="space-y-6">
-             <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <LayoutDashboard className="h-8 w-8 text-primary" />
                     <div>
-                    <h1 className="text-3xl font-bold font-headline">Customizar Dashboard</h1>
-                    <p className="text-muted-foreground">Arraste para reordenar ou desative os cards da sua tela inicial.</p>
+                        <h1 className="text-3xl font-bold font-headline">Customizar Dashboard</h1>
+                        <p className="text-muted-foreground">Arraste para reordenar ou desative os cards da sua tela inicial.</p>
                     </div>
                 </div>
                 <Button asChild>

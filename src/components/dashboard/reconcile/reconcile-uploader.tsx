@@ -13,6 +13,7 @@ import { Loader2, UploadCloud, FileText, FileUp, Info } from 'lucide-react';
 import { useState } from 'react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -236,8 +237,7 @@ export function ReconcileUploader({ accounts, cards, templates, onSuccess, onTar
             toast({ title: 'Arquivo enviado!', description: 'Seu extrato está sendo processado em segundo plano.' });
             onSuccess(response.data.reconciliationId, targetId, targetType as 'account' | 'card');
         } catch (error: any) {
-            const message = error?.response?.data?.message || 'Não foi possível enviar o arquivo.';
-            toast({ variant: 'destructive', title: 'Erro no Upload', description: message });
+            handleApiError(error, toast, 'Erro no Upload');
         } finally {
             setIsSubmitting(false);
         }

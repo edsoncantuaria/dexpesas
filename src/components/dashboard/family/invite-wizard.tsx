@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 import { Loader2, Check, UserSearch, Shield, Send } from 'lucide-react';
+import { handleApiError, getApiErrorMessage } from '@/lib/error-handler';
 
 interface InviteWizardProps {
     cellId: string;
@@ -83,7 +84,7 @@ export function InviteWizard({ cellId, open, onClose, onSuccess }: InviteWizardP
             return true;
         } catch (error: any) {
             setLookupResult(null);
-            setLookupError(error?.response?.data?.message || 'Usuário não encontrado.');
+            setLookupError(getApiErrorMessage(error) || 'Usuário não encontrado.');
             return false;
         } finally {
             setIsSearching(false);
@@ -114,11 +115,7 @@ export function InviteWizard({ cellId, open, onClose, onSuccess }: InviteWizardP
             onClose();
             resetWizard();
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Não foi possível enviar o convite.',
-                description: error?.response?.data?.message || 'Revise os dados e tente novamente.',
-            });
+            handleApiError(error, toast, 'Não foi possível enviar o convite.');
         } finally {
             setIsSubmitting(false);
         }

@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -103,7 +104,7 @@ export function ReconcileView({ reconciliation, manualTransactions, onMatch, onD
             toast({ title: 'Transação criada!', description: 'A transação do extrato foi adicionada aos seus lançamentos e conciliada.', className: 'bg-green-100 dark:bg-green-800' });
             onTransactionCreated();
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao criar transação.' });
+            handleApiError(error, toast, 'Erro ao criar transação');
         } finally {
             setIsCreating(null);
         }
@@ -117,7 +118,7 @@ export function ReconcileView({ reconciliation, manualTransactions, onMatch, onD
             toast({ title: 'Importação em Lote Iniciada', description: response.data.message });
             onBulkImportStart();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro na Importação em Lote', description: error.response?.data?.message || 'Tente novamente.' });
+            handleApiError(error, toast, 'Erro na Importação em Lote');
         } finally {
             setIsCreatingAll(false);
         }

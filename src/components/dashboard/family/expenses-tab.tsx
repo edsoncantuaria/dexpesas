@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Filter, ReceiptText, Trash2, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { CellSharedExpense, Clan, CellSharedAccount } from '@/lib/definitions';
 import { toCurrency } from './utils';
 import { NewSharedExpenseDialog, SettleSharedExpenseDialog, SettlementTarget } from './expenses-dialogs';
@@ -86,7 +87,7 @@ export function ExpensesTab({
             toast({ title: 'Despesa removida.' });
             await onRefresh();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao excluir despesa', description: error?.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao excluir despesa');
         }
     };
 

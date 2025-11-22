@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Wallet, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { CellSharedAccount, Clan, Account } from '@/lib/definitions';
 
 interface SharedAccountsCardProps {
@@ -49,13 +50,9 @@ export function SharedAccountsCard({
                 if (!active) return;
                 setAvailableAccounts(response.data || []);
             })
-            .catch(() => {
+            .catch((error) => {
                 if (!active) return;
-                toast({
-                    variant: 'destructive',
-                    title: 'Não foi possível carregar suas contas.',
-                    description: 'Tente novamente em instantes.',
-                });
+                handleApiError(error, toast, 'Não foi possível carregar suas contas');
                 setAvailableAccounts([]);
             })
             .finally(() => {
@@ -110,11 +107,7 @@ export function SharedAccountsCard({
             setDialogOpen(false);
             resetForm();
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Não foi possível compartilhar a conta.',
-                description: error?.response?.data?.message || 'Revise os dados e tente novamente.',
-            });
+            handleApiError(error, toast, 'Não foi possível compartilhar a conta');
         } finally {
             setIsSubmitting(false);
         }
@@ -127,11 +120,7 @@ export function SharedAccountsCard({
             toast({ title: 'Conta removida da família.' });
             await onRefreshSharedAccounts();
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Não foi possível remover a conta.',
-                description: error?.response?.data?.message || 'Tente novamente em instantes.',
-            });
+            handleApiError(error, toast, 'Não foi possível remover a conta');
         } finally {
             setRemovingId(null);
         }

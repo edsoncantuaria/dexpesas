@@ -10,6 +10,8 @@ import api from '@/lib/api';
 import { useToast } from "@/hooks/use-toast";
 import { LoadingScreen } from "@/components/ui/loading-screen";
 
+import { handleApiError } from "@/lib/error-handler";
+
 export default function ConquistasPage() {
     const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
     const [unlockedAchievements, setUnlockedAchievements] = useState<UnlockedAchievement[]>([]);
@@ -26,11 +28,7 @@ export default function ConquistasPage() {
             setAllAchievements(allRes.data);
             setUnlockedAchievements(unlockedRes.data);
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao buscar conquistas',
-                description: 'Não foi possível carregar os dados das conquistas.'
-            });
+            handleApiError(error, toast, 'Erro ao buscar conquistas');
         } finally {
             setIsLoading(false);
         }
@@ -60,10 +58,7 @@ export default function ConquistasPage() {
         } catch (error) {
             // Revert on error
             setUnlockedAchievements(originalUnlocked);
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao atualizar conquista',
-            });
+            handleApiError(error, toast, 'Erro ao atualizar conquista');
         }
     };
 

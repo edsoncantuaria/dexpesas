@@ -33,39 +33,44 @@ export function DesktopSidebar({ links }: DesktopSidebarProps) {
         </Link>
       </div>
       <nav className="flex flex-1 flex-col items-center gap-4 py-4">
-        {links.map((link) => (
-          <NavItem
-            key={link.href}
-            href={link.href}
-            label={link.label}
-            iconName={link.iconName}
-            isMobile={false}
-          />
-        ))}
+        {links.map((link) => {
+          const isLocked = !user?.emailVerified && (link.href.includes('/family') || link.href.includes('/investments'));
+          return (
+            <NavItem
+              key={link.href}
+              href={link.href}
+              label={link.label}
+              iconName={link.iconName}
+              isMobile={false}
+              locked={isLocked}
+              lockedMessage="Verifique seu e-mail para acessar"
+            />
+          );
+        })}
       </nav>
       <div className="mt-auto flex flex-col items-center gap-4 p-4">
         {user?.isAdmin && (
-            <TooltipProvider>
-              <Tooltip delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <Link href="/dashboard/admin">
-                       <Button variant="outline" size="icon" className="rounded-lg">
-                            <Shield className="h-5 w-5 text-primary" />
-                            <span className="sr-only">Painel Admin</span>
-                        </Button>
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>Painel Admin</p>
-                  </TooltipContent>
-              </Tooltip>
-           </TooltipProvider>
+          <TooltipProvider>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <Link href="/dashboard/admin">
+                  <Button variant="outline" size="icon" className="rounded-lg">
+                    <Shield className="h-5 w-5 text-primary" />
+                    <span className="sr-only">Painel Admin</span>
+                  </Button>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Painel Admin</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
         <Link href="/dashboard/configuracoes">
-           <Button variant="ghost" size="icon" className="rounded-lg">
-                <Settings className="h-5 w-5" />
-                <span className="sr-only">Configurações</span>
-           </Button>
+          <Button variant="ghost" size="icon" className="rounded-lg">
+            <Settings className="h-5 w-5" />
+            <span className="sr-only">Configurações</span>
+          </Button>
         </Link>
       </div>
     </aside>

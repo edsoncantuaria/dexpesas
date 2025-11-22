@@ -1,11 +1,14 @@
 // backend/src/routes/investmentRoutes.js
 import express from 'express';
+import authMiddleware, { requireVerification } from '../middlewares/authMiddleware.js';
 import investmentController from '../controllers/investmentController.js';
-import authMiddleware from '../middlewares/authMiddleware.js';
+import validate from '../middlewares/validate.js';
+import { investmentPlanSchema, investmentContributionSchema, investmentHoldingSchema } from '../validators/investmentSchema.js';
 
 const router = express.Router();
 
 router.use(authMiddleware);
+router.use(requireVerification);
 
 router.get('/plan', investmentController.getPlan);
 router.post('/plan', investmentController.upsertPlan);

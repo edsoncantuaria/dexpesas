@@ -47,6 +47,8 @@ import InvestmentProjectionCard from '@/components/dashboard/investments/investm
 import InvestmentEducationCard from '@/components/dashboard/investments/investment-education-card';
 import InvestmentMetricsCard from '@/components/dashboard/investments/investment-metrics-card';
 
+import { handleApiError } from '@/lib/error-handler';
+
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const percentFormatter = new Intl.NumberFormat('pt-BR', { style: 'percent', maximumFractionDigits: 2 });
 const contributionSourceLabel: Record<string, string> = {
@@ -145,12 +147,7 @@ export default function InvestimentosPage() {
           metricsResponse.data && Object.keys(metricsResponse.data).length ? metricsResponse.data : null;
         setMetrics(metricsData);
       } catch (error) {
-        console.error(error);
-        toast({
-          variant: 'destructive',
-          title: 'Erro ao carregar investimentos',
-          description: 'Não foi possível carregar os dados. Tente novamente em instantes.',
-        });
+        handleApiError(error, toast, 'Erro ao carregar investimentos');
       } finally {
         showLoader ? setIsPageLoading(false) : setIsRefreshing(false);
       }
@@ -197,12 +194,7 @@ export default function InvestimentosPage() {
       toast({ title: 'Plano atualizado!', description: 'O planejamento foi salvo com sucesso.' });
       await fetchAll();
     } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao salvar plano',
-        description: 'Verifique os dados e tente novamente.',
-      });
+      handleApiError(error, toast, 'Erro ao salvar plano');
     } finally {
       setIsPlanSaving(false);
     }
@@ -225,12 +217,7 @@ export default function InvestimentosPage() {
       setIsOnboardingOpen(false);
       await fetchAll();
     } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao configurar plano',
-        description: 'Não foi possível concluir o onboarding. Confira os valores e tente novamente.',
-      });
+      handleApiError(error, toast, 'Erro ao configurar plano');
     } finally {
       setIsSubmittingOnboarding(false);
     }
@@ -248,12 +235,7 @@ export default function InvestimentosPage() {
       toast({ title: 'Holding criado!', description: 'Agora você pode acompanhar esse investimento.' });
       await fetchAll();
     } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao criar holding',
-        description: 'Revise os dados e tente novamente.',
-      });
+      handleApiError(error, toast, 'Erro ao criar holding');
     }
   };
 
@@ -266,12 +248,7 @@ export default function InvestimentosPage() {
       toast({ title: 'Holding atualizado!', description: 'As informações foram salvas.' });
       await fetchAll();
     } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao atualizar holding',
-        description: 'Não foi possível salvar as alterações.',
-      });
+      handleApiError(error, toast, 'Erro ao atualizar holding');
     }
   };
 
@@ -281,12 +258,7 @@ export default function InvestimentosPage() {
       toast({ title: 'Holding removido', description: 'Removemos a carteira da sua visão.' });
       await fetchAll();
     } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao remover holding',
-        description: 'Tente novamente em instantes.',
-      });
+      handleApiError(error, toast, 'Erro ao remover holding');
     }
   };
 
@@ -307,12 +279,7 @@ export default function InvestimentosPage() {
       setIsContributionDialogOpen(false);
       await fetchAll();
     } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao registrar aporte',
-        description: 'Não foi possível registrar o aporte. Tente novamente.',
-      });
+      handleApiError(error, toast, 'Erro ao registrar aporte');
     } finally {
       setIsSubmittingContribution(false);
     }
@@ -324,12 +291,7 @@ export default function InvestimentosPage() {
       toast({ title: 'Holding atualizado!', description: 'Meta vinculada com sucesso.' });
       await fetchAll();
     } catch (error) {
-      console.error(error);
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao vincular meta',
-        description: 'Não foi possível atualizar o holding. Tente novamente.',
-      });
+      handleApiError(error, toast, 'Erro ao vincular meta');
     }
   };
 

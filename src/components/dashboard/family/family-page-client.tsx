@@ -16,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Users, Plus, LayoutDashboard, ReceiptText, PieChart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { handleApiError } from '@/lib/error-handler';
 
 export default function FamilyPageClient() {
     const { user, fetchUser } = useUser();
@@ -70,12 +71,7 @@ export default function FamilyPageClient() {
                 return;
             }
 
-            console.error('Failed to fetch cell data:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao carregar dados.',
-                description: 'Não foi possível carregar as informações da família.',
-            });
+            handleApiError(error, toast, 'Erro ao carregar dados');
         } finally {
             setIsLoading(false);
         }
@@ -91,11 +87,7 @@ export default function FamilyPageClient() {
             toast({ title: 'Convite aceito!', description: 'Bem-vindo à família.' });
             await fetchCellData();
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao aceitar convite.',
-                description: error?.response?.data?.message,
-            });
+            handleApiError(error, toast, 'Erro ao aceitar convite');
         }
     };
 
@@ -105,11 +97,7 @@ export default function FamilyPageClient() {
             toast({ title: 'Convite recusado.' });
             setInvitations((prev) => prev.filter((inv) => inv.id !== inviteId));
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao recusar convite.',
-                description: error?.response?.data?.message,
-            });
+            handleApiError(error, toast, 'Erro ao recusar convite');
         }
     };
 
@@ -121,11 +109,7 @@ export default function FamilyPageClient() {
             await fetchCellData();
             setCreateDialogOpen(false);
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao criar família.',
-                description: error?.response?.data?.message || 'Tente novamente.',
-            });
+            handleApiError(error, toast, 'Erro ao criar família');
         }
     };
 

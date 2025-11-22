@@ -8,6 +8,7 @@ import { PlusCircle, Skull } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Boss } from '@/lib/definitions';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { BossesTable } from '@/components/dashboard/admin/bosses/bosses-table';
 import { EditBossForm } from '@/components/dashboard/admin/bosses/edit-boss-form';
@@ -26,7 +27,7 @@ export default function AdminBossesPage() {
             const response = await api.get('/bosses/admin');
             setBosses(response.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar chefes' });
+            handleApiError(error, toast, 'Erro ao buscar chefes');
         } finally {
             setIsLoading(false);
         }
@@ -40,7 +41,7 @@ export default function AdminBossesPage() {
         setEditingBoss(boss || null);
         setIsDialogOpen(true);
     }
-    
+
     const handleCloseDialog = () => {
         setEditingBoss(null);
         setIsDialogOpen(false);
@@ -58,7 +59,7 @@ export default function AdminBossesPage() {
             fetchBosses();
             handleCloseDialog();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: `Erro ao ${isEditing ? 'atualizar' : 'criar'} chefe`, description: error.response?.data?.message });
+            handleApiError(error, toast, `Erro ao ${isEditing ? 'atualizar' : 'criar'} chefe`);
         } finally {
             setIsSubmitting(false);
         }
@@ -70,7 +71,7 @@ export default function AdminBossesPage() {
             toast({ title: 'Chefe excluído!', variant: 'destructive' });
             fetchBosses();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao excluir', description: error.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao excluir');
         }
     };
 
@@ -90,7 +91,7 @@ export default function AdminBossesPage() {
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
-                         <Button onClick={() => handleOpenDialog()}>
+                        <Button onClick={() => handleOpenDialog()}>
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Novo Chefe
                         </Button>
@@ -102,7 +103,7 @@ export default function AdminBossesPage() {
                                 Defina o HP, recompensas e período de atividade do chefe.
                             </DialogDescription>
                         </DialogHeader>
-                        <EditBossForm 
+                        <EditBossForm
                             boss={editingBoss}
                             isSubmitting={isSubmitting}
                             onSave={handleSave}

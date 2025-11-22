@@ -11,6 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { AIInsightCard } from '@/components/dashboard/ai/ai-insight-card';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { handleApiError } from '@/lib/error-handler';
+
 export function HabitAnalysis() {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,11 +28,7 @@ export function HabitAnalysis() {
       setAnalysis(response.data.analysis);
     } catch (err) {
       setError('Não foi possível obter a análise de hábitos.');
-      toast({
-        variant: 'destructive',
-        title: 'Erro na Análise',
-        description: 'Não foi possível se conectar ao serviço de IA.'
-      });
+      handleApiError(err, toast, 'Erro na Análise');
     } finally {
       setLoading(false);
     }

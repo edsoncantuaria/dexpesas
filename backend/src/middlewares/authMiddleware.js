@@ -23,4 +23,14 @@ const authMiddleware = (req, res, next) => {
     }
 };
 
+export const requireVerification = (req, res, next) => {
+    if (!req.user || !req.user.emailVerified) {
+        return res.status(403).json({
+            message: 'E-mail não verificado. Por favor, verifique seu e-mail para acessar este recurso.',
+            code: 'EMAIL_NOT_VERIFIED'
+        });
+    }
+    next();
+};
+
 export default authMiddleware;

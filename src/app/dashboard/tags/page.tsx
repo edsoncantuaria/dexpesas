@@ -5,20 +5,21 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Tag } from '@/lib/definitions';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { Button } from '@/components/ui/button';
 import { Tags as TagsIcon, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
 export default function TagsPage() {
@@ -33,7 +34,7 @@ export default function TagsPage() {
             const response = await api.get('/tags');
             setTags(response.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao carregar tags' });
+            handleApiError(error, toast, 'Erro ao carregar tags');
         } finally {
             setIsLoading(false);
         }
@@ -52,10 +53,10 @@ export default function TagsPage() {
             setTagToDelete(null);
             fetchTags(); // Recarrega a lista
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao remover tag' });
+            handleApiError(error, toast, 'Erro ao remover tag');
         }
     };
-    
+
     if (isLoading) {
         return <LoadingScreen />
     }

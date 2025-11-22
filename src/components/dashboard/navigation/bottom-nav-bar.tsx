@@ -7,6 +7,8 @@ import { motion } from 'framer-motion';
 import { useTransactionForm } from '@/contexts/TransactionFormContext';
 
 
+import { useUser } from '@/contexts/UserContext';
+
 type BottomNavBarProps = {
   links: Array<{
     href: string;
@@ -17,7 +19,8 @@ type BottomNavBarProps = {
 
 export function BottomNavBar({ links }: BottomNavBarProps) {
   const { openForm } = useTransactionForm();
-  
+  const { user } = useUser();
+
   // Divide os links para posicionar o botão de Ação no meio
   const firstHalf = links.slice(0, 2);
   const secondHalf = links.slice(2);
@@ -29,37 +32,45 @@ export function BottomNavBar({ links }: BottomNavBarProps) {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 h-20 border-t bg-background/95 backdrop-blur-sm md:hidden">
       <nav className="relative flex h-full items-center justify-around">
-        {firstHalf.map((link) => (
-          <NavItem
-            key={link.href}
-            href={link.href}
-            label={link.label}
-            iconName={link.iconName}
-            isMobile
-          />
-        ))}
+        {firstHalf.map((link) => {
+          const isLocked = !user?.emailVerified && (link.href.includes('/family') || link.href.includes('/investments'));
+          return (
+            <NavItem
+              key={link.href}
+              href={link.href}
+              label={link.label}
+              iconName={link.iconName}
+              isMobile
+              locked={isLocked}
+            />
+          );
+        })}
 
-         {/* Botão de Ação Flutuante (FAB) para Adicionar Transação */}
+        {/* Botão de Ação Flutuante (FAB) para Adicionar Transação */}
         <div className="absolute left-1/2 -translate-x-1/2 -top-7">
           <motion.button
-              onClick={handleAddClick}
-              whileTap={{ scale: 0.9 }}
-              className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
-              aria-label="Adicionar nova transação"
+            onClick={handleAddClick}
+            whileTap={{ scale: 0.9 }}
+            className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
+            aria-label="Adicionar nova transação"
           >
-              <Plus className="h-7 w-7" />
+            <Plus className="h-7 w-7" />
           </motion.button>
         </div>
-        
-        {secondHalf.map((link) => (
-          <NavItem
-            key={link.href}
-            href={link.href}
-            label={link.label}
-            iconName={link.iconName}
-            isMobile
-          />
-        ))}
+
+        {secondHalf.map((link) => {
+          const isLocked = !user?.emailVerified && (link.href.includes('/family') || link.href.includes('/investments'));
+          return (
+            <NavItem
+              key={link.href}
+              href={link.href}
+              label={link.label}
+              iconName={link.iconName}
+              isMobile
+              locked={isLocked}
+            />
+          );
+        })}
 
       </nav>
     </div>

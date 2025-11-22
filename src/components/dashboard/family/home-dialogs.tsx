@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { useUser } from '@/contexts/UserContext';
 import { Clan, CellBudget, CellFund, Category, Account } from '@/lib/definitions';
 import { parseAmount, toCurrency } from './utils';
@@ -65,9 +66,9 @@ export function CreateBudgetDialog({ open, onOpenChange, onSuccess, members }: {
                 if (isMounted) {
                     setCategories(response.data || []);
                 }
-            } catch {
+            } catch (error) {
                 if (isMounted) {
-                    toast({ variant: 'destructive', title: 'Não foi possível carregar categorias' });
+                    handleApiError(error, toast, 'Não foi possível carregar categorias');
                     setCategories([]);
                 }
             } finally {
@@ -135,7 +136,7 @@ export function CreateBudgetDialog({ open, onOpenChange, onSuccess, members }: {
             await onSuccess();
             onOpenChange(false);
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Não foi possível criar o orçamento.', description: error?.response?.data?.message || 'Tente novamente.' });
+            handleApiError(error, toast, 'Não foi possível criar o orçamento');
         } finally {
             setIsSubmitting(false);
         }
@@ -270,7 +271,7 @@ export function CreateFundDialog({ open, onOpenChange, onSuccess, members }: { o
             onOpenChange(false);
             setForm({ name: '', targetAmount: '', custodianId: '', withdrawalRoles: [], mirrorToCustodian: false });
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao criar caixinha', description: error?.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao criar caixinha');
         } finally {
             setIsSubmitting(false);
         }
@@ -398,7 +399,7 @@ export function FundActionDialog({
             setNotes('');
             setSourceAccountId('');
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro na operação', description: error?.response?.data?.message });
+            handleApiError(error, toast, 'Erro na operação');
         } finally {
             setIsSubmitting(false);
         }

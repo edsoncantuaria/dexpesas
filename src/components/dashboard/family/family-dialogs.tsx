@@ -10,6 +10,7 @@ import { ClanIcon } from '@/components/dashboard/clans/clan-icon';
 import { ImagePlus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import type { Clan } from '@/lib/definitions';
 
 export function CreateCellDialog({ open, onOpenChange, onSubmit }: { open: boolean; onOpenChange: (open: boolean) => void; onSubmit: (values: { name: string; description?: string; iconUrl?: string }) => Promise<void> }) {
@@ -33,10 +34,7 @@ export function CreateCellDialog({ open, onOpenChange, onSubmit }: { open: boole
             setIconObjectName(response.data.objectName);
             toast({ title: 'Imagem enviada com sucesso.' });
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Não foi possível enviar a imagem.',
-            });
+            handleApiError(error, toast, 'Não foi possível enviar a imagem');
         } finally {
             setIsUploading(false);
         }
@@ -162,10 +160,7 @@ export function EditCellDialog({
             setIconObjectName(response.data.objectName);
             toast({ title: 'Imagem enviada com sucesso.' });
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Não foi possível enviar a imagem.',
-            });
+            handleApiError(error, toast, 'Não foi possível enviar a imagem');
         } finally {
             setIsUploading(false);
         }
@@ -184,11 +179,7 @@ export function EditCellDialog({
             await onSuccess();
             onOpenChange(false);
         } catch (error: any) {
-            toast({
-                variant: 'destructive',
-                title: 'Não foi possível salvar.',
-                description: error?.response?.data?.message || 'Tente novamente em instantes.',
-            });
+            handleApiError(error, toast, 'Não foi possível salvar');
         } finally {
             setIsSubmitting(false);
         }

@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import api from '@/lib/api';
 import type { Reconciliation } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -48,7 +49,7 @@ export function ReconciliationHistoryList({ onResume, onFinalize }: HistoryListP
             const response = await api.get('/reconcile/history');
             setHistory(response.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar histórico' });
+            handleApiError(error, toast, 'Erro ao buscar histórico');
         } finally {
             setIsLoading(false);
         }

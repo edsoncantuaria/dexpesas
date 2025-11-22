@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CategorizationRule, Category } from '@/lib/definitions';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Trash2, Loader2, Wand2, ArrowRight, Search, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -129,7 +130,7 @@ export default function RegrasPage() {
       setRules(rulesRes.data);
       setCategories(catRes.data.filter((c: Category) => c.type === 'despesa'));
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao buscar dados' });
+      handleApiError(error, toast, 'Erro ao buscar dados');
     } finally {
       setIsLoading(false);
     }
@@ -164,7 +165,7 @@ export default function RegrasPage() {
       fetchData();
       setIsFormOpen(false);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao salvar regra' });
+      handleApiError(error, toast, 'Erro ao salvar regra');
     } finally {
       setIsSaving(false);
     }
@@ -179,7 +180,7 @@ export default function RegrasPage() {
       toast({ title: 'Regra removida.' });
     } catch (error) {
       setRules(originalRules);
-      toast({ variant: 'destructive', title: 'Erro ao remover regra' });
+      handleApiError(error, toast, 'Erro ao remover regra');
     }
   };
 
@@ -191,7 +192,7 @@ export default function RegrasPage() {
       fetchData();
       setIsDeleteAllAlertOpen(false);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao excluir regras' });
+      handleApiError(error, toast, 'Erro ao excluir regras');
     } finally {
       setIsSaving(false);
     }

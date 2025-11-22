@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ReconcileHero } from './reconcile-hero';
 import { motion } from 'framer-motion';
+import { handleApiError } from '@/lib/error-handler';
 
 type Target = (Account | CardType) & { type: 'account' | 'card' };
 
@@ -47,7 +48,7 @@ export function ReconcilePageClient() {
             setCards(cardRes.data);
             setTemplates(tempRes.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar dados iniciais' });
+            handleApiError(error, toast, 'Erro ao buscar dados iniciais');
         } finally {
             setIsLoading(false);
         }
@@ -74,7 +75,7 @@ export function ReconcilePageClient() {
             const res = await api.get(`/transactions?${queryParams}`);
             setManualTransactions(res.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar transações manuais' });
+            handleApiError(error, toast, 'Erro ao buscar transações manuais');
         }
     }, [toast]);
 
@@ -160,7 +161,7 @@ export function ReconcilePageClient() {
             }
             toast({ title: 'Conciliado!', description: 'A transação foi conciliada com sucesso.', className: 'bg-green-100 dark:bg-green-800' });
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao conciliar transação.' });
+            handleApiError(error, toast, 'Erro ao conciliar transação');
         }
     };
 
@@ -172,7 +173,7 @@ export function ReconcilePageClient() {
             }
             toast({ title: 'Transação Descartada.', variant: 'destructive' });
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao descartar transação.' });
+            handleApiError(error, toast, 'Erro ao descartar transação');
         }
     };
 
@@ -217,7 +218,7 @@ export function ReconcilePageClient() {
             setManualTransactions([]);
             setHistoryKey(Date.now());
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao cancelar.' });
+            handleApiError(error, toast, 'Erro ao cancelar');
         }
     };
 

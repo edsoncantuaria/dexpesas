@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Goal, Account, Category, GoalContribution, User } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { AddGoalForm } from '@/components/dashboard/metas/add-goal-form';
 import { GoalList } from '@/components/dashboard/metas/goal-list';
@@ -47,11 +48,7 @@ export default function MetasPage() {
             setCategories(categoriesRes.data.filter((c: Category) => c.nome !== 'Investimentos'));
             setUser(userRes.data);
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao buscar dados',
-                description: 'Não foi possível carregar as informações para as metas.'
-            });
+            handleApiError(error, toast, 'Erro ao buscar dados');
         } finally {
             setIsLoading(false);
         }
@@ -87,7 +84,7 @@ export default function MetasPage() {
             setCurrentContributions(res.data);
             setViewingGoal(goal);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar histórico.' });
+            handleApiError(error, toast, 'Erro ao buscar histórico');
         }
     };
     const handleCloseDetails = () => setViewingGoal(null);
@@ -107,12 +104,7 @@ export default function MetasPage() {
             });
             handleCloseForm();
         } catch (error: any) {
-            const message = error.response?.data?.message || 'Não foi possível salvar a meta.';
-            toast({
-                variant: 'destructive',
-                title: `Erro ao salvar meta`,
-                description: message,
-            });
+            handleApiError(error, toast, 'Erro ao salvar meta');
         } finally {
             setIsSubmitting(false);
         }
@@ -130,12 +122,7 @@ export default function MetasPage() {
             });
             handleCloseContribution();
         } catch (error: any) {
-            const message = error.response?.data?.message || 'Não foi possível adicionar a contribuição.';
-            toast({
-                variant: 'destructive',
-                title: `Erro ao contribuir`,
-                description: message,
-            });
+            handleApiError(error, toast, 'Erro ao contribuir');
         } finally {
             setIsSubmitting(false);
         }
@@ -153,8 +140,7 @@ export default function MetasPage() {
             });
             handleCloseFinalize();
         } catch (error: any) {
-            const message = error.response?.data?.message || 'Não foi possível finalizar a meta.';
-            toast({ variant: 'destructive', title: 'Erro ao Finalizar', description: message });
+            handleApiError(error, toast, 'Erro ao Finalizar');
         } finally {
             setIsSubmitting(false);
         }
@@ -169,7 +155,7 @@ export default function MetasPage() {
             toast({ title: "Valor Resgatado!", description: "O saldo da meta foi transferido para sua conta." });
             handleCloseRescue();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao resgatar', description: error.response?.data?.message || "Tente novamente." });
+            handleApiError(error, toast, 'Erro ao resgatar');
         } finally {
             setIsSubmitting(false);
         }
@@ -187,10 +173,7 @@ export default function MetasPage() {
                     variant: 'destructive'
                 });
             } catch (error) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Erro ao excluir meta',
-                });
+                handleApiError(error, toast, 'Erro ao excluir meta');
             }
         }
     };

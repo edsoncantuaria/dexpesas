@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import Cookies from 'js-cookie';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { handleApiError } from '@/lib/error-handler';
 
 const loginSchema = z.object({
   identifier: z.string().min(1, 'Email ou usuário é obrigatório.'),
@@ -103,12 +104,7 @@ export function AuthForm({ type }: AuthFormProps) {
         router.refresh();
       }
     } catch (error: any) {
-      const message = error.response?.data?.message || `Erro ao ${type === 'login' ? 'entrar' : 'registrar'}. Tente novamente.`;
-      toast({
-        variant: 'destructive',
-        title: `Falha no ${type === 'login' ? 'Login' : 'Cadastro'}`,
-        description: message,
-      });
+      handleApiError(error, toast, `Falha no ${type === 'login' ? 'Login' : 'Cadastro'}`);
     } finally {
       setIsLoading(false);
     }

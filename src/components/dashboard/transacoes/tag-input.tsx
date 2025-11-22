@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import type { Tag } from '@/lib/definitions';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 
 interface TagInputProps {
   allTags: Tag[];
@@ -48,20 +49,20 @@ export function TagInput({ allTags, selectedTags, onChange, onTagsUpdate }: TagI
     if (!selectedTags.includes(tagId)) {
       onChange([...selectedTags, tagId]);
     } else {
-        handleUnselect(tagId);
+      handleUnselect(tagId);
     }
   };
 
   const handleCreateTag = async () => {
     const newTagName = inputValue.trim();
     if (newTagName === '') return;
-    
+
     // Otimista: verifica se a tag já existe localmente
     const existingTag = allTags.find(tag => tag.name.toLowerCase() === newTagName.toLowerCase());
     if (existingTag) {
-        handleSelect(existingTag.id);
-        setInputValue('');
-        return;
+      handleSelect(existingTag.id);
+      setInputValue('');
+      return;
     }
 
     try {
@@ -71,17 +72,13 @@ export function TagInput({ allTags, selectedTags, onChange, onTagsUpdate }: TagI
       handleSelect(newTag.id); // Seleciona a nova tag
       setInputValue('');
     } catch (error: any) {
-      toast({
-        variant: 'destructive',
-        title: 'Erro ao criar tag',
-        description: error.response?.data?.message || 'Não foi possível criar a tag.',
-      });
+      handleApiError(error, toast, 'Erro ao criar tag');
     }
   };
 
   return (
     <div className="space-y-2">
-       <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             variant="outline"
@@ -89,7 +86,7 @@ export function TagInput({ allTags, selectedTags, onChange, onTagsUpdate }: TagI
             aria-expanded={open}
             className="w-full h-auto justify-start"
           >
-             <div className="flex gap-1 flex-wrap">
+            <div className="flex gap-1 flex-wrap">
               {selectedTagObjects.length > 0 ? selectedTagObjects.map(tag => (
                 <Badge
                   key={tag.id}
@@ -97,26 +94,26 @@ export function TagInput({ allTags, selectedTags, onChange, onTagsUpdate }: TagI
                   className="mr-1 group/badge"
                 >
                   {tag.name}
-                   <span
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`Remover ${tag.name}`}
-                        onKeyDown={(e) => {
-                           if (e.key === 'Enter' || e.key === ' ') {
-                               e.preventDefault();
-                               e.stopPropagation();
-                               handleUnselect(tag.id);
-                           }
-                        }}
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation(); // Impede que o popover abra/feche
-                            handleUnselect(tag.id);
-                        }}
-                        className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    >
-                        <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                    </span>
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Remover ${tag.name}`}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleUnselect(tag.id);
+                      }
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation(); // Impede que o popover abra/feche
+                      handleUnselect(tag.id);
+                    }}
+                    className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  >
+                    <X className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+                  </span>
                 </Badge>
               )) : (
                 <span className="text-muted-foreground">Selecione ou crie tags...</span>
@@ -126,50 +123,50 @@ export function TagInput({ allTags, selectedTags, onChange, onTagsUpdate }: TagI
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
           <Command>
-            <CommandInput 
-                placeholder="Buscar ou criar tag..."
-                value={inputValue}
-                onValueChange={setInputValue}
+            <CommandInput
+              placeholder="Buscar ou criar tag..."
+              value={inputValue}
+              onValueChange={setInputValue}
             />
             <CommandList>
-                <CommandEmpty>
-                    <button
-                        type="button"
-                        className="w-full text-left p-2 text-sm hover:bg-muted rounded-md flex items-center"
-                        onClick={handleCreateTag}
-                    >
-                       <PlusCircle className="mr-2 h-4 w-4" /> Criar nova tag: "{inputValue}"
-                    </button>
-                </CommandEmpty>
-                <CommandGroup>
+              <CommandEmpty>
+                <button
+                  type="button"
+                  className="w-full text-left p-2 text-sm hover:bg-muted rounded-md flex items-center"
+                  onClick={handleCreateTag}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" /> Criar nova tag: "{inputValue}"
+                </button>
+              </CommandEmpty>
+              <CommandGroup>
                 {allTags.map((tag) => (
-                    <CommandItem
+                  <CommandItem
                     key={tag.id}
                     onSelect={() => {
-                        handleSelect(tag.id);
+                      handleSelect(tag.id);
                     }}
-                    >
+                  >
                     <Check
-                        className={cn(
+                      className={cn(
                         'mr-2 h-4 w-4',
                         selectedTags.includes(tag.id) ? 'opacity-100' : 'opacity-0'
-                        )}
+                      )}
                     />
                     {tag.name}
-                    </CommandItem>
+                  </CommandItem>
                 ))}
-                </CommandGroup>
-                {inputValue && !allTags.some(t => t.name.toLowerCase() === inputValue.toLowerCase()) && (
-                    <>
-                    <CommandSeparator />
-                    <CommandGroup>
-                         <CommandItem onSelect={handleCreateTag}>
-                           <PlusCircle className="mr-2 h-4 w-4" />
-                            Criar e selecionar "{inputValue}"
-                        </CommandItem>
-                    </CommandGroup>
-                    </>
-                )}
+              </CommandGroup>
+              {inputValue && !allTags.some(t => t.name.toLowerCase() === inputValue.toLowerCase()) && (
+                <>
+                  <CommandSeparator />
+                  <CommandGroup>
+                    <CommandItem onSelect={handleCreateTag}>
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Criar e selecionar "{inputValue}"
+                    </CommandItem>
+                  </CommandGroup>
+                </>
+              )}
             </CommandList>
           </Command>
         </PopoverContent>

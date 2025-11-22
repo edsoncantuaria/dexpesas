@@ -20,6 +20,7 @@ import { PayBillDialog } from './pay-bill-dialog';
 import { getInvoicePeriod } from '@/lib/date-helpers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CardLimitStatus } from './card-limit-status';
+import { handleApiError } from '@/lib/error-handler';
 
 interface FaturaClientPageProps {
   cardId: string;
@@ -67,7 +68,7 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
         router.push('/dashboard/cartoes');
       }
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao carregar dados da fatura' });
+      handleApiError(error, toast, 'Erro ao carregar dados da fatura');
       router.push('/dashboard/cartoes');
     } finally {
       setIsLoading(false);
@@ -123,7 +124,7 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
       await fetchData();
       toast({ title: 'Transação excluída!', variant: 'destructive' });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao excluir transação' });
+      handleApiError(error, toast, 'Erro ao excluir transação');
     }
   };
 
@@ -135,8 +136,7 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
       toast({ title: 'Pagamento Registrado!', description: `O pagamento da fatura do cartão ${card.nome} foi registrado.` });
       setIsPayDialogOpen(false);
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Não foi possível registrar o pagamento.';
-      toast({ variant: 'destructive', title: 'Erro ao registrar pagamento', description: message });
+      handleApiError(error, toast, 'Erro ao registrar pagamento');
     }
   };
 

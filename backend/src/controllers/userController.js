@@ -4,11 +4,20 @@ import pkg from '@prisma/client';
 const { PrismaClient } = pkg;
 import bcrypt from 'bcryptjs';
 import GamificationService from '../services/gamificationService.js';
+import crypto from 'crypto';
+import EmailService from '../services/emailService.js';
 import { decryptValue, encryptValue } from '../utils/fieldEncryption.js';
 
 const prisma = new PrismaClient();
 
 const ALLOWED_GAMIFICATION_MODES = ['FULL', 'LITE', 'OFF'];
+
+const generateTokenPayload = (hoursValid = 1) => {
+    const token = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date(Date.now() + hoursValid * 60 * 60 * 1000);
+    return { token, hash, expiresAt };
+};
 
 class UserController {
     async getUser(req, res, next) {
@@ -18,6 +27,7 @@ class UserController {
                 select: {
                     id: true,
                     email: true,
+                    emailVerified: true,
                     username: true,
                     name: true,
                     age: true,
@@ -233,14 +243,39 @@ class UserController {
     async updateAccountInfo(req, res, next) {
         const { email, username } = req.body;
         try {
+            const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
+
+            const data = { username };
+            let emailChanged = false;
+
+            if (email && email !== currentUser.email) {
+                data.email = email;
+                data.emailVerified = false;
+                const verification = generateTokenPayload(24);
+                data.emailVerificationToken = verification.hash;
+                data.emailVerificationExpires = verification.expiresAt;
+                emailChanged = true;
+
+                // Envia o email para o novo endereço
+                EmailService.sendEmailVerification(email, verification.token).catch((error) => {
+                    console.error('Falha ao enviar e-mail de verificação para novo endereço:', error.message);
+                });
+            }
+
             const updatedUser = await prisma.user.update({
                 where: { id: req.user.id },
-                data: { email, username },
+                data,
                 select: {
-                    id: true, email: true, username: true, name: true
+                    id: true, email: true, username: true, name: true, emailVerified: true
                 }
             });
-            res.json(updatedUser);
+
+            res.json({
+                ...updatedUser,
+                message: emailChanged
+                    ? 'Perfil atualizado. Um link de verificação foi enviado para o novo e-mail.'
+                    : 'Perfil atualizado com sucesso.'
+            });
         } catch (error) {
             if (error.code === 'P2002') {
                 return res.status(409).json({ message: `O ${error.meta.target.includes('email') ? 'email' : 'usuário'} já está em uso.` });

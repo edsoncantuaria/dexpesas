@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Account, Automation, Goal, Transaction } from '@/lib/definitions';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -37,26 +38,26 @@ type RecurringExpenseWithAutomation = Transaction & { automation: Automation | n
  */
 function BillPayAutomationRow({ item, accounts, onToggle, onAccountChange, isSaving }: { item: RecurringExpenseWithAutomation, accounts: Account[], onToggle: (recorrenciaId: string, enabled: boolean) => void, onAccountChange: (recorrenciaId: string, accountId: string) => void, isSaving: boolean }) {
     const form = useForm({
-        defaultValues: { 
+        defaultValues: {
             enabled: item.automation?.enabled || false,
             sourceAccountId: (item.automation?.config as any)?.sourceAccountId || '',
         }
     });
 
     useEffect(() => {
-        form.reset({ 
+        form.reset({
             enabled: item.automation?.enabled || false,
             sourceAccountId: (item.automation?.config as any)?.sourceAccountId || '',
         });
     }, [item.automation, form]);
-    
+
     return (
         <Form {...form}>
-             <TableRow key={item.id}>
+            <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.descricao.replace(/\s\(\d+\/\d+\)$/, '')}</TableCell>
                 <TableCell>{Number(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</TableCell>
                 <TableCell>
-                     <Select
+                    <Select
                         value={form.watch('sourceAccountId')}
                         onValueChange={(value) => {
                             form.setValue('sourceAccountId', value);
@@ -68,14 +69,14 @@ function BillPayAutomationRow({ item, accounts, onToggle, onAccountChange, isSav
                             <SelectValue placeholder="Conta de Origem" />
                         </SelectTrigger>
                         <SelectContent>
-                             {accounts.map(acc => (
+                            {accounts.map(acc => (
                                 <SelectItem key={acc.id} value={acc.id}>{acc.nome}</SelectItem>
-                             ))}
+                            ))}
                         </SelectContent>
                     </Select>
                 </TableCell>
                 <TableCell className="text-right">
-                     <Switch
+                    <Switch
                         checked={form.watch('enabled')}
                         onCheckedChange={(checked) => {
                             form.setValue('enabled', checked);
@@ -117,7 +118,7 @@ export default function AutomacoesPage() {
             setGoals(goalsRes.data.filter((g: Goal) => g.status === 'IN_PROGRESS'));
             setBillPayAutomations(billPayRes.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar dados' });
+            handleApiError(error, toast, 'Erro ao buscar dados');
         } finally {
             setIsLoading(false);
         }
@@ -127,7 +128,7 @@ export default function AutomacoesPage() {
         setIsLoading(true);
         fetchData();
     }, [fetchData]);
-    
+
     useEffect(() => {
         if (roundUpAutomation) {
             const config = roundUpAutomation.config || {};
@@ -148,12 +149,12 @@ export default function AutomacoesPage() {
             toast({ title: 'Automação atualizada com sucesso!' });
             fetchData();
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao atualizar automação' });
+            handleApiError(error, toast, 'Erro ao atualizar automação');
         } finally {
             setIsSaving(false);
         }
     };
-    
+
     const handleRunManually = async () => {
         setIsRunning(true);
         try {
@@ -166,8 +167,7 @@ export default function AutomacoesPage() {
             }
             fetchData();
         } catch (error: any) {
-            const message = error.response?.data?.message || 'Não foi possível executar a automação.';
-            toast({ variant: 'destructive', title: 'Erro na Execução', description: message });
+            handleApiError(error, toast, 'Erro na Execução');
         } finally {
             setIsRunning(false);
         }
@@ -198,7 +198,7 @@ export default function AutomacoesPage() {
                                     <CardTitle>Guardar o Troco (Cofrinho Digital)</CardTitle>
                                     <CardDescription>Arredonde suas compras e poupe a diferença automaticamente.</CardDescription>
                                 </div>
-                                 <FormField
+                                <FormField
                                     control={roundUpForm.control}
                                     name="enabled"
                                     render={({ field }) => (
@@ -249,12 +249,12 @@ export default function AutomacoesPage() {
                                                         <SelectItem key={acc.id} value={acc.id}>{acc.nome} (Conta)</SelectItem>
                                                     ))}
                                                 </SelectGroup>
-                                                 <SelectGroup>
+                                                <SelectGroup>
                                                     <Label className="px-2 py-1.5 text-xs font-semibold">Metas</Label>
-                                                     {goals.map(goal => (
+                                                    {goals.map(goal => (
                                                         <SelectItem key={goal.id} value={goal.id}>{goal.name} (Meta)</SelectItem>
-                                                     ))}
-                                                 </SelectGroup>
+                                                    ))}
+                                                </SelectGroup>
                                             </SelectContent>
                                         </Select>
                                         <FormMessage />
@@ -269,10 +269,10 @@ export default function AutomacoesPage() {
                                     className="grid grid-cols-2 lg:grid-cols-4 gap-2"
                                     disabled={!roundUpForm.getValues('enabled') || isSaving}
                                 >
-                                   <FormItem><FormControl><RadioGroupItem value="MANUAL" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">Manual</FormLabel></FormItem>
-                                   <FormItem><FormControl><RadioGroupItem value="WEEKLY" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">Semanal</FormLabel></FormItem>
-                                   <FormItem><FormControl><RadioGroupItem value="MONTHLY" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">Mensal</FormLabel></FormItem>
-                                   <FormItem><FormControl><RadioGroupItem value="THRESHOLD" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">Por Valor</FormLabel></FormItem>
+                                    <FormItem><FormControl><RadioGroupItem value="MANUAL" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">Manual</FormLabel></FormItem>
+                                    <FormItem><FormControl><RadioGroupItem value="WEEKLY" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">Semanal</FormLabel></FormItem>
+                                    <FormItem><FormControl><RadioGroupItem value="MONTHLY" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">Mensal</FormLabel></FormItem>
+                                    <FormItem><FormControl><RadioGroupItem value="THRESHOLD" className="sr-only peer" /></FormControl><FormLabel className="flex items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">Por Valor</FormLabel></FormItem>
                                 </RadioGroup>
                                 {scheduleType === 'THRESHOLD' && (
                                     <div className='pt-2'>
@@ -308,7 +308,7 @@ export default function AutomacoesPage() {
                     </form>
                 </Form>
             </Card>
-            
+
             <Separator />
 
             <Card>
@@ -328,14 +328,14 @@ export default function AutomacoesPage() {
                         </TableHeader>
                         <TableBody>
                             {billPayAutomations.length > 0 ? billPayAutomations.map(item => (
-                               <BillPayAutomationRow
+                                <BillPayAutomationRow
                                     key={item.id}
                                     item={item}
                                     accounts={accounts.filter(a => a.tipo === 'corrente')}
                                     onToggle={(recorrenciaId, enabled) => handleUpdateAutomation('BILL_PAY', { recorrenciaId, enabled })}
-                                    onAccountChange={(recorrenciaId, accountId) => handleUpdateAutomation('BILL_PAY', { recorrenciaId, config: { sourceAccountId: accountId }})}
+                                    onAccountChange={(recorrenciaId, accountId) => handleUpdateAutomation('BILL_PAY', { recorrenciaId, config: { sourceAccountId: accountId } })}
                                     isSaving={isSaving}
-                               />
+                                />
                             )) : (
                                 <TableRow>
                                     <TableCell colSpan={4} className="h-24 text-center">
@@ -346,7 +346,7 @@ export default function AutomacoesPage() {
                         </TableBody>
                     </Table>
                 </CardContent>
-                 <CardFooter>
+                <CardFooter>
                     <Alert variant="default" className="text-xs">
                         <Info className="h-4 w-4" />
                         <AlertDescription>

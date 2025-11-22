@@ -11,6 +11,7 @@ import { LoadingScreen } from '@/components/ui/loading-screen';
 import { AchievementsList } from '@/components/dashboard/progresso/achievements-list';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
+import { handleApiError } from '@/lib/error-handler';
 
 export default function ProgressoPage() {
     const [profile, setProfile] = useState<(GamificationProfile & { updatedAt: string }) | null>(null);
@@ -35,10 +36,7 @@ export default function ProgressoPage() {
             setAllAchievements(allAchievRes.data);
             setUnlockedAchievements(unlockedAchievRes.data);
         } catch (error) {
-            toast({
-                variant: "destructive",
-                title: "Erro ao buscar perfil de progresso",
-            });
+            handleApiError(error, toast, "Erro ao buscar perfil de progresso");
         } finally {
             if (showLoading) setIsLoading(false);
         }

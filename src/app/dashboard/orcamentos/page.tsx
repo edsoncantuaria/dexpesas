@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { ptBR } from 'date-fns/locale';
 import { BudgetSummaryCard } from "@/components/dashboard/orcamentos/budget-summary-card";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { handleApiError } from "@/lib/error-handler";
 
 export default function OrcamentosPage() {
     const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -43,11 +44,7 @@ export default function OrcamentosPage() {
             setCategories(catRes.data.filter((c: Category) => c.nome !== 'Salario' && c.nome !== 'Investimentos'));
             setUser(userRes.data);
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao buscar orçamentos',
-                description: 'Não foi possível carregar a lista de orçamentos para este mês.'
-            });
+            handleApiError(error, toast, 'Erro ao buscar orçamentos');
         } finally {
             setIsLoading(false);
         }
@@ -93,12 +90,7 @@ export default function OrcamentosPage() {
             handleCloseForm();
             setIsUnbudgetedDialogOpen(false); // Fecha o dialog de não orçados se aberto
         } catch (error: any) {
-            const message = error.response?.data?.message || 'Não foi possível salvar o orçamento.';
-            toast({
-                variant: 'destructive',
-                title: `Erro ao salvar orçamento`,
-                description: message
-            });
+            handleApiError(error, toast, `Erro ao salvar orçamento`);
         } finally {
             setIsSubmitting(false);
         }
@@ -116,10 +108,7 @@ export default function OrcamentosPage() {
                     variant: 'destructive'
                 });
             } catch (error) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Erro ao excluir orçamento',
-                });
+                handleApiError(error, toast, 'Erro ao excluir orçamento');
             }
         }
     };

@@ -14,6 +14,7 @@ import { useEffect, useState, useCallback } from 'react';
 import type { Account, Card as CardType } from '@/lib/definitions';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { handleApiError } from '@/lib/error-handler';
 import { LimitExceededDialog } from '@/components/ui/limit-exceeded-dialog';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 
@@ -37,7 +38,7 @@ export function AddTransactionDialog() {
             setAccounts(accRes.data);
             setCards(cardRes.data);
         } catch (error) {
-            toast({ variant: 'destructive', title: 'Erro ao buscar dados do formulário'});
+            handleApiError(error, toast, 'Erro ao buscar dados do formulário');
         } finally {
             setIsLoadingData(false);
         }
@@ -65,9 +66,9 @@ export function AddTransactionDialog() {
                 title: `Transação ${editingTransaction ? 'atualizada' : 'criada'}!`,
                 description: 'Sua movimentação foi salva com sucesso.',
             });
-            
+
             window.dispatchEvent(new Event('transaction-updated'));
-            
+
             if (shouldClose) {
                 handleClose();
             }
@@ -79,23 +80,19 @@ export function AddTransactionDialog() {
                     amountExceeded: error.response.data.valorExcedido
                 });
             } else {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Erro ao salvar',
-                    description: error.response?.data?.message || 'Não foi possível salvar a operação.',
-                });
+                handleApiError(error, toast, 'Erro ao salvar transação');
             }
         } finally {
             setIsSubmitting(false);
         }
-      };
+    };
 
 
     return (
         <>
             <Dialog open={isFormOpen} onOpenChange={(isOpen) => !isOpen && handleClose()}>
                 <DialogContent className="sm:max-w-md md:max-w-xl p-0 overflow-hidden">
-                     <DialogHeader className="p-6 pb-4 border-b">
+                    <DialogHeader className="p-6 pb-4 border-b">
                         <DialogTitle>{editingTransaction ? 'Editar Transação' : 'Nova Operação'}</DialogTitle>
                         <DialogDescription>
                             {editingTransaction ? 'Atualize os detalhes da sua movimentação.' : 'Adicione uma nova receita ou despesa.'}
@@ -106,7 +103,7 @@ export function AddTransactionDialog() {
                             <LoadingScreen />
                         </div>
                     ) : (
-                       <div className="overflow-y-auto max-h-[80vh] p-6 pt-2">
+                        <div className="overflow-y-auto max-h-[80vh] p-6 pt-2">
                             <AddTransactionForm
                                 key={editingTransaction?.id || 'new'}
                                 transaction={editingTransaction}
@@ -116,12 +113,12 @@ export function AddTransactionDialog() {
                                 onClose={handleClose}
                                 isSubmitting={isSubmitting}
                             />
-                       </div>
+                        </div>
                     )}
                 </DialogContent>
             </Dialog>
-             {limitError && (
-                <LimitExceededDialog 
+            {limitError && (
+                <LimitExceededDialog
                     isOpen={limitError.isOpen}
                     onClose={() => setLimitError(null)}
                     limitAvailable={limitError.limitAvailable}

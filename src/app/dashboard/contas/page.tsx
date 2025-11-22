@@ -16,6 +16,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Account } from "@/lib/definitions";
 import { useToast } from "@/hooks/use-toast";
 import api from '@/lib/api';
+import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from "@/components/ui/loading-screen";
 import { TransferForm } from "@/components/dashboard/contas/transfer-form";
 import { AddAccountForm } from "@/components/dashboard/contas/add-account-form";
@@ -35,11 +36,7 @@ export default function ContasPage() {
             const response = await api.get('/accounts');
             setAccounts(response.data);
         } catch (error) {
-            toast({
-                variant: 'destructive',
-                title: 'Erro ao buscar contas',
-                description: 'Não foi possível carregar a lista de contas.'
-            });
+            handleApiError(error, toast, 'Erro ao buscar contas');
         } finally {
             setIsLoading(false);
         }
@@ -71,7 +68,7 @@ export default function ContasPage() {
             toast({ title: `Conta ${isEditing ? 'atualizada' : 'criada'}!` });
             handleCloseForm();
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Erro ao salvar conta', description: error.response?.data?.message });
+            handleApiError(error, toast, 'Erro ao salvar conta');
         } finally {
             setIsSubmitting(false);
         }
@@ -85,8 +82,7 @@ export default function ContasPage() {
             toast({ title: 'Transferência realizada com sucesso!' });
             setIsTransferFormOpen(false);
         } catch (error: any) {
-            const message = error.response?.data?.message || 'Não foi possível realizar a transferência.';
-            toast({ variant: 'destructive', title: 'Erro na Transferência', description: message });
+            handleApiError(error, toast, 'Erro na Transferência');
         } finally {
             setIsSubmitting(false);
         }
@@ -105,11 +101,7 @@ export default function ContasPage() {
                     variant: 'destructive'
                 });
             } catch (error) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Erro ao excluir conta',
-                    description: 'Não foi possível remover a conta.'
-                });
+                handleApiError(error, toast, 'Erro ao excluir conta');
             }
         }
     };

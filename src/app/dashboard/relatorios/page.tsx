@@ -29,6 +29,7 @@ import { CardInsightsCard } from '@/components/dashboard/relatorios/card-insight
 import { TagInsightsCard } from '@/components/dashboard/relatorios/tag-insights-card';
 import { ReportsHero } from '@/components/dashboard/relatorios/reports-hero';
 import { motion } from 'framer-motion';
+import { handleApiError } from '@/lib/error-handler';
 
 type FilterChip =
   | { key: string; label: string; type: 'dateRange' | 'type' | 'text' }
@@ -106,7 +107,7 @@ export default function RelatoriosPage() {
       setTags(tagsRes.data);
       setBudgets(budgetsRes.data);
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro ao buscar dados para relatórios' });
+      handleApiError(error, toast, 'Erro ao buscar dados para relatórios');
     } finally {
       setIsLoading(false);
     }
@@ -315,7 +316,7 @@ export default function RelatoriosPage() {
       document.body.removeChild(link);
       toast({ title: "Exportação Concluída" });
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Erro na Exportação' });
+      handleApiError(error, toast, 'Erro na Exportação');
     } finally {
       setIsExporting(false);
     }

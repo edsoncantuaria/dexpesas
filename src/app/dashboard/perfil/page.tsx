@@ -48,6 +48,7 @@ import type { User, LegacyRuin } from "@/lib/definitions";
 import api from "@/lib/api";
 import { CloudiveLoading } from "@/components/brand/cloudive-loading";
 import { LegacyRuinCard } from "@/components/dashboard/perfil/legacy-ruin-card";
+import { handleApiError } from "@/lib/error-handler";
 import { Label } from "@radix-ui/react-label";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -112,10 +113,7 @@ export default function PerfilPage() {
         setAvatarUrl(presignedUrlRes.data.url);
       }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Erro ao buscar dados do perfil",
-      });
+      handleApiError(error, toast, "Erro ao buscar dados do perfil");
     } finally {
       setIsLoading(false);
     }
@@ -149,10 +147,7 @@ export default function PerfilPage() {
         setAvatarUrl(presignedUrlRes.data.url);
         toast({ title: "Avatar atualizado com sucesso!" });
       } catch (error) {
-        toast({
-          variant: "destructive",
-          title: "Erro ao fazer upload da imagem",
-        });
+        handleApiError(error, toast, "Erro ao fazer upload da imagem");
       } finally {
         setIsUploading(false);
       }
@@ -183,7 +178,7 @@ export default function PerfilPage() {
       window.dispatchEvent(new Event("profile-updated"));
       form.reset(response.data, { keepDirty: false });
     } catch (error) {
-      toast({ variant: "destructive", title: "Erro ao atualizar perfil" });
+      handleApiError(error, toast, "Erro ao atualizar perfil");
     }
   };
 
@@ -292,6 +287,70 @@ export default function PerfilPage() {
                       </FormItem>
                     )}
                   />
+
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">E-mail</Label>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <Input
+                          value={user.email}
+                          onChange={(e) => {
+                            // Atualiza o estado local do usuário para permitir edição do email
+                            // Nota: Isso não salva no banco ainda, só no estado local para o input
+                            setUser(prev => prev ? { ...prev, email: e.target.value } : null);
+                          }}
+                          className="bg-muted/30"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              const res = await api.put('/user/account', { email: user.email });
+                              toast({
+                                title: "E-mail atualizado",
+                                description: res.data.message || "Verifique sua caixa de entrada.",
+                              });
+                              // Atualiza o user com a resposta do backend (que deve ter emailVerified: false)
+                              setUser(prev => prev ? { ...prev, ...res.data } : null);
+                            } catch (error: any) {
+                              handleApiError(error, toast, "Erro ao atualizar e-mail");
+                            }
+                          }}
+                        >
+                          Salvar
+                        </Button>
+                      </div>
+
+                      {!user.emailVerified && (
+                        <div className="flex items-center justify-between bg-yellow-500/10 p-2 rounded-md border border-yellow-500/20">
+                          <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                            <ShieldHalf className="h-3 w-3" />
+                            E-mail não verificado
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs hover:bg-yellow-500/20"
+                            onClick={async () => {
+                              try {
+                                await api.post('/auth/resend-verification', { email: user.email });
+                                toast({
+                                  title: "E-mail enviado!",
+                                  description: "Verifique sua caixa de entrada (e spam).",
+                                });
+                              } catch (error) {
+                                handleApiError(error, toast, "Erro ao reenviar");
+                              }
+                            }}
+                          >
+                            Reenviar Confirmação
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <FormField
                     control={form.control}
                     name="age"
