@@ -1,13 +1,7 @@
 // src/components/dashboard/transacoes/add-transaction-dialog.tsx
 'use client';
 
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { AddTransactionForm } from './add-transaction-form';
 import { useTransactionForm } from '@/contexts/TransactionFormContext';
 import { useEffect, useState, useCallback } from 'react';
@@ -90,33 +84,31 @@ export function AddTransactionDialog() {
 
     return (
         <>
-            <Dialog open={isFormOpen} onOpenChange={(isOpen) => !isOpen && handleClose()}>
-                <DialogContent className="sm:max-w-md md:max-w-xl p-0 overflow-hidden">
-                    <DialogHeader className="p-6 pb-4 border-b">
-                        <DialogTitle>{editingTransaction ? 'Editar Transação' : 'Nova Operação'}</DialogTitle>
-                        <DialogDescription>
-                            {editingTransaction ? 'Atualize os detalhes da sua movimentação.' : 'Adicione uma nova receita ou despesa.'}
-                        </DialogDescription>
-                    </DialogHeader>
-                    {isLoadingData ? (
-                        <div className="h-96 flex items-center justify-center">
-                            <LoadingScreen />
-                        </div>
-                    ) : (
-                        <div className="overflow-y-auto max-h-[80vh] p-6 pt-2">
-                            <AddTransactionForm
-                                key={editingTransaction?.id || 'new'}
-                                transaction={editingTransaction}
-                                accounts={accounts}
-                                cards={cards}
-                                onSave={handleSaveTransaction}
-                                onClose={handleClose}
-                                isSubmitting={isSubmitting}
-                            />
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <ResponsiveDialog
+                isOpen={isFormOpen}
+                setIsOpen={(isOpen) => !isOpen && handleClose()}
+                title={editingTransaction ? 'Editar Transação' : 'Nova Operação'}
+                description={editingTransaction ? 'Atualize os detalhes da sua movimentação.' : 'Adicione uma nova receita ou despesa.'}
+            >
+                {isLoadingData ? (
+                    <div className="h-96 flex items-center justify-center">
+                        <LoadingScreen />
+                    </div>
+                ) : (
+                    <div className="overflow-y-auto max-h-[80vh] p-1">
+                        <AddTransactionForm
+                            key={editingTransaction?.id || 'new'}
+                            transaction={editingTransaction}
+                            accounts={accounts}
+                            cards={cards}
+                            onSave={handleSaveTransaction}
+                            onClose={handleClose}
+                            isSubmitting={isSubmitting}
+                        />
+                    </div>
+                )}
+            </ResponsiveDialog>
+
             {limitError && (
                 <LimitExceededDialog
                     isOpen={limitError.isOpen}

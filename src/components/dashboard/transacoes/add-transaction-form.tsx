@@ -456,8 +456,8 @@ export function AddTransactionForm({
         <form className={cn("w-full max-w-full space-y-6", className)}>
 
           {/* 1. Animated Segmented Control for Type */}
-          <div className="flex justify-center pb-2" ref={registerFieldRef('tipo')}>
-            <div className="relative flex p-1 bg-muted/50 rounded-full">
+          <div className="flex justify-center pb-2 w-full overflow-x-auto no-scrollbar" ref={registerFieldRef('tipo')}>
+            <div className="relative flex p-1 bg-muted/50 rounded-full min-w-fit">
               {TRANSACTION_TYPE_OPTIONS.map((option) => {
                 const isActive = watchTipo === option.value;
                 const Icon = option.icon;
@@ -467,7 +467,7 @@ export function AddTransactionForm({
                     type="button"
                     onClick={() => form.setValue('tipo', option.value)}
                     className={cn(
-                      "relative z-10 flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors duration-200 rounded-full",
+                      "relative z-10 flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium transition-colors duration-200 rounded-full whitespace-nowrap",
                       isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
                     )}
                   >
@@ -482,8 +482,8 @@ export function AddTransactionForm({
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
                       />
                     )}
-                    <span className="relative z-20 flex items-center gap-2">
-                      <Icon className="h-4 w-4" />
+                    <span className="relative z-20 flex items-center gap-1.5">
+                      <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       {option.label}
                     </span>
                   </button>
@@ -501,12 +501,12 @@ export function AddTransactionForm({
                 <FormItem className="w-full text-center">
                   <FormControl>
                     <div className="relative flex items-center justify-center">
-                      <span className="text-4xl font-bold text-muted-foreground mr-2">R$</span>
+                      <span className="text-3xl sm:text-4xl font-bold text-muted-foreground mr-2">R$</span>
                       <input
                         type="number"
                         step="0.01"
                         placeholder="0,00"
-                        className="bg-transparent text-6xl font-bold text-center w-full max-w-[300px] outline-none placeholder:text-muted-foreground/30"
+                        className="bg-transparent text-5xl sm:text-6xl font-bold text-center w-full max-w-[250px] sm:max-w-[300px] outline-none placeholder:text-muted-foreground/30"
                         value={field.value || ''}
                         onChange={(e) => field.onChange(parseFloat(e.target.value))}
                         autoFocus

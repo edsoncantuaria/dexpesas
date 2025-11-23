@@ -8,7 +8,7 @@ import { MoreVertical, Pencil, Trash2, Repeat, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { useMemo, useState } from 'react';
 import { DeleteBudgetDialog } from './delete-budget-dialog';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
@@ -25,7 +25,7 @@ type BudgetListProps = {
 
 type BudgetFilter = 'all' | 'personal' | 'family';
 
-const formatCurrency = (value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+
 
 export function BudgetList({ budgets, onEdit, onDelete }: BudgetListProps) {
   const [deletingBudget, setDeletingBudget] = useState<Budget | null>(null);
@@ -97,14 +97,14 @@ export function BudgetList({ budgets, onEdit, onDelete }: BudgetListProps) {
             </Button>
           ))}
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             className="rounded-xl border bg-gradient-to-br from-primary/10 to-primary/5 p-4 shadow-sm"
           >
-            <p className="text-xs uppercase text-muted-foreground font-medium mb-1">Limite total</p>
-            <p className="text-3xl font-bold">{formatCurrency(totals.limit)}</p>
+            <p className="text-[10px] md:text-xs uppercase text-muted-foreground font-medium mb-1">Limite total</p>
+            <p className="text-xl md:text-3xl font-bold">{formatCurrency(totals.limit)}</p>
           </motion.div>
           <motion.div
             initial={{ y: 20, opacity: 0 }}
@@ -112,10 +112,10 @@ export function BudgetList({ budgets, onEdit, onDelete }: BudgetListProps) {
             transition={{ delay: 0.1 }}
             className="rounded-xl border bg-gradient-to-br from-muted/50 to-muted/30 p-4 shadow-sm"
           >
-            <p className="text-xs uppercase text-muted-foreground font-medium mb-1">
+            <p className="text-[10px] md:text-xs uppercase text-muted-foreground font-medium mb-1">
               {filterMode === 'family' ? 'Gasto compartilhado' : 'Gasto total'}
             </p>
-            <p className="text-3xl font-bold">{formatCurrency(totals.spent)}</p>
+            <p className="text-xl md:text-3xl font-bold">{formatCurrency(totals.spent)}</p>
           </motion.div>
         </div>
       </div>
