@@ -317,13 +317,21 @@ class ReconciliationService {
             };
         }
 
+        // Gerar fitId único para parcelas
+        // Alguns bancos (como Nubank) geram o mesmo FITID para todas as parcelas de uma compra
+        // Precisamos tornar cada parcela única no nosso sistema
+        let fitId = t.FITID;
+        if (metadata && metadata.installmentNumber) {
+            fitId = `${t.FITID}-installment-${metadata.installmentNumber}`;
+        }
+
         return {
             reconciliationId,
             date: postDate,
             amount: Math.abs(amount), // Trabalhamos com valores absolutos
             type: amount >= 0 ? 'CREDIT' : 'DEBIT',
             description: t.MEMO,
-            fitId: t.FITID,
+            fitId: fitId,
             metadata: metadata
         };
     }
@@ -347,21 +355,42 @@ class ReconciliationService {
 
         const existingTransactions = await prisma.importedTransaction.findMany({
             where: { fitId: { in: fitIds } },
-            select: { fitId: true, reconciliationId: true },
+            select: { id: true, fitId: true, reconciliationId: true, status: true },
         });
 
-        if (existingTransactions.length === transactionsToCreate.length) {
-            console.warn(`[Reconciliation ${reconciliationId}] Todos os lançamentos do arquivo já foram reconciliados anteriormente.`, {
-                previousReconciliationId: existingTransactions[0]?.reconciliationId,
-            });
-            await prisma.reconciliation.update({
-                where: { id: reconciliationId },
-                data: { status: 'FAILED' },
-            });
-            const duplicateError = new Error('Este extrato já foi reconciliado anteriormente.');
-            duplicateError.code = 'EXTRACT_ALREADY_RECONCILED';
-            duplicateError.details = { previousReconciliationId: existingTransactions[0]?.reconciliationId };
-            throw duplicateError;
+        const existingMap = new Map(existingTransactions.map(t => [t.fitId, t]));
+        const toCreate = [];
+        const toUpdateIds = [];
+
+        for (const tx of transactionsToCreate) {
+            const existing = existingMap.get(tx.fitId);
+            if (existing) {
+                // Se já existe e não está reconciliada, trazemos para a reconciliação atual
+                // Isso resolve o caso de transações importadas no mês anterior mas que pertencem a este mês
+                if (existing.status !== 'RECONCILED') {
+                    toUpdateIds.push(existing.id);
+                }
+                // Se já está reconciliada, ignoramos silenciosamente (já foi processada)
+            } else {
+                toCreate.push(tx);
+            }
+        }
+
+        // Se todas já existem e estão reconciliadas, aí sim é erro
+        if (toCreate.length === 0 && toUpdateIds.length === 0 && existingTransactions.length > 0) {
+            console.warn(`[Reconciliation ${reconciliationId}] Todos os lançamentos já foram reconciliados anteriormente.`);
+            // Não lançar erro, apenas finalizar com 0 importados, pois pode ser um re-upload parcial
+            // Mas se o usuário espera algo, talvez devêssemos avisar. 
+            // Mantendo comportamento original de erro se TUDO for duplicado reconciliado.
+            if (existingTransactions.every(t => t.status === 'RECONCILED')) {
+                await prisma.reconciliation.update({
+                    where: { id: reconciliationId },
+                    data: { status: 'FAILED' },
+                });
+                const duplicateError = new Error('Este extrato já foi reconciliado anteriormente.');
+                duplicateError.code = 'EXTRACT_ALREADY_RECONCILED';
+                throw duplicateError;
+            }
         }
 
         const dates = transactionsToCreate.map(t => new Date(t.date));
@@ -385,10 +414,22 @@ class ReconciliationService {
         const manualTransactions = await prisma.transaction.findMany({ where: whereClause });
 
         await prisma.$transaction(async (tx) => {
-            await tx.importedTransaction.createMany({
-                data: transactionsToCreate,
-                skipDuplicates: true, // Garante que transações com o mesmo FITID não sejam inseridas novamente.
-            });
+            // 1. Atualizar as transações órfãs para a nova reconciliação
+            if (toUpdateIds.length > 0) {
+                await tx.importedTransaction.updateMany({
+                    where: { id: { in: toUpdateIds } },
+                    data: { reconciliationId: reconciliationId }
+                });
+                console.info(`[Reconciliation ${reconciliationId}] ${toUpdateIds.length} transações antigas foram movidas para esta reconciliação.`);
+            }
+
+            // 2. Criar as novas transações
+            if (toCreate.length > 0) {
+                await tx.importedTransaction.createMany({
+                    data: toCreate,
+                    skipDuplicates: true,
+                });
+            }
 
             const importedTransactions = await tx.importedTransaction.findMany({
                 where: { reconciliationId }

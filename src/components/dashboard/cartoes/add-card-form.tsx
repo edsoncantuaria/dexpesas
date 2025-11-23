@@ -34,6 +34,7 @@ const formSchema = z.object({
     lastFourDigits: z.union([z.string().trim().length(4, { message: 'Informe os 4 últimos dígitos.' }), z.literal('')]).optional().nullable(),
     issuer: z.union([z.string(), z.literal('')]).optional().nullable(),
     paymentAccountId: z.string().optional(),
+    defaultCashbackRate: z.coerce.number().min(0).max(100, { message: 'Cashback deve ser entre 0% e 100%.' }).optional().nullable(),
 });
 
 type AddCardFormProps = {
@@ -79,6 +80,7 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting, cancelLabe
             lastFourDigits: '',
             issuer: '',
             paymentAccountId: 'none',
+            defaultCashbackRate: 0,
         },
     });
 
@@ -89,6 +91,7 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting, cancelLabe
                 closingDayGap: card.closingDayGap ?? 7,
                 jurosRotativo: card.jurosRotativo ?? 14.9,
                 rewardsType: card.rewardsType ?? 'nenhum',
+                rewardsProgram: card.rewardsProgram ?? '',
                 rewardsConversionRate: card.rewardsConversionRate ?? 1.0,
                 currencyForConversion: card.currencyForConversion ?? 'BRL',
                 billingCurrency: card.billingCurrency ?? 'BRL',
@@ -96,6 +99,7 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting, cancelLabe
                 lastFourDigits: card.lastFourDigits ?? '',
                 issuer: card.issuer ?? '',
                 paymentAccountId: card.paymentAccountId || 'none',
+                defaultCashbackRate: card.defaultCashbackRate ?? 0,
             });
         }
     }, [card, form]);
@@ -114,7 +118,9 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting, cancelLabe
             diaFechamento: calculatedClosingDay,
             lastFourDigits: values.lastFourDigits?.trim() ? values.lastFourDigits.trim() : undefined,
             issuer: values.issuer?.trim() ? values.issuer.trim() : undefined,
+            paymentAccountId: values.paymentAccountId === 'none' ? undefined : values.paymentAccountId,
         };
+
         const cardData = isEditing ? { ...payload, id: card.id } : payload;
         onSuccess(cardData);
     }
@@ -123,7 +129,10 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting, cancelLabe
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4"
+            >
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField control={form.control} name="nome" render={({ field }) => (<FormItem><FormLabel>Nome do Cartão</FormLabel><FormControl><Input placeholder="Ex: Cartão Platinum" {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name="bandeira" render={({ field }) => (<FormItem><FormLabel>Bandeira</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Selecione a bandeira" /></SelectTrigger></FormControl><SelectContent><SelectItem value="visa">Visa</SelectItem><SelectItem value="mastercard">Mastercard</SelectItem><SelectItem value="elo">Elo</SelectItem><SelectItem value="amex">American Express</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
@@ -265,13 +274,38 @@ export function AddCardForm({ card, onSuccess, onClose, isSubmitting, cancelLabe
                                     </Select><FormMessage />
                                 </FormItem>
                             )} />
+                            {watchRewardsType === 'cashback' && (
+                                <FormField control={form.control} name="defaultCashbackRate" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Taxa de Cashback Padrão (%)</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                max="100"
+                                                placeholder="Ex: 1.5"
+                                                {...field}
+                                                value={field.value ?? ''}
+                                            />
+                                        </FormControl>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                            Percentual de cashback aplicado automaticamente nas compras
+                                        </p>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                            )}
                         </div>
                     )}
                 </div>
 
                 <div className="flex justify-end pt-4 gap-2">
                     <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>{cancelLabel}</Button>
-                    <Button type="submit" disabled={isSubmitting}>
+                    <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                    >
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         {isSubmitting ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Adicionar Cartão'}
                     </Button>

@@ -1,7 +1,13 @@
 // backend/src/services/pdfGenerator.js
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { ptBR } from 'date-fns/locale/index.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class PDFGeneratorService {
     /**
@@ -17,114 +23,104 @@ class PDFGeneratorService {
             margin: 50,
             info: {
                 Title: `Fatura ${card.nome} - ${invoiceData.monthLabel}`,
-                Author: 'Jornada Financeira',
+                Author: 'Dexpesas',
                 Subject: 'Fatura de Cartão de Crédito',
             }
         });
 
-        // Define cores
-        const primaryColor = '#2563eb';
-        const grayColor = '#6b7280';
-        const darkGray = '#374151';
+        // Cores Premium (Nubank-ish / Modern Fintech)
+        const colors = {
+            primary: '#820AD1', // Roxo Dexpesas/Nubank
+            secondary: '#111827', // Gray 900
+            text: '#374151', // Gray 700
+            muted: '#9CA3AF', // Gray 400
+            border: '#E5E7EB', // Gray 200
+            success: '#10B981', // Emerald 500
+            danger: '#EF4444', // Red 500
+            bgLight: '#F9FAFB' // Gray 50
+        };
 
-        // Header
-        doc.fontSize(24)
-            .fillColor(primaryColor)
-            .text('Jornada Financeira', { align: 'center' })
-            .moveDown(0.3);
+        // --- HEADER ---
 
-        doc.fontSize(12)
-            .fillColor(grayColor)
-            .text('Fatura de Cartão de Crédito', { align: 'center' })
-            .moveDown(2);
+        // Logo
+        const logoPath = path.join(__dirname, '../../../public/cloudive-logo.svg');
+        if (fs.existsSync(logoPath)) {
+            try {
+                doc.image(logoPath, 50, 45, { width: 40 });
+            } catch (error) {
+                // Fallback se SVG falhar
+            }
+        }
 
-        // Card Info Box
-        const boxTop = doc.y;
-        doc.roundedRect(50, boxTop, 495, 100, 5)
-            .lineWidth(1)
-            .strokeColor('#e5e7eb')
-            .stroke();
+        // Nome da Empresa
+        doc.fontSize(20)
+            .font('Helvetica-Bold')
+            .fillColor(colors.primary)
+            .text('Dexpesas', 100, 53);
 
+        // Título do Documento
         doc.fontSize(10)
-            .fillColor(darkGray)
-            .text(`Cartão: ${card.nome}`, 70, boxTop + 20)
-            .text(`Bandeira: ${card.bandeira.toUpperCase()}`, 70, boxTop + 35)
-            .text(`Final: ${card.lastFourDigits || '****'}`, 70, boxTop + 50)
-            .text(`Limite: R$ ${Number(card.limite).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 70, boxTop + 65);
+            .font('Helvetica')
+            .fillColor(colors.muted)
+            .text('FATURA DE CARTÃO DE CRÉDITO', 50, 90, { align: 'left', characterSpacing: 2 });
 
-        doc.text(`Período: ${invoiceData.monthLabel}`, 320, boxTop + 20)
-            .text(`Fechamento: ${format(invoiceData.closingDate, 'dd/MM/yyyy', { locale: ptBR })}`, 320, boxTop + 35)
-            .text(`Vencimento: ${format(invoiceData.dueDate, 'dd/MM/yyyy', { locale: ptBR })}`, 320, boxTop + 50);
+        // --- INFO BOX (Resumo do Cartão e Datas) ---
+        const boxTop = 110;
 
-        doc.moveDown(4);
+        // Fundo cinza claro para o box
+        doc.rect(50, boxTop, 495, 80)
+            .fill(colors.bgLight);
 
-        // Summary
-        const summaryY = doc.y;
-        doc.fontSize(16)
-            .fillColor(primaryColor)
-            .text('Resumo da Fatura', 50, summaryY)
-            .moveDown(1);
+        // Linha superior colorida
+        doc.rect(50, boxTop, 495, 3)
+            .fill(colors.primary);
 
+        // Coluna 1: Cartão
+        doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.secondary)
+            .text(card.nome, 70, boxTop + 20);
+
+        doc.fontSize(9).font('Helvetica').fillColor(colors.text)
+            .text(`Final ${card.lastFourDigits || '****'}`, 70, boxTop + 40)
+            .text(card.bandeira.toUpperCase(), 70, boxTop + 55);
+
+        // Coluna 2: Datas
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(colors.muted).text('VENCIMENTO', 250, boxTop + 20);
+        doc.fontSize(12).font('Helvetica').fillColor(colors.secondary)
+            .text(format(invoiceData.dueDate, 'dd/MM/yyyy', { locale: ptBR }), 250, boxTop + 35);
+
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(colors.muted).text('FECHAMENTO', 250, boxTop + 55);
+        doc.fontSize(10).font('Helvetica').fillColor(colors.text)
+            .text(format(invoiceData.closingDate, 'dd/MM/yyyy', { locale: ptBR }), 330, boxTop + 55);
+
+        // Coluna 3: Total
         const totalExpenses = transactions
             .filter(t => t.tipo === 'despesa')
             .reduce((sum, t) => sum + Number(t.valor), 0);
-
         const totalPayments = transactions
             .filter(t => t.tipo === 'receita')
             .reduce((sum, t) => sum + Number(t.valor), 0);
-
         const balance = totalExpenses - totalPayments;
 
-        doc.fontSize(12)
-            .fillColor(darkGray)
-            .text(`Total de Despesas:`, 70, doc.y)
-            .fillColor('#dc2626')
-            .text(`R$ ${totalExpenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 350, doc.y, { align: 'right' })
-            .moveDown(0.5);
+        doc.fontSize(9).font('Helvetica-Bold').fillColor(colors.muted).text('VALOR TOTAL', 400, boxTop + 20, { align: 'right' });
+        doc.fontSize(16).font('Helvetica-Bold').fillColor(balance > 0 ? colors.danger : colors.success)
+            .text(`R$ ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 400, boxTop + 35, { align: 'right' });
 
-        if (totalPayments > 0) {
-            doc.fillColor(darkGray)
-                .text(`Pagamentos/Créditos:`, 70, doc.y)
-                .fillColor('#16a34a')
-                .text(`- R$ ${totalPayments.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 350, doc.y, { align: 'right' })
-                .moveDown(0.5);
-        }
+        // --- TRANSACTIONS TABLE ---
+        const tableTop = 230;
 
-        doc.fontSize(14)
-            .fillColor(darkGray)
-            .text(`Valor Total a Pagar:`, 70, doc.y)
-            .fillColor(balance > 0 ? '#dc2626' : '#16a34a')
-            .text(`R$ ${balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 350, doc.y, { align: 'right', width: 195 })
-            .moveDown(2);
-
-        // Divider
-        doc.moveTo(50, doc.y)
-            .lineTo(545, doc.y)
-            .strokeColor('#e5e7eb')
-            .stroke()
-            .moveDown(1);
-
-        // Transactions Table
-        doc.fontSize(16)
-            .fillColor(primaryColor)
-            .text('Lançamentos', 50, doc.y)
-            .moveDown(1);
+        doc.fontSize(12).font('Helvetica-Bold').fillColor(colors.secondary)
+            .text('Detalhamento da Fatura', 50, 200);
 
         // Table Header
-        const tableTop = doc.y;
-        doc.fontSize(9)
-            .fillColor('#6b7280')
-            .text('Data', 50, tableTop, { width: 60 })
-            .text('Descrição', 115, tableTop, { width: 230 })
-            .text('Categoria', 350, tableTop, { width: 100 })
-            .text('Valor', 455, tableTop, { width: 90, align: 'right' });
+        doc.rect(50, tableTop, 495, 25).fill(colors.bgLight);
 
-        doc.moveTo(50, tableTop + 15)
-            .lineTo(545, tableTop + 15)
-            .strokeColor('#e5e7eb')
-            .stroke();
+        doc.fontSize(8).font('Helvetica-Bold').fillColor(colors.muted);
+        doc.text('DATA', 60, tableTop + 8);
+        doc.text('DESCRIÇÃO', 120, tableTop + 8);
+        doc.text('CATEGORIA', 350, tableTop + 8);
+        doc.text('VALOR (R$)', 450, tableTop + 8, { align: 'right', width: 80 });
 
-        let yPosition = tableTop + 25;
+        let yPosition = tableTop + 35;
 
         // Group by date
         const groupedTransactions = transactions.reduce((acc, t) => {
@@ -134,60 +130,65 @@ class PDFGeneratorService {
             return acc;
         }, {});
 
-        // Sort dates
         const sortedDates = Object.keys(groupedTransactions).sort();
 
         for (const dateKey of sortedDates) {
             const dayTransactions = groupedTransactions[dateKey];
+            const dateLabel = format(new Date(dateKey + 'T12:00:00'), 'dd MMM', { locale: ptBR }).toUpperCase();
+
+            // Date Header (Optional, or just list)
+            // Vamos listar direto para ficar clean
 
             for (const transaction of dayTransactions) {
-                // Check if we need a new page
-                if (yPosition > 700) {
+                if (yPosition > 750) {
                     doc.addPage();
                     yPosition = 50;
+                    // Re-draw header on new page? Maybe simple version
                 }
 
-                const transactionDate = format(new Date(transaction.data), 'dd/MM');
                 const valor = Number(transaction.valor);
                 const isExpense = transaction.tipo === 'despesa';
 
-                doc.fontSize(9)
-                    .fillColor(darkGray)
-                    .text(transactionDate, 50, yPosition, { width: 60 })
-                    .text(transaction.descricao, 115, yPosition, { width: 230, height: 20, ellipsis: true })
-                    .text(transaction.categoria?.nome || '-', 350, yPosition, { width: 100, ellipsis: true })
-                    .fillColor(isExpense ? '#dc2626' : '#16a34a')
+                // Row Background (Zebra striping optional, keeping clean white)
+
+                // Data
+                doc.fontSize(9).font('Helvetica').fillColor(colors.text)
+                    .text(format(new Date(transaction.data), 'dd/MM'), 60, yPosition);
+
+                // Descrição
+                doc.font('Helvetica-Bold').fillColor(colors.secondary)
+                    .text(transaction.descricao, 120, yPosition, { width: 220, ellipsis: true });
+
+                // Installment info
+                if (transaction.installmentNumber && transaction.totalInstallments) {
+                    doc.fontSize(8).font('Helvetica').fillColor(colors.muted)
+                        .text(`Parcela ${transaction.installmentNumber}/${transaction.totalInstallments}`, 120, yPosition + 12);
+                }
+
+                // Categoria
+                doc.fontSize(9).font('Helvetica').fillColor(colors.muted)
+                    .text(transaction.category?.nome || '-', 350, yPosition, { width: 100, ellipsis: true });
+
+                // Valor
+                doc.font('Helvetica-Bold').fillColor(isExpense ? colors.text : colors.success)
                     .text(
-                        `${isExpense ? '' : '- '}R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                        455,
+                        `${isExpense ? '' : '- '}${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                        450,
                         yPosition,
-                        { width: 90, align: 'right' }
+                        { align: 'right', width: 80 }
                     );
 
-                yPosition += 25;
+                yPosition += (transaction.installmentNumber ? 35 : 25);
 
-                // Show installment info if applicable
-                if (transaction.installmentNumber && transaction.totalInstallments) {
-                    doc.fontSize(7)
-                        .fillColor('#9ca3af')
-                        .text(
-                            `${transaction.installmentNumber}/${transaction.totalInstallments}`,
-                            115,
-                            yPosition - 18
-                        );
-                }
+                // Divider line light
+                doc.moveTo(50, yPosition - 5).lineTo(545, yPosition - 5).lineWidth(0.5).strokeColor(colors.border).stroke();
             }
         }
 
         // Footer
-        doc.fontSize(8)
-            .fillColor('#9ca3af')
-            .text(
-                `Gerado em ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}`,
-                50,
-                750,
-                { align: 'center', width: 495 }
-            );
+        const pageBottom = 800;
+        doc.fontSize(8).fillColor(colors.muted)
+            .text('Dexpesas - Controle Financeiro Inteligente', 50, pageBottom, { align: 'center' });
 
         return doc;
     }

@@ -9,7 +9,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, DollarSign, Download, FileChec
 import { cn } from "@/lib/utils";
 import { format, addMonths, subMonths, setDate } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { motion, AnimatePresence } from 'framer-motion';
+
 
 type FaturaSummaryCardProps = {
   card: CardType;
@@ -43,159 +43,112 @@ export function FaturaSummaryCard({
   dueDate,
 }: FaturaSummaryCardProps) {
 
-  const [direction, setDirection] = useState(0);
-
-  const variants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? 100 : -100,
-      opacity: 0,
-    }),
-    center: {
-      zIndex: 1,
-      x: 0,
-      opacity: 1,
-    },
-    exit: (direction: number) => ({
-      zIndex: 0,
-      x: direction < 0 ? 100 : -100,
-      opacity: 0,
-    }),
-  };
-
-  const swipeConfidenceThreshold = 10000;
-  const swipePower = (offset: number, velocity: number) => {
-    return Math.abs(offset) * velocity;
-  };
-
   const paginate = (newDirection: number) => {
-    setDirection(newDirection);
     onMonthChange(newDirection > 0 ? addMonths(selectedMonth, 1) : subMonths(selectedMonth, 1));
   };
 
   return (
-    <Card className="shadow-xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10 h-full flex flex-col overflow-hidden relative">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-lg sm:text-xl bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
-            Resumo da Fatura
-          </CardTitle>
-          <div className="flex items-center gap-1 sm:gap-2 z-10">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"
-              onClick={() => paginate(-1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <p className="text-sm font-semibold capitalize w-28 sm:w-32 text-center select-none">
+    <Card className="shadow-lg bg-card border-border/50 h-full flex flex-col overflow-hidden relative group">
+      {/* Header with Month Navigation */}
+      <div className="p-4 sm:p-6 pb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-accent transition-colors"
+            onClick={() => paginate(-1)}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <div className="text-center">
+            <p className="text-lg font-semibold capitalize select-none leading-none">
               {format(dueDate, 'MMMM yyyy', { locale: ptBR })}
             </p>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-primary/10 transition-colors"
-              onClick={() => paginate(1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <p className="text-xs text-muted-foreground mt-1">
+              Vence dia {format(dueDate, 'dd')}
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-accent transition-colors"
+            onClick={() => paginate(1)}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {isReconciled && (
+          <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-full border border-emerald-100 dark:border-emerald-900">
+            <FileCheck className="h-3.5 w-3.5" />
+            Reconciliado
+          </div>
+        )}
+      </div>
+
+      <CardContent className="flex-1 flex flex-col p-4 sm:p-6 pt-2">
+        {/* Hero Section: Saldo Devedor */}
+        <div className="flex flex-col items-center justify-center py-6 sm:py-8">
+          <p className="text-sm text-muted-foreground font-medium mb-2 uppercase tracking-wider">
+            Fatura Atual
+          </p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-2xl text-muted-foreground font-medium">R$</span>
+            <span className={cn(
+              "text-4xl sm:text-5xl font-bold tracking-tight",
+              saldoDevedor > 0 ? "text-foreground" : "text-emerald-600"
+            )}>
+              {saldoDevedor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+
+          {/* Secondary Stats Row */}
+          <div className="flex items-center gap-6 mt-6 text-sm">
+            <div className="flex flex-col items-center">
+              <span className="text-muted-foreground text-xs mb-0.5">Total Fechado</span>
+              <span className="font-semibold">{formatCurrency(faturaTotal)}</span>
+            </div>
+            <div className="w-px h-8 bg-border/60"></div>
+            <div className="flex flex-col items-center">
+              <span className="text-muted-foreground text-xs mb-0.5">Pago</span>
+              <span className="font-semibold text-emerald-600">{formatCurrency(valorPago)}</span>
+            </div>
           </div>
         </div>
-        <CardDescription className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm mt-2">
-          <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> Fecha: {format(period.end, 'dd/MM')}</span>
-          <span className="flex items-center gap-1.5"><CalendarDays className="h-3 w-3" /> Vence: {format(dueDate, 'dd/MM')}</span>
-        </CardDescription>
-      </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col pb-4 sm:pb-6">
-        <AnimatePresence mode="wait" custom={direction}>
-          <motion.div
-            key={selectedMonth.toISOString()}
-            custom={direction}
-            variants={variants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{
-              x: { type: "spring", stiffness: 300, damping: 30 },
-              opacity: { duration: 0.2 },
-            }}
-            drag="x"
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={1}
-            onDragEnd={(e, { offset, velocity }) => {
-              const swipe = swipePower(offset.x, velocity.x);
-              if (swipe < -swipeConfidenceThreshold) {
-                paginate(1);
-              } else if (swipe > swipeConfidenceThreshold) {
-                paginate(-1);
-              }
-            }}
-            className="flex-1 flex flex-col"
-          >
-            <div className="bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl p-4 sm:p-6 mb-3 sm:mb-4 border border-primary/20 shadow-inner">
-              <p className="text-xs sm:text-sm text-muted-foreground mb-1 sm:mb-2 uppercase tracking-wide">Saldo Devedor</p>
-              <p className={cn(
-                "text-2xl sm:text-3xl md:text-4xl font-bold truncate",
-                saldoDevedor > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
-              )}>
-                {formatCurrency(saldoDevedor)}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-muted/50 to-muted/30 border">
-                <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 uppercase">Total da Fatura</p>
-                <p className="text-base sm:text-xl font-bold truncate">{formatCurrency(faturaTotal)}</p>
-              </div>
-              <div className="p-3 sm:p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-green-500/5 border border-emerald-500/20">
-                <p className="text-[10px] sm:text-xs text-muted-foreground mb-1 uppercase">Valor Pago</p>
-                <p className="text-base sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 truncate">{formatCurrency(valorPago)}</p>
-              </div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
-
-        <div className="flex flex-col gap-2 pt-4 sm:pt-6 z-10 mt-auto">
+        {/* Actions */}
+        <div className="mt-auto space-y-3">
           <Button
-            className="w-full shadow-lg shadow-primary/20 h-12 text-base font-medium"
+            className="w-full h-12 text-base font-medium shadow-md hover:shadow-lg transition-all bg-primary hover:bg-primary/90"
             disabled={saldoDevedor <= 0}
             onClick={onPayBill}
           >
             <DollarSign className="mr-2 h-5 w-5" />
-            Pagar ou Amortizar
+            Pagar Fatura
           </Button>
-          <Button
-            variant="outline"
-            className="w-full h-10 text-sm font-medium"
-            onClick={onDownloadPDF}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Baixar PDF
-          </Button>
-          <Button
-            variant="outline"
-            className={cn(
-              "w-full h-10 text-sm font-medium",
-              isReconciled
-                ? "border-green-500 bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400"
-                : "border-primary/50 hover:bg-primary/10"
-            )}
-            onClick={onReconcile}
-            disabled={isReconciled}
-          >
-            {isReconciled ? (
-              <>
-                <FileCheck className="mr-2 h-4 w-4" />
-                Fatura Reconciliada ✓
-              </>
-            ) : (
-              <>
-                <FileCheck className="mr-2 h-4 w-4" />
-                Reconciliar com OFX
-              </>
-            )}
-          </Button>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className="w-full h-10 text-xs sm:text-sm font-medium border-border/60 hover:bg-accent/50"
+              onClick={onDownloadPDF}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              PDF
+            </Button>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-full h-10 text-xs sm:text-sm font-medium border-border/60 hover:bg-accent/50",
+                isReconciled && "text-emerald-600 border-emerald-200 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-900"
+              )}
+              onClick={onReconcile}
+              disabled={isReconciled}
+            >
+              <FileCheck className="mr-2 h-4 w-4" />
+              {isReconciled ? 'Reconciliado' : 'Reconciliar'}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

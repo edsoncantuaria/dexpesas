@@ -22,6 +22,14 @@ router.get('/:cardId/analytics/spending', cardController.getSpendingAnalysis);
 router.get('/:cardId/analytics/history', cardController.getMonthlyHistory);
 router.get('/:cardId/analytics/projection', cardController.getInvoiceProjection);
 
+// Cashback Routes
+router.get('/:cardId/cashback', cardController.getCashbackSummary);
+router.get('/:cardId/cashback/analytics', cardController.getCashbackAnalytics);
+router.post('/:cardId/cashback/redeem', cardController.redeemCashback);
+
+// Card Alerts Routes (specific card)
+router.get('/:cardId/alerts', cardController.getAlertsByCard);
+
 // Card Routes
 router.get('/', cardController.getAllCards);
 router.get('/:cardId', cardController.getCardById);
@@ -34,3 +42,4 @@ router.delete('/:id', cardController.deleteCard);
 router.post('/:cardId/pay', validate(cardPaymentSchema), cardController.payCardBill);
 
 export default router;
+

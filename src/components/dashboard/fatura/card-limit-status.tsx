@@ -29,7 +29,7 @@ export function CardLimitStatus({ totalLimit, availableLimit, bestDayToBuy }: Ca
     };
 
     return (
-        <Card className="h-full flex flex-col shadow-xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10">
+        <Card className="flex flex-col shadow-xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10">
             <CardHeader>
                 <CardTitle className="text-xl bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
                     Status do Limite

@@ -64,9 +64,11 @@ async function backupDatabase() {
         console.log('🔄 Iniciando backup do banco de dados...');
         console.log(`📦 Database: ${dbConfig.database}`);
         console.log(`💾 Arquivo: ${backupFileName}`);
+        console.log(`⚠️  Nota: Tabela _prisma_migrations será excluída do backup`);
 
-        // Comando mysqldump
-        const command = `mysqldump -h ${dbConfig.host} -P ${dbConfig.port} -u ${dbConfig.user} -p${dbConfig.password} ${dbConfig.database} > "${backupPath}"`;
+        // Comando mysqldump excluindo a tabela _prisma_migrations
+        // Isso permite que migrations sejam aplicadas após restore
+        const command = `mysqldump -h ${dbConfig.host} -P ${dbConfig.port} -u ${dbConfig.user} -p${dbConfig.password} --ignore-table=${dbConfig.database}._prisma_migrations ${dbConfig.database} > "${backupPath}"`;
 
         await execAsync(command);
 
@@ -77,6 +79,7 @@ async function backupDatabase() {
         console.log('✅ Backup concluído com sucesso!');
         console.log(`📁 Local: ${backupPath}`);
         console.log(`📊 Tamanho: ${fileSizeInMB} MB`);
+        console.log(`🔧 Migrations preservadas: Ao restaurar, execute 'npx prisma migrate deploy'`);
 
         return backupPath;
     } catch (error) {
@@ -86,3 +89,4 @@ async function backupDatabase() {
 }
 
 backupDatabase();
+

@@ -7,6 +7,7 @@ export const cardSchema = z.object({
   limite: z.coerce.number().positive('O limite deve ser um número positivo.'),
   diaFechamento: z.coerce.number().int().min(1, 'O dia deve ser no mínimo 1.').max(31, 'O dia deve ser no máximo 31.'),
   diaVencimento: z.coerce.number().int().min(1, 'O dia deve ser no mínimo 1.').max(31, 'O dia deve ser no máximo 31.'),
+  closingDayGap: z.coerce.number().int().min(7, 'Mínimo de 7 dias.').max(14, 'Máximo de 14 dias.').optional(),
   bandeira: z.enum(['visa', 'mastercard', 'elo', 'amex']),
   status: z.enum(['ACTIVE', 'BLOCKED', 'CANCELLED']).optional(),
   rewardsType: z.string().optional().nullable(),
@@ -25,7 +26,7 @@ export const cardSchema = z.object({
 
 // Schema para validar o pagamento da fatura
 export const cardPaymentSchema = z.object({
-    amount: z.coerce.number().positive('O valor do pagamento deve ser positivo.'),
-    accountId: z.string().min(1, 'A conta de origem é obrigatória.'),
-    paymentDate: z.string().datetime({ message: "Data de pagamento inválida." }).optional(),
+  amount: z.coerce.number().positive('O valor do pagamento deve ser positivo.'),
+  accountId: z.string().min(1, 'A conta de origem é obrigatória.'),
+  paymentDate: z.string().datetime({ message: "Data de pagamento inválida." }).optional(),
 });

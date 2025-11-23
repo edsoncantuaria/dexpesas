@@ -24,9 +24,14 @@ interface FutureTransaction {
     };
 }
 
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+
 export function FutureInstallmentsWidget() {
     const [transactions, setTransactions] = useState<FutureTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -54,21 +59,18 @@ export function FutureInstallmentsWidget() {
 
     if (isLoading) {
         return (
-            <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Próximos Lançamentos
-                    </CardTitle>
+            <Card className="border-none shadow-none bg-transparent">
+                <CardHeader className="px-0 pt-0 pb-4">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="p-0 space-y-4">
                     {[1, 2, 3].map((i) => (
                         <div key={i} className="flex items-center justify-between">
-                            <div className="space-y-1">
+                            <div className="space-y-2">
                                 <Skeleton className="h-4 w-32" />
-                                <Skeleton className="h-3 w-20" />
+                                <Skeleton className="h-3 w-24" />
                             </div>
-                            <Skeleton className="h-4 w-16" />
+                            <Skeleton className="h-4 w-20" />
                         </div>
                     ))}
                 </CardContent>
@@ -77,58 +79,76 @@ export function FutureInstallmentsWidget() {
     }
 
     if (transactions.length === 0) {
-        return null; // Don't show if empty
+        return null;
     }
 
     return (
-        <Card>
-            <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Próximos Lançamentos
-                    </CardTitle>
-                    <Link href="/dashboard/servicos/parcelas" className="text-xs text-primary hover:underline flex items-center">
-                        Ver tudo <ArrowRight className="ml-1 h-3 w-3" />
-                    </Link>
-                </div>
-            </CardHeader>
-            <CardContent className="pt-2">
-                <div className="space-y-4">
-                    {transactions.map((t) => (
-                        <div key={t.id} className="flex items-center justify-between group">
-                            <div className="space-y-0.5">
-                                <div className="font-medium text-sm truncate max-w-[180px]" title={t.descricao}>
-                                    {t.descricao}
-                                </div>
-                                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                    {t.card && (
-                                        <span className="flex items-center">
-                                            <CreditCard className="h-3 w-3 mr-1" />
-                                            {t.card.nome}
-                                        </span>
-                                    )}
-                                    <span>• {format(parseISO(t.data), 'dd/MM', { locale: ptBR })}</span>
-                                    {t.installmentNumber && (
-                                        <span>• {t.installmentNumber}/{t.totalInstallments}</span>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="font-bold text-sm text-red-600">
-                                R$ {Number(t.valor).toFixed(2)}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+            <Card className="border-none shadow-none bg-transparent">
+                <CardHeader className="px-0 pt-0 pb-2">
+                    <div className="flex items-center justify-between">
+                        <CollapsibleTrigger asChild>
+                            <Button variant="ghost" size="sm" className="p-0 hover:bg-transparent hover:text-primary flex items-center gap-2 h-auto font-semibold text-base text-foreground">
+                                <Calendar className="h-4 w-4 text-primary" />
+                                Próximos Lançamentos
+                                <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", isOpen ? "transform rotate-180" : "")} />
+                            </Button>
+                        </CollapsibleTrigger>
 
-                <div className="mt-4 pt-3 border-t">
-                    <Button variant="ghost" size="sm" className="w-full text-xs h-8" asChild>
-                        <Link href="/dashboard/servicos/parcelas">
-                            Gerenciar Parcelas Futuras
-                        </Link>
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
+                        {isOpen && (
+                            <Link
+                                href="/dashboard/servicos/parcelas"
+                                className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+                            >
+                                Ver todos <ArrowRight className="h-3 w-3" />
+                            </Link>
+                        )}
+                    </div>
+                </CardHeader>
+                <CollapsibleContent className="animate-collapsible-down">
+                    <CardContent className="p-0 pt-2">
+                        <div className="space-y-3">
+                            {transactions.map((t) => (
+                                <div
+                                    key={t.id}
+                                    className="flex items-center justify-between p-3 rounded-xl bg-card border border-border/50 hover:border-primary/20 hover:bg-accent/50 transition-all group"
+                                >
+                                    <div className="flex items-center gap-3 overflow-hidden">
+                                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary">
+                                            <CreditCard className="h-5 w-5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <div className="font-medium text-sm truncate text-foreground" title={t.descricao}>
+                                                {t.descricao}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                                                <span className="font-medium text-foreground/80">
+                                                    {format(parseISO(t.data), 'dd MMM', { locale: ptBR })}
+                                                </span>
+                                                {t.installmentNumber && (
+                                                    <>
+                                                        <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                                                        <span>{t.installmentNumber}/{t.totalInstallments}</span>
+                                                    </>
+                                                )}
+                                                {t.card && (
+                                                    <>
+                                                        <span className="w-1 h-1 rounded-full bg-muted-foreground/40" />
+                                                        <span className="truncate max-w-[80px]">{t.card.nome}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="font-bold text-sm text-foreground whitespace-nowrap pl-2">
+                                        R$ {Number(t.valor).toFixed(2)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </CollapsibleContent>
+            </Card>
+        </Collapsible>
     );
 }

@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { LoadingScreen } from '@/components/ui/loading-screen';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, CreditCard, TrendingUp, Package, ArrowRight, Filter, X, MoreVertical, Ban, FastForward } from 'lucide-react';
+import { Calendar, CreditCard, TrendingUp, Package, ArrowRight, Filter, X, MoreVertical, Ban, FastForward, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -287,122 +288,129 @@ export default function ParcelasPage() {
       {filteredData && filteredData.summary.length > 0 ? (
         <div className="space-y-6">
           {filteredData.summary.map((month) => (
-            <Card key={month.month} className="overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
-                      {format(parseISO(month.date), 'MMMM yyyy', { locale: ptBR })}
-                    </CardTitle>
-                    <CardDescription className="mt-1">
-                      {month.transactions.length} {month.transactions.length === 1 ? 'parcela' : 'parcelas'}
-                    </CardDescription>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm text-muted-foreground">Total do mês</div>
-                    <div className="text-2xl font-bold text-red-600">R$ {month.total.toFixed(2)}</div>
-                  </div>
-                </div>
-
-                {/* Cards breakdown */}
-                {month.byCard.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    {month.byCard.map(cardSum => (
-                      <Badge key={cardSum.card.id} variant="outline" className="px-3 py-1">
-                        <CreditCard className="h-3 w-3 mr-1" />
-                        {cardSum.card.nome}: R$ {cardSum.total.toFixed(2)}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </CardHeader>
-
-              <CardContent className="p-0">
-                <div className="divide-y">
-                  {month.transactions.map((transaction) => (
-                    <div
-                      key={transaction.id}
-                      className="p-4 hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 cursor-pointer" onClick={() => {
-                          if (!transaction.isRecurring && transaction.cardId) {
-                            router.push(`/dashboard/fatura/${transaction.cardId}`);
-                          }
-                        }}>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{transaction.descricao}</span>
-                            {transaction.isRecurring && (
-                              <Badge variant="secondary" className="text-xs">Recorrente</Badge>
-                            )}
-                            {transaction.totalInstallments && (
-                              <Badge variant="outline" className="text-xs">
-                                {transaction.installmentNumber}/{transaction.totalInstallments}
-                              </Badge>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap gap-2 mt-2 text-sm text-muted-foreground">
-                            {transaction.card && (
-                              <span className="flex items-center gap-1">
-                                <CreditCard className="h-3 w-3" />
-                                {transaction.card.nome}
-                              </span>
-                            )}
-                            {transaction.categoria && (
-                              <span className="flex items-center gap-1">
-                                <Package className="h-3 w-3" />
-                                {transaction.categoria.nome}
-                              </span>
-                            )}
-                            <span>{format(parseISO(transaction.data), 'dd/MM/yyyy')}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-red-600">
-                              R$ {Number(transaction.valor).toFixed(2)}
-                            </div>
-                          </div>
-
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              {transaction.isRecurring && (
-                                <DropdownMenuItem
-                                  className="text-red-600 focus:text-red-600 cursor-pointer"
-                                  onClick={() => setTransactionToCancel(transaction)}
-                                >
-                                  <Ban className="mr-2 h-4 w-4" />
-                                  Cancelar Série
-                                </DropdownMenuItem>
-                              )}
-                              {transaction.installmentNumber && (
-                                <DropdownMenuItem
-                                  className="cursor-pointer"
-                                  onClick={() => setTransactionToAnticipate(transaction)}
-                                >
-                                  <FastForward className="mr-2 h-4 w-4" />
-                                  Antecipar Parcela
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+            <Collapsible key={month.month} defaultOpen={true}>
+              <Card className="overflow-hidden">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 cursor-pointer hover:bg-primary/10 transition-colors group">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Calendar className="h-5 w-5" />
+                          {format(parseISO(month.date), 'MMMM yyyy', { locale: ptBR })}
+                          <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                        </CardTitle>
+                        <CardDescription className="mt-1">
+                          {month.transactions.length} {month.transactions.length === 1 ? 'parcela' : 'parcelas'}
+                        </CardDescription>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm text-muted-foreground">Total do mês</div>
+                        <div className="text-2xl font-bold text-red-600">R$ {month.total.toFixed(2)}</div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+
+                    {/* Cards breakdown */}
+                    {month.byCard.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-4">
+                        {month.byCard.map(cardSum => (
+                          <Badge key={cardSum.card.id} variant="outline" className="px-3 py-1 bg-background/50">
+                            <CreditCard className="h-3 w-3 mr-1" />
+                            {cardSum.card.nome}: R$ {cardSum.total.toFixed(2)}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </CardHeader>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent>
+                  <CardContent className="p-0">
+                    <div className="divide-y">
+                      {month.transactions.map((transaction) => (
+                        <div
+                          key={transaction.id}
+                          className="p-4 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1 cursor-pointer" onClick={() => {
+                              if (!transaction.isRecurring && transaction.cardId) {
+                                router.push(`/dashboard/fatura/${transaction.cardId}`);
+                              }
+                            }}>
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{transaction.descricao}</span>
+                                {transaction.isRecurring && (
+                                  <Badge variant="secondary" className="text-xs">Recorrente</Badge>
+                                )}
+                                {transaction.totalInstallments && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {transaction.installmentNumber}/{transaction.totalInstallments}
+                                  </Badge>
+                                )}
+                              </div>
+
+                              <div className="flex flex-wrap gap-2 mt-2 text-sm text-muted-foreground">
+                                {transaction.card && (
+                                  <span className="flex items-center gap-1">
+                                    <CreditCard className="h-3 w-3" />
+                                    {transaction.card.nome}
+                                  </span>
+                                )}
+                                {transaction.categoria && (
+                                  <span className="flex items-center gap-1">
+                                    <Package className="h-3 w-3" />
+                                    {transaction.categoria.nome}
+                                  </span>
+                                )}
+                                <span>{format(parseISO(transaction.data), 'dd/MM/yyyy')}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <div className="text-lg font-bold text-red-600">
+                                  R$ {Number(transaction.valor).toFixed(2)}
+                                </div>
+                              </div>
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                                  <DropdownMenuSeparator />
+                                  {transaction.isRecurring && (
+                                    <DropdownMenuItem
+                                      className="text-red-600 focus:text-red-600 cursor-pointer"
+                                      onClick={() => setTransactionToCancel(transaction)}
+                                    >
+                                      <Ban className="mr-2 h-4 w-4" />
+                                      Cancelar Série
+                                    </DropdownMenuItem>
+                                  )}
+                                  {transaction.installmentNumber && (
+                                    <DropdownMenuItem
+                                      className="cursor-pointer"
+                                      onClick={() => setTransactionToAnticipate(transaction)}
+                                    >
+                                      <FastForward className="mr-2 h-4 w-4" />
+                                      Antecipar Parcela
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
           ))}
         </div>
       ) : (

@@ -7,6 +7,7 @@ import AuditWorker from './src/workers/auditWorker.js';
 import SeriesCreationWorker from './src/workers/transactionValidationWorker.js';
 import CellJobsWorker from './src/workers/cellJobsWorker.js';
 import InvestmentWorker from './src/workers/investmentWorker.js';
+import CardAlertWorker from './src/workers/cardAlertWorker.js';
 
 console.log('🌱 Iniciando processo de Worker...');
 
@@ -14,7 +15,7 @@ try {
     // Testa a conexão com o Redis
     redisClient.ping().then(() => {
         console.log('🔗 Worker conectado ao Redis: Sim');
-        
+
         // Inicia os workers
         NotificationWorker.run();
         ReconciliationWorker.run();
@@ -23,6 +24,7 @@ try {
         SeriesCreationWorker.run();
         CellJobsWorker.run();
         InvestmentWorker.run();
+        CardAlertWorker.run();
 
         console.log('🚀 Todos os workers estão rodando e aguardando jobs.');
 
@@ -45,6 +47,7 @@ process.on('SIGINT', async () => {
     await SeriesCreationWorker.close();
     await CellJobsWorker.close();
     await InvestmentWorker.close();
+    await CardAlertWorker.close();
     redisClient.quit();
     console.log('✅ Conexões do worker encerradas.');
     process.exit(0);

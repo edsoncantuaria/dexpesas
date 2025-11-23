@@ -382,6 +382,7 @@ model User {
   investmentContributions       InvestmentContribution[]
   investmentSnapshots           InvestmentSnapshot[]
   investmentNudgeConversions    InvestmentNudgeConversion[]
+  cardAlerts                    CardAlert[]                 @relation("User_CardAlerts")
 }
 
 model Clan {
@@ -797,6 +798,11 @@ model Card {
   jurosRotativo         Decimal?      @db.Decimal(10, 4)
   userId                String
   paymentAccountId      String?
+  // Cashback fields
+  defaultCashbackRate       Decimal?  @default(0) @db.Decimal(5, 2)
+  totalCashbackEarned       Decimal   @default(0) @db.Decimal(18, 4)
+  cashbackExpiresAt         DateTime?
+  cashbackRedemptionMinimum Decimal?  @db.Decimal(10, 2)
 
   // --- Relações ---
   user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -806,6 +812,7 @@ model Card {
   invoices              CardInvoice[]    @relation("CardInvoice_Card")
   billingRecurringBills RecurringBill[]  @relation("RecurringBill_BillCard")
   autoPayRecurringBills RecurringBill[]  @relation("RecurringBill_AutoPayCard")
+  alerts                CardAlert[]      @relation("Card_Alerts")
 }
 
 model Transaction {
@@ -844,6 +851,9 @@ model Transaction {
   isReconciled               Boolean           @default(false)
   isInvoicePayment           Boolean           @default(false)
   finalizedGoalId            String?
+  // Cashback fields
+  cashbackAmount             Decimal?          @db.Decimal(10, 4)
+  cashbackPercentage         Decimal?          @db.Decimal(5, 2)
   userId                     String
   accountId                  String?
   cardId                     String?
@@ -1137,6 +1147,27 @@ model Notification {
 
   // --- Relações ---
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CardAlert {
+  id          String        @id @default(cuid())
+  cardId      String
+  userId      String
+  type        AlertType
+  severity    AlertSeverity
+  title       String
+  message     String
+  metadata    Json?
+  triggeredAt DateTime      @default(now())
+  read        Boolean       @default(false)
+  dismissed   Boolean       @default(false)
+
+  // --- Relações ---
+  card Card @relation("Card_Alerts", fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation("User_CardAlerts", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([cardId, triggeredAt])
 }
 
 model Automation {

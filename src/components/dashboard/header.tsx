@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { NotificationPanel } from './notifications/notification-panel';
+import { CardAlertsBadge } from './header/card-alerts-badge';
 import { useState, useEffect } from 'react';
 import { useTransactionForm } from '@/contexts/TransactionFormContext';
 import { Logo } from '@/components/logo';
@@ -65,6 +66,10 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Card Alerts Badge */}
+        <CardAlertsBadge />
+
+        {/* Notifications */}
         <DropdownMenu open={open} onOpenChange={setOpen}>
           <DropdownMenuTrigger asChild>
             <Button

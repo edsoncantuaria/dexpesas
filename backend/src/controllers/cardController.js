@@ -441,11 +441,11 @@ class CardController {
                     }
                 },
                 include: {
-                    categoria: {
+                    category: {
                         select: {
                             nome: true,
-                            icone: true,
-                            cor: true
+                            icon: true,
+                            label: true // Usado como cor
                         }
                     }
                 },
@@ -454,11 +454,18 @@ class CardController {
                 }
             });
 
+            // Calcular Data de Vencimento corretamente
+            let dueDate = setDate(end, card.diaVencimento);
+            // Se o dia de vencimento for menor que o dia de fechamento, o vencimento é no mês seguinte ao fechamento
+            if (card.diaVencimento < card.diaFechamento) {
+                dueDate = addMonths(dueDate, 1);
+            }
+
             // Preparar dados
             const invoiceData = {
                 monthLabel: month || new Date().toISOString().slice(0, 7),
                 closingDate: end,
-                dueDate: new Date(card.diaVencimento)
+                dueDate: dueDate
             };
 
             // Gerar PDF
@@ -466,11 +473,36 @@ class CardController {
 
             // Configurar headers
             const filename = `fatura-${card.nome.replace(/\s+/g, '-')}-${invoiceData.monthLabel}.pdf`;
-            res.setHeader('Content-Type', 'application/pdf');
-            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-            // Stream do PDF para response
-            pdfDoc.pipe(res);
+            // Coletar chunks para salvar no MinIO e enviar
+            const chunks = [];
+            pdfDoc.on('data', chunk => chunks.push(chunk));
+            pdfDoc.on('end', async () => {
+                const pdfBuffer = Buffer.concat(chunks);
+
+                // Salvar no MinIO
+                try {
+                    const bucketName = config.minio.bucketName;
+                    const objectName = `invoices/${cardId}/${invoiceData.monthLabel}-${Date.now()}.pdf`;
+
+                    const bucketExists = await minioClient.bucketExists(bucketName);
+                    if (!bucketExists) {
+                        await minioClient.makeBucket(bucketName);
+                    }
+
+                    await minioClient.putObject(bucketName, objectName, pdfBuffer);
+                    console.log(`PDF salvo no MinIO: ${objectName}`);
+                } catch (minioError) {
+                    console.error('Erro ao salvar PDF no MinIO:', minioError);
+                    // Não falhar a request se o MinIO falhar, apenas logar
+                }
+
+                // Enviar para o cliente
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+                res.send(pdfBuffer);
+            });
+
             pdfDoc.end();
 
         } catch (error) {
@@ -858,6 +890,20 @@ class CardController {
                 referenceDate = subMonths(referenceDate, 1);
             }
 
+            // Limpar reconciliações anteriores não finalizadas para este mês/cartão
+            // Isso evita conflitos de fitId (que é unique) caso o usuário tente importar novamente
+            const existingReconciliations = await prisma.reconciliation.findMany({
+                where: {
+                    cardId,
+                    invoiceMonth,
+                    status: { in: ['PROCESSING', 'PENDING_REVIEW', 'FAILED'] }
+                }
+            });
+
+            for (const rec of existingReconciliations) {
+                await InvoiceReconciliationService.cancelInvoiceReconciliation(rec.id, userId);
+            }
+
             // Criar registro de reconciliação
             const reconciliation = await prisma.reconciliation.create({
                 data: {
@@ -1151,6 +1197,126 @@ class CardController {
         }
     }
 
+    // GET /cards/:cardId/cashback
+    // Retorna resumo de cashback do cartão
+    async getCashbackSummary(req, res, next) {
+        const { cardId } = req.params;
+        const userId = req.user.id;
+        const { startDate, endDate } = req.query;
+
+        try {
+            const card = await prisma.card.findFirst({
+                where: { id: cardId, userId }
+            });
+
+            if (!card) {
+                const err = new Error('Cartão não encontrado.');
+                err.statusCode = 404;
+                return next(err);
+            }
+
+            const CashbackService = (await import('../services/cashbackService.js')).default;
+            const summary = await CashbackService.getCashbackSummary(
+                userId,
+                cardId,
+                startDate ? new Date(startDate) : null,
+                endDate ? new Date(endDate) : null
+            );
+
+            res.json({
+                card: {
+                    id: card.id,
+                    nome: card.nome,
+                    defaultCashbackRate: card.defaultCashbackRate,
+                    totalCashbackEarned: card.totalCashbackEarned,
+                    cashbackRedemptionMinimum: card.cashbackRedemptionMinimum,
+                    cashbackExpiresAt: card.cashbackExpiresAt
+                },
+                summary
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // GET /cards/:cardId/cashback/analytics
+    // Retorna analytics de cashback
+    async getCashbackAnalytics(req, res, next) {
+        const { cardId } = req.params;
+        const userId = req.user.id;
+        const { period = 'month' } = req.query;
+
+        try {
+            const card = await prisma.card.findFirst({
+                where: { id: cardId, userId }
+            });
+
+            if (!card) {
+                const err = new Error('Cartão não encontrado.');
+                err.statusCode = 404;
+                return next(err);
+            }
+
+            const CashbackService = (await import('../services/cashbackService.js')).default;
+            const analytics = await CashbackService.getCashbackAnalytics(userId, cardId, period);
+
+            res.json(analytics);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // POST /cards/:cardId/cashback/redeem
+    // Resgata cashback
+    async redeemCashback(req, res, next) {
+        const { cardId } = req.params;
+        const userId = req.user.id;
+        const { amount, accountId } = req.body;
+
+        if (!amount || amount <= 0) {
+            const err = new Error('Valor de resgate inválido.');
+            err.statusCode = 400;
+            return next(err);
+        }
+
+        try {
+            const result = await prisma.$transaction(async (tx) => {
+                const CashbackService = (await import('../services/cashbackService.js')).default;
+                return await CashbackService.redeemCashback(userId, cardId, parseFloat(amount), accountId, tx);
+            });
+
+            res.status(201).json({
+                message: 'Cashback resgatado com sucesso!',
+                ...result
+            });
+        } catch (error) {
+            if (error.statusCode) {
+                return res.status(error.statusCode).json({ message: error.message });
+            }
+            next(error);
+        }
+    }
+
+    // GET /cards/:cardId/alerts
+    // Retorna alertas de um cartão específico
+    async getAlertsByCard(req, res, next) {
+        const { cardId } = req.params;
+        const userId = req.user.id;
+        const { dismissed = 'false' } = req.query;
+
+        try {
+            const CardAlertService = (await import('../services/cardAlertService.js')).default;
+            const alerts = await CardAlertService.getUserAlerts(userId, {
+                cardId,
+                dismissed: dismissed === 'true'
+            });
+
+            res.json(alerts);
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export default new CardController();
+

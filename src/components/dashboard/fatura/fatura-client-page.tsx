@@ -21,6 +21,7 @@ import { PayBillDialog } from './pay-bill-dialog';
 import { getInvoicePeriod } from '@/lib/date-helpers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CardLimitStatus } from './card-limit-status';
+import { CashbackSummaryCard } from '../cartoes/cashback-summary-card';
 import { InvoiceHistorySelector } from './invoice-history-selector';
 import { handleApiError } from '@/lib/error-handler';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -278,17 +279,22 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
           />
         </div>
         <div className="lg:col-span-1">
-          <CardLimitStatus
-            totalLimit={Number(card.limite)}
-            availableLimit={limiteDisponivel}
-            bestDayToBuy={card.bestDayToBuy}
-          />
+          <div className="grid grid-cols-1 gap-6">
+            <CardLimitStatus
+              totalLimit={Number(card.limite)}
+              availableLimit={limiteDisponivel}
+              bestDayToBuy={card.bestDayToBuy}
+            />
+            <CashbackSummaryCard cardId={cardId} cardName={card.nome} />
+          </div>
         </div>
       </div>
 
+
       <Tabs defaultValue="invoice" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 mb-6">
+        <TabsList className="grid w-full grid-cols-3 mb-6">
           <TabsTrigger value="invoice">Fatura</TabsTrigger>
+          <TabsTrigger value="future">Futuro</TabsTrigger>
           <TabsTrigger value="analytics">Análises</TabsTrigger>
         </TabsList>
 
@@ -367,27 +373,47 @@ export function FaturaClientPage({ cardId }: FaturaClientPageProps) {
               </>
             )}
           </div>
+        </TabsContent>
 
-          {
-            futureInstallments.length > 0 && (
-              <Card className="shadow-xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10">
-                <CardHeader>
-                  <CardTitle className="text-xl bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
-                    Lançamentos Futuros
-                  </CardTitle>
-                  <CardDescription>Estas são as parcelas que entrarão nas próximas faturas.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
+        <TabsContent value="future" className="space-y-6">
+          <Card className="shadow-xl bg-gradient-to-br from-card/90 to-card/70 backdrop-blur-sm border-white/10">
+            <CardHeader>
+              <CardTitle className="text-xl bg-gradient-to-br from-foreground to-muted-foreground bg-clip-text text-transparent">
+                Lançamentos Futuros
+              </CardTitle>
+              <CardDescription>Estas são as parcelas que entrarão nas próximas faturas.</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {futureInstallments.filter(t => new Date(t.data) > period.end).length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  Nenhum lançamento futuro encontrado.
+                </div>
+              ) : (
+                <>
                   <div className="block md:hidden">
-                    <TransactionMobileList data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => { }} accounts={accounts} cards={[card]} />
+                    <TransactionMobileList
+                      data={futureInstallments.filter(t => new Date(t.data) > period.end)}
+                      onEdit={handleOpenForm}
+                      onDelete={handleDeleteTransaction}
+                      onTogglePaidStatus={() => { }}
+                      accounts={accounts}
+                      cards={[card]}
+                    />
                   </div>
                   <div className="hidden md:block">
-                    <TransactionsTable data={futureInstallments} onEdit={handleOpenForm} onDelete={handleDeleteTransaction} onTogglePaidStatus={() => { }} accounts={accounts} cards={[card]} />
+                    <TransactionsTable
+                      data={futureInstallments.filter(t => new Date(t.data) > period.end)}
+                      onEdit={handleOpenForm}
+                      onDelete={handleDeleteTransaction}
+                      onTogglePaidStatus={() => { }}
+                      accounts={accounts}
+                      cards={[card]}
+                    />
                   </div>
-                </CardContent>
-              </Card>
-            )
-          }
+                </>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="analytics">
