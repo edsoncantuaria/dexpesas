@@ -2,14 +2,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -182,107 +175,103 @@ export function LinkInstallmentsDialog({
     const selectedCount = selectedIds.size;
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>Vincular Parcelas</DialogTitle>
-                    <DialogDescription>
-                        Agrupe transações importadas soltas em um único parcelamento.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="flex items-center gap-4 py-4">
-                    <div className="grid gap-1.5 flex-1">
-                        <Label>Total de Parcelas</Label>
-                        <Input
-                            type="number"
-                            min={selectedCount}
-                            max={99}
-                            value={totalInstallments}
-                            onChange={(e) => setTotalInstallments(Number(e.target.value))}
-                        />
-                    </div>
-                    <div className="flex-1 flex items-center justify-end text-sm text-muted-foreground">
-                        {selectedCount} transações selecionadas
-                    </div>
+        <ResponsiveDialog
+            isOpen={open}
+            setIsOpen={onOpenChange}
+            title="Vincular Parcelas"
+            description="Agrupe transações importadas soltas em um único parcelamento."
+        >
+            <div className="flex items-center gap-4 py-4">
+                <div className="grid gap-1.5 flex-1">
+                    <Label>Total de Parcelas</Label>
+                    <Input
+                        type="number"
+                        min={selectedCount}
+                        max={99}
+                        value={totalInstallments}
+                        onChange={(e) => setTotalInstallments(Number(e.target.value))}
+                    />
                 </div>
+                <div className="flex-1 flex items-center justify-end text-sm text-muted-foreground">
+                    {selectedCount} transações selecionadas
+                </div>
+            </div>
 
-                {loading ? (
-                    <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : (
-                    <ScrollArea className="flex-1 pr-4 -mr-4">
-                        <div className="space-y-6">
-                            {candidates.length === 0 ? (
-                                <div className="text-center py-8 text-muted-foreground">
-                                    Nenhuma transação similar encontrada nos meses vizinhos.
-                                </div>
-                            ) : (
-                                candidates.map((group) => (
-                                    <div key={group.month} className="space-y-2">
-                                        <h4 className="text-sm font-medium text-muted-foreground sticky top-0 bg-background py-1 z-10">
-                                            {format(group.date, 'MMMM yyyy', { locale: ptBR })}
-                                        </h4>
-                                        <div className="grid gap-2">
-                                            {group.transactions.map((t) => {
-                                                const isSelected = selectedIds.has(t.id);
-                                                const isPivot = t.id === transaction?.id;
+            {loading ? (
+                <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+            ) : (
+                <ScrollArea className="flex-1 pr-4 -mr-4 max-h-[400px]">
+                    <div className="space-y-6">
+                        {candidates.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                                Nenhuma transação similar encontrada nos meses vizinhos.
+                            </div>
+                        ) : (
+                            candidates.map((group) => (
+                                <div key={group.month} className="space-y-2">
+                                    <h4 className="text-sm font-medium text-muted-foreground sticky top-0 bg-background py-1 z-10">
+                                        {format(group.date, 'MMMM yyyy', { locale: ptBR })}
+                                    </h4>
+                                    <div className="grid gap-2">
+                                        {group.transactions.map((t) => {
+                                            const isSelected = selectedIds.has(t.id);
+                                            const isPivot = t.id === transaction?.id;
 
-                                                return (
-                                                    <div
-                                                        key={t.id}
-                                                        className={cn(
-                                                            "flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer",
-                                                            isSelected ? "border-primary bg-primary/5" : "hover:bg-muted/50",
-                                                            isPivot && "ring-1 ring-primary ring-offset-1"
-                                                        )}
-                                                        onClick={() => toggleSelection(t.id)}
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <Checkbox
-                                                                checked={isSelected}
-                                                                onCheckedChange={() => toggleSelection(t.id)}
-                                                                disabled={isPivot}
-                                                            />
-                                                            <div>
-                                                                <p className="font-medium text-sm">{t.descricao}</p>
-                                                                <p className="text-xs text-muted-foreground">
-                                                                    {format(new Date(t.data), "dd 'de' MMM", { locale: ptBR })}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <p className="font-medium text-sm">
-                                                                {Number(t.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                            return (
+                                                <div
+                                                    key={t.id}
+                                                    className={cn(
+                                                        "flex items-center justify-between p-3 rounded-lg border transition-colors cursor-pointer",
+                                                        isSelected ? "border-primary bg-primary/5" : "hover:bg-muted/50",
+                                                        isPivot && "ring-1 ring-primary ring-offset-1"
+                                                    )}
+                                                    onClick={() => toggleSelection(t.id)}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <Checkbox
+                                                            checked={isSelected}
+                                                            onCheckedChange={() => toggleSelection(t.id)}
+                                                            disabled={isPivot}
+                                                        />
+                                                        <div>
+                                                            <p className="font-medium text-sm">{t.descricao}</p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {format(new Date(t.data), "dd 'de' MMM", { locale: ptBR })}
                                                             </p>
-                                                            {isPivot && (
-                                                                <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
-                                                                    Original
-                                                                </span>
-                                                            )}
                                                         </div>
                                                     </div>
-                                                );
-                                            })}
-                                        </div>
+                                                    <div className="text-right">
+                                                        <p className="font-medium text-sm">
+                                                            {Number(t.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                                        </p>
+                                                        {isPivot && (
+                                                            <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
+                                                                Original
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
-                                ))
-                            )}
-                        </div>
-                    </ScrollArea>
-                )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </ScrollArea>
+            )}
 
-                <DialogFooter className="pt-4 border-t mt-4">
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-                        Cancelar
-                    </Button>
-                    <Button onClick={handleSave} disabled={saving || selectedCount < 2}>
-                        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Vincular {selectedCount} Parcelas
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+                <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                    Cancelar
+                </Button>
+                <Button onClick={handleSave} disabled={saving || selectedCount < 2}>
+                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Vincular {selectedCount} Parcelas
+                </Button>
+            </div>
+        </ResponsiveDialog>
     );
 }

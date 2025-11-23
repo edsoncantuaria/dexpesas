@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -154,25 +155,21 @@ export function SharedAccountsCard({
                     <CardDescription>Mostre saldos relevantes para toda a família e controle quem pode vê-los.</CardDescription>
                 </div>
                 {canManageSharedAccounts && (
-                    <Dialog
-                        open={isDialogOpen}
-                        onOpenChange={(open) => {
-                            setDialogOpen(open);
-                            if (!open) resetForm();
-                        }}
-                    >
-                        <DialogTrigger asChild>
-                            <Button size="sm" variant="outline" className="w-full sm:w-auto">
-                                <Wallet className="h-4 w-4 mr-1" />
-                                Vincular conta
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-lg">
-                            <DialogHeader>
-                                <DialogTitle>Compartilhar conta com a família</DialogTitle>
-                                <DialogDescription>Selecione uma das suas contas e escolha quem poderá enxergar os detalhes.</DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
+                    <>
+                        <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => setDialogOpen(true)}>
+                            <Wallet className="h-4 w-4 mr-1" />
+                            Vincular conta
+                        </Button>
+                        <ResponsiveDialog
+                            isOpen={isDialogOpen}
+                            setIsOpen={(open) => {
+                                setDialogOpen(open);
+                                if (!open) resetForm();
+                            }}
+                            title="Compartilhar conta com a família"
+                            description="Selecione uma das suas contas e escolha quem poderá enxergar os detalhes."
+                        >
+                            <div className="space-y-4 py-4">
                                 <div className="space-y-2">
                                     <Label>Conta</Label>
                                     {isLoadingAccounts ? (
@@ -228,14 +225,14 @@ export function SharedAccountsCard({
                                     </div>
                                 )}
                             </div>
-                            <DialogFooter>
+                            <div className="flex justify-end pt-4">
                                 <Button onClick={handleLinkAccount} disabled={!isFormValid || isSubmitting || shareableAccounts.length === 0}>
                                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                     {isSubmitting ? 'Compartilhando...' : 'Compartilhar conta'}
                                 </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
+                            </div>
+                        </ResponsiveDialog>
+                    </>
                 )}
             </CardHeader>
             <CardContent className="space-y-4">
@@ -308,6 +305,6 @@ export function SharedAccountsCard({
                     })}
                 </div>
             </CardContent>
-        </Card>
+        </Card >
     );
 }

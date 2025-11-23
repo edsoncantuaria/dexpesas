@@ -3,7 +3,7 @@
 
 import { Target, PlusCircle, BrainCircuit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { useState, useEffect, useCallback } from 'react';
 import type { Goal, Account, Category, GoalContribution, User } from '@/lib/definitions';
 import { useToast } from '@/hooks/use-toast';
@@ -196,29 +196,26 @@ export default function MetasPage() {
                         <p className="text-muted-foreground mt-1">Transforme seus sonhos em realidade, um passo de cada vez.</p>
                     </div>
                 </div>
-                <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                    <DialogTrigger asChild>
+                <ResponsiveDialog
+                    isOpen={isFormOpen}
+                    setIsOpen={setIsFormOpen}
+                    title={editingGoal ? 'Editar Objetivo' : 'Novo Objetivo Financeiro'}
+                    description={editingGoal ? 'Atualize os detalhes do seu objetivo.' : 'Defina uma meta clara e começe a poupar para alcançá-la.'}
+                    trigger={
                         <Button onClick={() => handleOpenForm()} className="shadow-lg shadow-primary/20">
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Novo Objetivo
                         </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle className="text-2xl">{editingGoal ? 'Editar Objetivo' : 'Novo Objetivo Financeiro'}</DialogTitle>
-                            <DialogDescription>
-                                {editingGoal ? 'Atualize os detalhes do seu objetivo.' : 'Defina uma meta clara e comece a poupar para alcançá-la.'}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <AddGoalForm
-                            goal={editingGoal}
-                            accounts={accounts}
-                            onSuccess={handleSaveGoal}
-                            onClose={handleCloseForm}
-                            isSubmitting={isSubmitting}
-                        />
-                    </DialogContent>
-                </Dialog>
+                    }
+                >
+                    <AddGoalForm
+                        goal={editingGoal}
+                        accounts={accounts}
+                        onSuccess={handleSaveGoal}
+                        onClose={handleCloseForm}
+                        isSubmitting={isSubmitting}
+                    />
+                </ResponsiveDialog>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -271,23 +268,20 @@ export default function MetasPage() {
             </div>
 
             {contributingGoal && (
-                <Dialog open={!!contributingGoal} onOpenChange={(isOpen) => !isOpen && handleCloseContribution()}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Contribuir para "{contributingGoal.name}"</DialogTitle>
-                            <DialogDescription>
-                                Transfira um valor de uma de suas contas para este objetivo.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <AddContributionForm
-                            goal={contributingGoal}
-                            accounts={accounts.filter(a => a.tipo === 'corrente' || a.tipo === 'poupanca')}
-                            onSuccess={handleAddContribution}
-                            onClose={handleCloseContribution}
-                            isSubmitting={isSubmitting}
-                        />
-                    </DialogContent>
-                </Dialog>
+                <ResponsiveDialog
+                    isOpen={!!contributingGoal}
+                    setIsOpen={(isOpen) => !isOpen && handleCloseContribution()}
+                    title={`Contribuir para "${contributingGoal.name}"`}
+                    description="Transfira um valor de uma de suas contas para este objetivo."
+                >
+                    <AddContributionForm
+                        goal={contributingGoal}
+                        accounts={accounts.filter(a => a.tipo === 'corrente' || a.tipo === 'poupanca')}
+                        onSuccess={handleAddContribution}
+                        onClose={handleCloseContribution}
+                        isSubmitting={isSubmitting}
+                    />
+                </ResponsiveDialog>
             )}
 
             {finalizingGoal && (

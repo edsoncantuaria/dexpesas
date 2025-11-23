@@ -12,7 +12,7 @@ import { ReconcileView } from '@/components/dashboard/reconcile/reconcile-view';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReconciliationHistoryList } from '@/components/dashboard/reconcile/history-list';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ReconcileHero } from './reconcile-hero';
@@ -352,81 +352,77 @@ export function ReconcilePageClient() {
                 </TabsContent>
             </Tabs>
 
-            <Dialog open={finalizeHelpOpen} onOpenChange={setFinalizeHelpOpen}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Saldo diferente do extrato</DialogTitle>
-                        <DialogDescription>
-                            {finalizeErrorMessage || 'Não é possível finalizar enquanto houver diferença entre o saldo do extrato e da conta no Dexpesas.'}
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-3 text-sm">
-                        <div className="rounded-md border border-dashed p-3">
-                            <p className="text-xs uppercase text-muted-foreground">Diferença atual</p>
-                            <p className="text-xl font-semibold">{formatCurrency(differenceValue ?? null)}</p>
+            <ResponsiveDialog
+                isOpen={finalizeHelpOpen}
+                setIsOpen={setFinalizeHelpOpen}
+                title="Saldo diferente do extrato"
+                description={finalizeErrorMessage || 'Não é possível finalizar enquanto houver diferença entre o saldo do extrato e da conta no Dexpesas.'}
+            >
+                <div className="space-y-3 text-sm py-4">
+                    <div className="rounded-md border border-dashed p-3">
+                        <p className="text-xs uppercase text-muted-foreground">Diferença atual</p>
+                        <p className="text-xl font-semibold">{formatCurrency(differenceValue ?? null)}</p>
+                    </div>
+                    {reconciliation && (
+                        <div className="rounded-md border border-muted/50 p-3 space-y-1 text-muted-foreground">
+                            <p className="font-semibold text-foreground">Comparativo de saldos</p>
+                            <p>Saldo inicial no Dexpesas: {formatCurrency(reconciliation.systemOpeningBalance ?? null)}</p>
+                            <p>Saldo inicial do extrato: {formatCurrency(reconciliation.statementOpeningBalance ? Number(reconciliation.statementOpeningBalance) : null)}</p>
+                            <p>Saldo final no Dexpesas: {formatCurrency(reconciliation.systemClosingBalance ?? null)}</p>
+                            <p>Saldo final do extrato: {formatCurrency(reconciliation.statementClosingBalance ? Number(reconciliation.statementClosingBalance) : null)}</p>
                         </div>
-                        {reconciliation && (
-                            <div className="rounded-md border border-muted/50 p-3 space-y-1 text-muted-foreground">
-                                <p className="font-semibold text-foreground">Comparativo de saldos</p>
-                                <p>Saldo inicial no Dexpesas: {formatCurrency(reconciliation.systemOpeningBalance ?? null)}</p>
-                                <p>Saldo inicial do extrato: {formatCurrency(reconciliation.statementOpeningBalance ? Number(reconciliation.statementOpeningBalance) : null)}</p>
-                                <p>Saldo final no Dexpesas: {formatCurrency(reconciliation.systemClosingBalance ?? null)}</p>
-                                <p>Saldo final do extrato: {formatCurrency(reconciliation.statementClosingBalance ? Number(reconciliation.statementClosingBalance) : null)}</p>
-                            </div>
-                        )}
-                        <p className="text-muted-foreground">
-                            Para finalizar é necessário que o saldo final do Dexpesas seja igual ao saldo final do extrato importado.
-                            Isso evita fechar o período com lançamentos faltando ou duplicados.
+                    )}
+                    <p className="text-muted-foreground">
+                        Para finalizar é necessário que o saldo final do Dexpesas seja igual ao saldo final do extrato importado.
+                        Isso evita fechar o período com lançamentos faltando ou duplicados.
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                        <li>Garanta que todas as transações importadas foram conciliadas, descartadas ou criadas no sistema.</li>
+                        <li>Verifique o saldo inicial configurado na conta (menu Contas). Ele deve ser igual ao saldo do extrato no início do período.</li>
+                        <li>Se não houver mais pendências, clique em “Atualizar” e tente finalizar novamente.</li>
+                    </ul>
+                </div>
+                <div className="flex justify-end pt-4">
+                    <Button onClick={() => setFinalizeHelpOpen(false)}>Entendi</Button>
+                </div>
+            </ResponsiveDialog>
+            <ResponsiveDialog
+                isOpen={guideDialogOpen}
+                setIsOpen={setGuideDialogOpen}
+                title="Guia de Reconciliação"
+                description="Entenda por que e como usar o módulo."
+            >
+                <div className="space-y-4 text-sm py-4 overflow-y-auto max-h-[70vh]">
+                    <div>
+                        <p className="font-semibold">Por que usar?</p>
+                        <p className="text-muted-foreground">Reconciliações garantem que o saldo no Dexpesas seja igual ao saldo do banco, o que evita lançamentos duplicados e dá segurança para tomar decisões.</p>
+                    </div>
+                    <div>
+                        <p className="font-semibold">Como preparar</p>
+                        <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
+                            <li>Abra o extrato e anote o saldo inicial e final exibidos pelo banco.</li>
+                            <li>Edite a conta no Dexpesas (menu Finanças &gt; Contas) e coloque o saldo inicial igual ao do extrato mais antigo que você vai importar.</li>
+                            <li>Faça o upload do extrato e concilie cada lançamento ou crie os que faltarem.</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <p className="font-semibold">Com qual frequência?</p>
+                        <p className="text-muted-foreground">Recomenda-se conciliar semanalmente ou logo após fechar uma fatura. Quanto menor o intervalo, menos pendências para revisar.</p>
+                    </div>
+                    <div className="rounded-md border border-dashed p-3 text-muted-foreground">
+                        <p className="font-semibold text-foreground mb-1">Precisa ajustar o saldo inicial?</p>
+                        <p>
+                            Use o botão abaixo para acessar a tela de contas e editar o saldo diretamente. Não é necessário criar transações fictícias para corrigir o valor inicial.
                         </p>
-                        <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
-                            <li>Garanta que todas as transações importadas foram conciliadas, descartadas ou criadas no sistema.</li>
-                            <li>Verifique o saldo inicial configurado na conta (menu Contas). Ele deve ser igual ao saldo do extrato no início do período.</li>
-                            <li>Se não houver mais pendências, clique em “Atualizar” e tente finalizar novamente.</li>
-                        </ul>
                     </div>
-                    <DialogFooter>
-                        <Button onClick={() => setFinalizeHelpOpen(false)}>Entendi</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-            <Dialog open={guideDialogOpen} onOpenChange={setGuideDialogOpen}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Guia de Reconciliação</DialogTitle>
-                        <DialogDescription>Entenda por que e como usar o módulo.</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 text-sm">
-                        <div>
-                            <p className="font-semibold">Por que usar?</p>
-                            <p className="text-muted-foreground">Reconciliações garantem que o saldo no Dexpesas seja igual ao saldo do banco, o que evita lançamentos duplicados e dá segurança para tomar decisões.</p>
-                        </div>
-                        <div>
-                            <p className="font-semibold">Como preparar</p>
-                            <ol className="list-decimal pl-5 space-y-1 text-muted-foreground">
-                                <li>Abra o extrato e anote o saldo inicial e final exibidos pelo banco.</li>
-                                <li>Edite a conta no Dexpesas (menu Finanças &gt; Contas) e coloque o saldo inicial igual ao do extrato mais antigo que você vai importar.</li>
-                                <li>Faça o upload do extrato e concilie cada lançamento ou crie os que faltarem.</li>
-                            </ol>
-                        </div>
-                        <div>
-                            <p className="font-semibold">Com qual frequência?</p>
-                            <p className="text-muted-foreground">Recomenda-se conciliar semanalmente ou logo após fechar uma fatura. Quanto menor o intervalo, menos pendências para revisar.</p>
-                        </div>
-                        <div className="rounded-md border border-dashed p-3 text-muted-foreground">
-                            <p className="font-semibold text-foreground mb-1">Precisa ajustar o saldo inicial?</p>
-                            <p>
-                                Use o botão abaixo para acessar a tela de contas e editar o saldo diretamente. Não é necessário criar transações fictícias para corrigir o valor inicial.
-                            </p>
-                        </div>
-                    </div>
-                    <DialogFooter className="flex-col sm:flex-row sm:items-center sm:justify-between">
-                        <Button variant="secondary" asChild>
-                            <Link href="/dashboard/contas">Abrir página de Contas</Link>
-                        </Button>
-                        <Button onClick={() => setGuideDialogOpen(false)}>Entendi</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pt-4 gap-2">
+                    <Button variant="secondary" asChild>
+                        <Link href="/dashboard/contas">Abrir página de Contas</Link>
+                    </Button>
+                    <Button onClick={() => setGuideDialogOpen(false)}>Entendi</Button>
+                </div>
+            </ResponsiveDialog>
         </div>
     );
 }

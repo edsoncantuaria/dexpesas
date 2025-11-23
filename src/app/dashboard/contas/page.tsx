@@ -4,14 +4,7 @@
 import { Landmark, ArrowRightLeft, PlusCircle } from "lucide-react";
 import { AccountList } from "@/components/dashboard/contas/account-list";
 import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from "@/components/ui/dialog";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { useState, useEffect, useCallback } from "react";
 import type { Account } from "@/lib/definitions";
 import { useToast } from "@/hooks/use-toast";
@@ -74,7 +67,7 @@ export default function ContasPage() {
         }
     };
 
-    const handleTransfer = async (transferData: { fromAccountId: string, toAccountId: string, amount: number, description: string }) => {
+    const handleTransfer = async (transferData: { fromAccountId: string, toAccountId: string, amount: number, description?: string }) => {
         setIsSubmitting(true);
         try {
             await api.post('/accounts/transfer', transferData);
@@ -128,49 +121,47 @@ export default function ContasPage() {
                 </div>
                 <div className="flex w-full sm:w-auto items-center gap-2">
                     {accounts.length > 1 && (
-                        <Dialog open={isTransferFormOpen} onOpenChange={setIsTransferFormOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline" className="w-full sm:w-auto">
-                                    <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                    Transferir
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle className="text-2xl">Transferir entre Contas</DialogTitle>
-                                    <DialogDescription>Mova dinheiro de uma conta para outra.</DialogDescription>
-                                </DialogHeader>
-                                <TransferForm
-                                    accounts={accounts}
-                                    onSave={handleTransfer}
-                                    isSaving={isSubmitting}
-                                    onClose={() => setIsTransferFormOpen(false)}
-                                />
-                            </DialogContent>
-                        </Dialog>
-                    )}
-                    <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="w-full sm:w-auto shadow-lg shadow-primary/20" onClick={() => handleOpenForm()}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Nova Conta
+                        <>
+                            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setIsTransferFormOpen(true)}>
+                                <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                Transferir
                             </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl">{editingAccount ? 'Editar Conta' : 'Adicionar Nova Conta'}</DialogTitle>
-                                <DialogDescription>
-                                    {editingAccount ? 'Atualize as informações da sua conta.' : 'Preencha as informações para adicionar uma nova conta.'}
-                                </DialogDescription>
-                            </DialogHeader>
+                            <ResponsiveDialog
+                                isOpen={isTransferFormOpen}
+                                setIsOpen={setIsTransferFormOpen}
+                                title="Transferir entre Contas"
+                                description="Mova dinheiro de uma conta para outra."
+                            >
+                                <div className="py-4">
+                                    <TransferForm
+                                        accounts={accounts}
+                                        onSave={handleTransfer}
+                                        isSaving={isSubmitting}
+                                        onClose={() => setIsTransferFormOpen(false)}
+                                    />
+                                </div>
+                            </ResponsiveDialog>
+                        </>
+                    )}
+                    <Button className="w-full sm:w-auto shadow-lg shadow-primary/20" onClick={() => handleOpenForm()}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Nova Conta
+                    </Button>
+                    <ResponsiveDialog
+                        isOpen={isFormOpen}
+                        setIsOpen={setIsFormOpen}
+                        title={editingAccount ? 'Editar Conta' : 'Adicionar Nova Conta'}
+                        description={editingAccount ? 'Atualize as informações da sua conta.' : 'Preencha as informações para adicionar uma nova conta.'}
+                    >
+                        <div className="py-4">
                             <AddAccountForm
                                 account={editingAccount}
                                 onSuccess={handleSaveAccount}
                                 onClose={handleCloseForm}
                                 isSubmitting={isSubmitting}
                             />
-                        </DialogContent>
-                    </Dialog>
+                        </div>
+                    </ResponsiveDialog>
                 </div>
             </div>
 

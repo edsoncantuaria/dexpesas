@@ -7,7 +7,7 @@ import { ptBR } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Loader2, PlusCircle, RefreshCcw, AlertTriangle, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -520,114 +520,111 @@ export default function InvestimentosPage() {
         onSubmit={handleOnboardingSubmit}
       />
 
-      <Dialog open={isContributionDialogOpen} onOpenChange={setIsContributionDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Registrar aporte</DialogTitle>
-            <DialogDescription>
-              Movimente valores entre uma conta de origem e uma conta de investimento para manter o histórico em dia.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleContributionSubmit} className="space-y-4">
+      <ResponsiveDialog
+        isOpen={isContributionDialogOpen}
+        setIsOpen={setIsContributionDialogOpen}
+        title="Registrar aporte"
+        description="Movimente valores entre uma conta de origem e uma conta de investimento para manter o histórico em dia."
+      >
+        <form onSubmit={handleContributionSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="amount">Valor (R$)</Label>
+            <Input
+              id="amount"
+              type="number"
+              min="0"
+              step="50"
+              required
+              value={contributionForm.amount}
+              onChange={(event) =>
+                setContributionForm((prev) => ({ ...prev, amount: event.target.value }))
+              }
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="amount">Valor (R$)</Label>
-              <Input
-                id="amount"
-                type="number"
-                min="0"
-                step="50"
-                required
-                value={contributionForm.amount}
-                onChange={(event) =>
-                  setContributionForm((prev) => ({ ...prev, amount: event.target.value }))
+              <Label>Conta de origem</Label>
+              <Select
+                value={contributionForm.sourceAccountId}
+                onValueChange={(value) =>
+                  setContributionForm((prev) => ({ ...prev, sourceAccountId: value }))
                 }
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Conta de origem</Label>
-                <Select
-                  value={contributionForm.sourceAccountId}
-                  onValueChange={(value) =>
-                    setContributionForm((prev) => ({ ...prev, sourceAccountId: value }))
-                  }
-                  disabled={cashAccounts.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cashAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.nome} — {account.instituicao}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Conta de investimento</Label>
-                <Select
-                  value={contributionForm.destinationAccountId}
-                  onValueChange={(value) =>
-                    setContributionForm((prev) => ({ ...prev, destinationAccountId: value }))
-                  }
-                  disabled={investmentAccounts.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {investmentAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.nome} — {account.instituicao}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição</Label>
-              <Input
-                id="description"
-                placeholder="Ex: Aporte mensal automático"
-                value={contributionForm.description}
-                onChange={(event) =>
-                  setContributionForm((prev) => ({ ...prev, description: event.target.value }))
-                }
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notas</Label>
-              <Textarea
-                id="notes"
-                placeholder="Detalhes adicionais ou contexto para o aporte."
-                value={contributionForm.notes}
-                onChange={(event) =>
-                  setContributionForm((prev) => ({ ...prev, notes: event.target.value }))
-                }
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsContributionDialogOpen(false)}
+                disabled={cashAccounts.length === 0}
               >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmittingContribution || !contributionForm.amount}>
-                {isSubmittingContribution ? 'Registrando...' : 'Registrar aporte'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cashAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.nome} — {account.instituicao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Conta de investimento</Label>
+              <Select
+                value={contributionForm.destinationAccountId}
+                onValueChange={(value) =>
+                  setContributionForm((prev) => ({ ...prev, destinationAccountId: value }))
+                }
+                disabled={investmentAccounts.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione" />
+                </SelectTrigger>
+                <SelectContent>
+                  {investmentAccounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.nome} — {account.instituicao}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Descrição</Label>
+            <Input
+              id="description"
+              placeholder="Ex: Aporte mensal automático"
+              value={contributionForm.description}
+              onChange={(event) =>
+                setContributionForm((prev) => ({ ...prev, description: event.target.value }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notas</Label>
+            <Textarea
+              id="notes"
+              placeholder="Detalhes adicionais ou contexto para o aporte."
+              value={contributionForm.notes}
+              onChange={(event) =>
+                setContributionForm((prev) => ({ ...prev, notes: event.target.value }))
+              }
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsContributionDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmittingContribution || !contributionForm.amount}>
+              {isSubmittingContribution ? 'Registrando...' : 'Registrar aporte'}
+            </Button>
+          </div>
+        </form>
+      </ResponsiveDialog>
     </div>
   );
 }

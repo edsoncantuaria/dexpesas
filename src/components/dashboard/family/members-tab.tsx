@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogTrigger } from '@/components/ui/dialog';
+
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
@@ -87,25 +87,25 @@ export function MembersTab({
                     </div>
                     <TooltipProvider>
                         <div className="flex items-center gap-2">
-                            <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <DialogTrigger asChild>
-                                            <Button size="sm" className="gap-2">
-                                                <UserPlus className="h-4 w-4" />
-                                                Convidar
-                                            </Button>
-                                        </DialogTrigger>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Convidar novo membro</TooltipContent>
-                                </Tooltip>
-                                <InviteWizard
-                                    cellId={cell.id}
-                                    open={isInviteOpen}
-                                    onClose={() => setIsInviteOpen(false)}
-                                    onSuccess={onChange}
-                                />
-                            </Dialog>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        size="sm"
+                                        className="gap-2"
+                                        onClick={() => setIsInviteOpen(true)}
+                                    >
+                                        <UserPlus className="h-4 w-4" />
+                                        Convidar
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Convidar novo membro</TooltipContent>
+                            </Tooltip>
+                            <InviteWizard
+                                cellId={cell.id}
+                                open={isInviteOpen}
+                                onClose={() => setIsInviteOpen(false)}
+                                onSuccess={onChange}
+                            />
 
                             <AlertDialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
                                 <Tooltip>

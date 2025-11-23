@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,65 +54,64 @@ export function CreateCellDialog({ open, onOpenChange, onSubmit }: { open: boole
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Nova Família Financeira</DialogTitle>
-                    <DialogDescription>Defina nome e ícone para o seu workspace.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                    <div className="flex items-center gap-4">
-                        <ClanIcon iconUrl={iconObjectName || form.iconUrl || undefined} clanName={form.name || 'Nova Família'} size="lg" />
-                        <div className="space-y-2">
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleUpload}
-                            />
+        <ResponsiveDialog
+            isOpen={open}
+            setIsOpen={onOpenChange}
+            title="Nova Família Financeira"
+            description="Defina nome e ícone para o seu workspace."
+        >
+            <div className="space-y-4 py-4">
+                <div className="flex items-center gap-4">
+                    <ClanIcon iconUrl={iconObjectName || form.iconUrl || undefined} clanName={form.name || 'Nova Família'} size="lg" />
+                    <div className="space-y-2">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleUpload}
+                        />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading}
+                        >
+                            <ImagePlus className="h-4 w-4 mr-2" />
+                            {isUploading ? 'Enviando...' : 'Enviar foto'}
+                        </Button>
+                        {iconObjectName && (
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isUploading}
+                                onClick={() => setIconObjectName(null)}
                             >
-                                <ImagePlus className="h-4 w-4 mr-2" />
-                                {isUploading ? 'Enviando...' : 'Enviar foto'}
+                                Remover
                             </Button>
-                            {iconObjectName && (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setIconObjectName(null)}
-                                >
-                                    Remover
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                    <div>
-                        <Label>Nome</Label>
-                        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Família Costa" />
-                    </div>
-                    <div>
-                        <Label>Descrição</Label>
-                        <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Contextualize os objetivos desta família." />
-                    </div>
-                    <div>
-                        <Label>Ícone (URL opcional)</Label>
-                        <Input value={form.iconUrl} onChange={(e) => setForm({ ...form, iconUrl: e.target.value })} placeholder="https://..." />
+                        )}
                     </div>
                 </div>
-                <DialogFooter>
-                    <Button onClick={handleSubmit} disabled={isSubmitting || !form.name.trim()}>
-                        {isSubmitting ? 'Criando...' : 'Criar família'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                <div>
+                    <Label>Nome</Label>
+                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Família Costa" />
+                </div>
+                <div>
+                    <Label>Descrição</Label>
+                    <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Contextualize os objetivos desta família." />
+                </div>
+                <div>
+                    <Label>Ícone (URL opcional)</Label>
+                    <Input value={form.iconUrl} onChange={(e) => setForm({ ...form, iconUrl: e.target.value })} placeholder="https://..." />
+                </div>
+            </div>
+            <div className="flex justify-end pt-4">
+                <Button onClick={handleSubmit} disabled={isSubmitting || !form.name.trim()}>
+                    {isSubmitting ? 'Criando...' : 'Criar família'}
+                </Button>
+            </div>
+        </ResponsiveDialog>
     );
 }
 
@@ -186,107 +185,103 @@ export function EditCellDialog({
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Editar identidade da família</DialogTitle>
-                    <DialogDescription>Atualize nome, descrição e imagem exibida no Modo Família.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                    <div className="flex items-center gap-4">
-                        <ClanIcon iconUrl={iconObjectName || cell.iconUrl || undefined} clanName={form.name || cell.name} size="lg" />
-                        <div className="space-y-2">
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleUpload}
-                            />
+        <ResponsiveDialog
+            isOpen={open}
+            setIsOpen={onOpenChange}
+            title="Editar identidade da família"
+            description="Atualize nome, descrição e imagem exibida no Modo Família."
+        >
+            <div className="space-y-4 py-4">
+                <div className="flex items-center gap-4">
+                    <ClanIcon iconUrl={iconObjectName || cell.iconUrl || undefined} clanName={form.name || cell.name} size="lg" />
+                    <div className="space-y-2">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleUpload}
+                        />
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={isUploading}
+                        >
+                            <ImagePlus className="h-4 w-4 mr-2" />
+                            {isUploading ? 'Enviando...' : 'Trocar imagem'}
+                        </Button>
+                        {iconObjectName && (
                             <Button
                                 type="button"
-                                variant="outline"
+                                variant="ghost"
                                 size="sm"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isUploading}
+                                onClick={() => setIconObjectName(null)}
                             >
-                                <ImagePlus className="h-4 w-4 mr-2" />
-                                {isUploading ? 'Enviando...' : 'Trocar imagem'}
+                                Remover imagem
                             </Button>
-                            {iconObjectName && (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setIconObjectName(null)}
-                                >
-                                    Remover imagem
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                    <div>
-                        <Label>Nome</Label>
-                        <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                    </div>
-                    <div>
-                        <Label>Descrição</Label>
-                        <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                        )}
                     </div>
                 </div>
-                <DialogFooter>
-                    <Button onClick={handleSubmit} disabled={!form.name.trim() || isSubmitting}>
-                        {isSubmitting ? 'Salvando...' : 'Salvar alterações'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                <div>
+                    <Label>Nome</Label>
+                    <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                </div>
+                <div>
+                    <Label>Descrição</Label>
+                    <Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+                </div>
+            </div>
+            <div className="flex justify-end pt-4">
+                <Button onClick={handleSubmit} disabled={!form.name.trim() || isSubmitting}>
+                    {isSubmitting ? 'Salvando...' : 'Salvar alterações'}
+                </Button>
+            </div>
+        </ResponsiveDialog>
     );
 }
 
 export function FamilyHelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden">
-                <DialogHeader className="space-y-2">
-                    <DialogTitle>Guia rápido do Modo Família</DialogTitle>
-                    <DialogDescription>
-                        Sincronize orçamentos, metas e rateios entre todos os membros preservando permissões individuais. Use este resumo para tirar dúvidas rápidas.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="max-h-[70vh] space-y-6 overflow-y-auto pr-3 text-sm text-muted-foreground">
-                    <section className="space-y-2">
-                        <h4 className="text-base font-semibold text-foreground">Fluxo em três passos</h4>
-                        <ol className="list-decimal space-y-2 pl-5">
-                            <li>Convide os membros e defina quem é líder/admin. As permissões determinam quem pode criar budgets, fundos e rateios.</li>
-                            <li>Configure orçamentos compartilhados ou híbridos. Eles aparecem como “espelhos” no orçamento pessoal de cada membro.</li>
-                            <li>Registre caixinhas e despesas compartilhadas. Cada parte gera uma transação pendente na conta pessoal escolhida.</li>
-                        </ol>
-                    </section>
-                    <section className="space-y-2">
-                        <h4 className="text-base font-semibold text-foreground">Orçamentos e metas</h4>
-                        <ul className="list-disc space-y-1 pl-5">
-                            <li><span className="font-medium text-foreground">Categoria:</span> usa as mesmas categorias do módulo pessoal. Assim o espelho cai no lugar certo.</li>
-                            <li><span className="font-medium text-foreground">Limite:</span> valor máximo mensal. Escolha divisão igualitária ou porcentagens customizadas.</li>
-                            <li><span className="font-medium text-foreground">Tipo:</span> CELL (todos), HYBRID (parte pessoal + parte coletiva) ou PERSONAL (apenas referência vinculada).</li>
-                            <li><span className="font-medium text-foreground">Caixinhas:</span> sempre vinculam uma meta espelho ao responsável. Investir/Resgatar pede conta de origem/destino.</li>
-                        </ul>
-                    </section>
-                    <section className="space-y-2">
-                        <h4 className="text-base font-semibold text-foreground">Rateios e transações</h4>
-                        <ul className="list-disc space-y-1 pl-5">
-                            <li>“Nova despesa” cria uma transação pendente para cada participante. É preciso selecionar a conta pessoal de cada um.</li>
-                            <li>Ao registrar pagamento, a transação é quitada e o histórico fica disponível para todos.</li>
-                            <li>O filtro lateral ajuda a encontrar despesas por descrição, status ou mês.</li>
-                        </ul>
-                    </section>
-                    <section className="space-y-2">
-                        <h4 className="text-base font-semibold text-foreground">Permissões e rastreio</h4>
-                        <p>Timeline e alertas registram toda alteração (limites, fundos, decisões). Use-os para auditar quem editou o quê e quando.</p>
-                        <p className="text-xs">Dica: se um membro não vê saldos, verifique se ele possui permissão e se a conta foi compartilhada na aba “Contas”.</p>
-                    </section>
-                </div>
-            </DialogContent>
-        </Dialog>
+        <ResponsiveDialog
+            isOpen={open}
+            setIsOpen={onOpenChange}
+            title="Guia rápido do Modo Família"
+            description="Sincronize orçamentos, metas e rateios entre todos os membros preservando permissões individuais. Use este resumo para tirar dúvidas rápidas."
+        >
+            <div className="max-h-[70vh] space-y-6 overflow-y-auto pr-3 text-sm text-muted-foreground py-4">
+                <section className="space-y-2">
+                    <h4 className="text-base font-semibold text-foreground">Fluxo em três passos</h4>
+                    <ol className="list-decimal space-y-2 pl-5">
+                        <li>Convide os membros e defina quem é líder/admin. As permissões determinam quem pode criar budgets, fundos e rateios.</li>
+                        <li>Configure orçamentos compartilhados ou híbridos. Eles aparecem como “espelhos” no orçamento pessoal de cada membro.</li>
+                        <li>Registre caixinhas e despesas compartilhadas. Cada parte gera uma transação pendente na conta pessoal escolhida.</li>
+                    </ol>
+                </section>
+                <section className="space-y-2">
+                    <h4 className="text-base font-semibold text-foreground">Orçamentos e metas</h4>
+                    <ul className="list-disc space-y-1 pl-5">
+                        <li><span className="font-medium text-foreground">Categoria:</span> usa as mesmas categorias do módulo pessoal. Assim o espelho cai no lugar certo.</li>
+                        <li><span className="font-medium text-foreground">Limite:</span> valor máximo mensal. Escolha divisão igualitária ou porcentagens customizadas.</li>
+                        <li><span className="font-medium text-foreground">Tipo:</span> CELL (todos), HYBRID (parte pessoal + parte coletiva) ou PERSONAL (apenas referência vinculada).</li>
+                        <li><span className="font-medium text-foreground">Caixinhas:</span> sempre vinculam uma meta espelho ao responsável. Investir/Resgatar pede conta de origem/destino.</li>
+                    </ul>
+                </section>
+                <section className="space-y-2">
+                    <h4 className="text-base font-semibold text-foreground">Rateios e transações</h4>
+                    <ul className="list-disc space-y-1 pl-5">
+                        <li>“Nova despesa” cria uma transação pendente para cada participante. É preciso selecionar a conta pessoal de cada um.</li>
+                        <li>Ao registrar pagamento, a transação é quitada e o histórico fica disponível para todos.</li>
+                        <li>O filtro lateral ajuda a encontrar despesas por descrição, status ou mês.</li>
+                    </ul>
+                </section>
+                <section className="space-y-2">
+                    <h4 className="text-base font-semibold text-foreground">Permissões e rastreio</h4>
+                    <p>Timeline e alertas registram toda alteração (limites, fundos, decisões). Use-os para auditar quem editou o quê e quando.</p>
+                    <p className="text-xs">Dica: se um membro não vê saldos, verifique se ele possui permissão e se a conta foi compartilhada na aba “Contas”.</p>
+                </section>
+            </div>
+        </ResponsiveDialog>
     )
 }

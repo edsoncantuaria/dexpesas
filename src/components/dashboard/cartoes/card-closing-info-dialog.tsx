@@ -1,15 +1,9 @@
+
 // src/components/dashboard/cartoes/card-closing-info-dialog.tsx
 'use client';
 
 import { useState, useMemo } from 'react';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -66,27 +60,23 @@ export function CardClosingInfoDialog({ trigger }: CardClosingInfoDialogProps) {
     }, [searchTerm]);
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                {trigger || (
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                    >
-                        <Info className="h-4 w-4" />
-                    </Button>
-                )}
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>Quanto tempo antes do vencimento a fatura fecha?</DialogTitle>
-                    <DialogDescription>
-                        Consulte quantos dias antes do vencimento a fatura fecha em cada banco
-                    </DialogDescription>
-                </DialogHeader>
-
+        <ResponsiveDialog
+            isOpen={isOpen}
+            setIsOpen={setIsOpen}
+            trigger={trigger || (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                >
+                    <Info className="h-4 w-4" />
+                </Button>
+            )}
+            title="Quanto tempo antes do vencimento a fatura fecha?"
+            description="Consulte quantos dias antes do vencimento a fatura fecha em cada banco"
+        >
+            <div className="flex flex-col gap-4 max-h-[60vh] overflow-hidden">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -97,12 +87,12 @@ export function CardClosingInfoDialog({ trigger }: CardClosingInfoDialogProps) {
                     />
                 </div>
 
-                <div className="overflow-auto flex-1">
+                <div className="overflow-auto flex-1 -mx-4 px-4 sm:mx-0 sm:px-0">
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-[40%]">Banco</TableHead>
-                                <TableHead className="text-center w-[25%]">Dias Antes do Vencimento</TableHead>
+                                <TableHead className="text-center w-[25%]">Dias Antes</TableHead>
                                 <TableHead className="w-[35%]">Exemplo</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -139,7 +129,7 @@ export function CardClosingInfoDialog({ trigger }: CardClosingInfoDialogProps) {
                         Consulte seu banco ou aplicativo do cartão para informações precisas.
                     </p>
                 </div>
-            </DialogContent>
-        </Dialog>
+            </div>
+        </ResponsiveDialog>
     );
 }

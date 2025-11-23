@@ -37,7 +37,7 @@ import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { AttachmentPreviewer } from '@/components/ui/attachment-previewer';
 import {
   Collapsible,
@@ -66,30 +66,44 @@ const MOBILE_PAGE_SIZE = 30;
 // --- Skeleton Component ---
 export function TransactionListSkeleton() {
   return (
-    <div className="space-y-6 pb-20 px-4 pt-4">
+    <div className="space-y-6 pb-20">
       {[1, 2].map((group) => (
-        <div key={group} className="space-y-3">
-          {/* Date Header Skeleton */}
-          <div className="flex justify-between items-center py-2">
-            <Skeleton className="h-5 w-32 rounded-md" />
-            <Skeleton className="h-5 w-20 rounded-md" />
-          </div>
-          {/* Transaction Cards Skeleton */}
-          {[1, 2, 3].map((item) => (
-            <div key={item} className="flex items-center p-4 gap-3 bg-card/50 rounded-xl border border-border/40">
-              <Skeleton className="h-10 w-10 rounded-full" />
-              <div className="flex-1 space-y-2">
-                <div className="flex justify-between">
-                  <Skeleton className="h-4 w-3/4 rounded-md" />
-                  <Skeleton className="h-4 w-20 rounded-md" />
-                </div>
-                <div className="flex gap-2">
-                  <Skeleton className="h-3 w-16 rounded-md" />
-                  <Skeleton className="h-3 w-24 rounded-md" />
-                </div>
+        <div key={group}>
+          {/* Sticky Date Header Skeleton - matches DailySummaryHeader */}
+          <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border/40 pb-2 pt-4 px-4 mb-2 shadow-sm">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4 rounded" />
+                <Skeleton className="h-4 w-24 rounded-md" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-4 w-20 rounded-md" />
+                <Skeleton className="h-5 w-5 rounded-full" />
               </div>
             </div>
-          ))}
+          </div>
+          {/* Transaction Cards Skeleton - matches SwipeableTransactionCard */}
+          <div className="space-y-2 px-1">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="rounded-xl bg-card border-0 shadow-sm p-4">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full flex-shrink-0" />
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex justify-between items-start gap-2">
+                      <Skeleton className="h-4 w-2/3 rounded-md" />
+                      <Skeleton className="h-4 w-16 rounded-md" />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-3 w-16 rounded-md" />
+                      <Skeleton className="h-2 w-1 rounded-full" />
+                      <Skeleton className="h-3 w-20 rounded-md" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
@@ -509,26 +523,21 @@ export function TransactionMobileList({
       />
 
       {/* Dialog para visualização de anexo */}
-      <Dialog open={!!viewingAttachment} onOpenChange={(isOpen) => !isOpen && setViewingAttachment(null)}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden bg-black/90 border-0">
+      <ResponsiveDialog
+        isOpen={!!viewingAttachment}
+        setIsOpen={(isOpen) => !isOpen && setViewingAttachment(null)}
+        title="Anexo"
+        description="Visualização do comprovante"
+      >
+        <div className="relative w-full h-[60vh] flex items-center justify-center bg-black/5 rounded-md overflow-hidden">
           {viewingAttachment && (
-            <div className="relative w-full h-[80vh] flex items-center justify-center">
-              <AttachmentPreviewer
-                objectName={viewingAttachment}
-                onRemove={() => { }}
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 text-white hover:bg-white/20 rounded-full"
-                onClick={() => setViewingAttachment(null)}
-              >
-                <ChevronDown className="h-6 w-6" />
-              </Button>
-            </div>
+            <AttachmentPreviewer
+              objectName={viewingAttachment}
+              onRemove={() => { }}
+            />
           )}
-        </DialogContent>
-      </Dialog>
+        </div>
+      </ResponsiveDialog>
     </>
   );
 }

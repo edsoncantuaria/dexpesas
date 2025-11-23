@@ -2,14 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -141,179 +134,175 @@ export function InvestmentOnboardingDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">Personalize seu plano</DialogTitle>
-          <DialogDescription>
-            Usamos esses dados para sugerir quanto investir, quanto reservar para lazer e quais alertas inteligentes
-            enviar. Não movimentamos dinheiro real por você.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-5">
+    <ResponsiveDialog
+      isOpen={open}
+      setIsOpen={onOpenChange}
+      title="Personalize seu plano"
+      description="Usamos esses dados para sugerir quanto investir, quanto reservar para lazer e quais alertas inteligentes enviar. Não movimentamos dinheiro real por você."
+    >
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="monthlyIncome">Renda fixa mensal (R$)</Label>
+          <Input
+            id="monthlyIncome"
+            type="number"
+            min="0"
+            step="100"
+            required
+            value={monthlyIncome}
+            onChange={(event) => setMonthlyIncome(event.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Tolerância de risco</Label>
+          <Select value={priority} onValueChange={(value: InvestmentPriority) => setPriority(value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione" />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(priorityCopy) as InvestmentPriority[]).map((key) => (
+                <SelectItem key={key} value={key}>
+                  <div>
+                    <p className="font-medium">{priorityCopy[key].label}</p>
+                    <p className="text-xs text-muted-foreground">{priorityCopy[key].helper}</p>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Preset rápido</Label>
+          <div className="grid gap-3 sm:grid-cols-4">
+            {(Object.keys(PRESETS) as Array<'conservador' | 'balanceado' | 'agressivo'>).map((key) => (
+              <Button
+                key={key}
+                type="button"
+                variant={selectedPreset === key ? 'default' : 'outline'}
+                className={cn(
+                  "flex flex-col items-start gap-1 text-left h-auto py-3",
+                  selectedPreset === key && "shadow-lg shadow-primary/20"
+                )}
+                onClick={() => setSelectedPreset(key)}
+              >
+                <span className="font-semibold">{PRESETS[key].label}</span>
+                <span className="text-xs text-muted-foreground line-clamp-2">{PRESETS[key].description}</span>
+              </Button>
+            ))}
+            <Button
+              type="button"
+              variant={selectedPreset === 'custom' ? 'default' : 'outline'}
+              className={cn(
+                "h-auto py-3",
+                selectedPreset === 'custom' && "shadow-lg shadow-primary/20"
+              )}
+              onClick={() => setSelectedPreset('custom')}
+            >
+              Personalizar
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-4 rounded-lg border p-3">
           <div className="space-y-2">
-            <Label htmlFor="monthlyIncome">Renda fixa mensal (R$)</Label>
+            <div className="flex items-center justify-between text-sm font-medium">
+              <Label>Percentual do excedente para investir</Label>
+              <span>{percentFormatter.format(targetPercent)}</span>
+            </div>
+            <Slider
+              min={0.05 * 100}
+              max={60}
+              step={1}
+              value={[percentValue]}
+              onValueChange={(value) => {
+                setTargetPercent((value[0] ?? 0) / 100);
+                markCustom();
+              }}
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm font-medium">
+              <Label>Percentual mínimo para lazer</Label>
+              <span>{percentFormatter.format(leisurePercent)}</span>
+            </div>
+            <Slider
+              min={5}
+              max={50}
+              step={1}
+              value={[leisurePercentValue]}
+              onValueChange={(value) => {
+                setLeisurePercent((value[0] ?? 0) / 100);
+                markCustom();
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="leisureFloor">Piso fixo para lazer (R$)</Label>
             <Input
-              id="monthlyIncome"
+              id="leisureFloor"
+              type="number"
+              min="0"
+              step="50"
+              value={leisureFloor}
+              onChange={(event) => {
+                setLeisureFloor(event.target.value);
+                markCustom();
+              }}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="emergencyFund">Fundo de emergência (R$)</Label>
+            <Input
+              id="emergencyFund"
               type="number"
               min="0"
               step="100"
-              required
-              value={monthlyIncome}
-              onChange={(event) => setMonthlyIncome(event.target.value)}
+              value={emergencyFund}
+              onChange={(event) => {
+                setEmergencyFund(event.target.value);
+                markCustom();
+              }}
             />
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <Label>Tolerância de risco</Label>
-            <Select value={priority} onValueChange={(value: InvestmentPriority) => setPriority(value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(priorityCopy) as InvestmentPriority[]).map((key) => (
-                  <SelectItem key={key} value={key}>
-                    <div>
-                      <p className="font-medium">{priorityCopy[key].label}</p>
-                      <p className="text-xs text-muted-foreground">{priorityCopy[key].helper}</p>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="notes">Observações</Label>
+          <Textarea
+            id="notes"
+            placeholder="Ex: renda variável agressiva até janeiro, depois reduzir um pouco os aportes."
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+          />
+        </div>
 
-          <div className="space-y-2">
-            <Label>Preset rápido</Label>
-            <div className="grid gap-3 sm:grid-cols-4">
-              {(Object.keys(PRESETS) as Array<'conservador' | 'balanceado' | 'agressivo'>).map((key) => (
-                <Button
-                  key={key}
-                  type="button"
-                  variant={selectedPreset === key ? 'default' : 'outline'}
-                  className={cn(
-                    "flex flex-col items-start gap-1 text-left h-auto py-3",
-                    selectedPreset === key && "shadow-lg shadow-primary/20"
-                  )}
-                  onClick={() => setSelectedPreset(key)}
-                >
-                  <span className="font-semibold">{PRESETS[key].label}</span>
-                  <span className="text-xs text-muted-foreground line-clamp-2">{PRESETS[key].description}</span>
-                </Button>
-              ))}
-              <Button
-                type="button"
-                variant={selectedPreset === 'custom' ? 'default' : 'outline'}
-                className={cn(
-                  "h-auto py-3",
-                  selectedPreset === 'custom' && "shadow-lg shadow-primary/20"
-                )}
-                onClick={() => setSelectedPreset('custom')}
-              >
-                Personalizar
-              </Button>
-            </div>
-          </div>
+        <div className="rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-4 text-sm">
+          {monthlyIncomeNumber > 0 ? (
+            <p>
+              Com essa configuração, o planner vai buscar <strong>{currencyFormatter.format(projectedInvestment)}</strong> por mês
+              em investimentos sempre que houver excedente, garantindo ao menos{' '}
+              <strong>{currencyFormatter.format(Number(leisureFloor || 0))}</strong> para lazer.
+            </p>
+          ) : (
+            <p>Informe sua renda fixa para ver as projeções automáticas.</p>
+          )}
+        </div>
 
-          <div className="space-y-4 rounded-lg border p-3">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm font-medium">
-                <Label>Percentual do excedente para investir</Label>
-                <span>{percentFormatter.format(targetPercent)}</span>
-              </div>
-              <Slider
-                min={0.05 * 100}
-                max={60}
-                step={1}
-                value={[percentValue]}
-                onValueChange={(value) => {
-                  setTargetPercent((value[0] ?? 0) / 100);
-                  markCustom();
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm font-medium">
-                <Label>Percentual mínimo para lazer</Label>
-                <span>{percentFormatter.format(leisurePercent)}</span>
-              </div>
-              <Slider
-                min={5}
-                max={50}
-                step={1}
-                value={[leisurePercentValue]}
-                onValueChange={(value) => {
-                  setLeisurePercent((value[0] ?? 0) / 100);
-                  markCustom();
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="leisureFloor">Piso fixo para lazer (R$)</Label>
-              <Input
-                id="leisureFloor"
-                type="number"
-                min="0"
-                step="50"
-                value={leisureFloor}
-                onChange={(event) => {
-                  setLeisureFloor(event.target.value);
-                  markCustom();
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="emergencyFund">Fundo de emergência (R$)</Label>
-              <Input
-                id="emergencyFund"
-                type="number"
-                min="0"
-                step="100"
-                value={emergencyFund}
-                onChange={(event) => {
-                  setEmergencyFund(event.target.value);
-                  markCustom();
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Observações</Label>
-            <Textarea
-              id="notes"
-              placeholder="Ex: renda variável agressiva até janeiro, depois reduzir um pouco os aportes."
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-            />
-          </div>
-
-          <div className="rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-4 text-sm">
-            {monthlyIncomeNumber > 0 ? (
-              <p>
-                Com essa configuração, o planner vai buscar <strong>{currencyFormatter.format(projectedInvestment)}</strong> por mês
-                em investimentos sempre que houver excedente, garantindo ao menos{' '}
-                <strong>{currencyFormatter.format(Number(leisureFloor || 0))}</strong> para lazer.
-              </p>
-            ) : (
-              <p>Informe sua renda fixa para ver as projeções automáticas.</p>
-            )}
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Mais tarde
-            </Button>
-            <Button type="submit" disabled={isSubmitting || !monthlyIncomeNumber}>
-              {isSubmitting ? 'Personalizando...' : 'Começar plano'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Mais tarde
+          </Button>
+          <Button type="submit" disabled={isSubmitting || !monthlyIncomeNumber}>
+            {isSubmitting ? 'Personalizando...' : 'Começar plano'}
+          </Button>
+        </div>
+      </form>
+    </ResponsiveDialog>
   );
 }
 

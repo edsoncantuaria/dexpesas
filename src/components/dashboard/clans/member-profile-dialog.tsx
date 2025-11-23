@@ -3,12 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Loader2, Sword, ShieldCheck, GraduationCap, Sparkles } from 'lucide-react';
 import type { User, GamificationProfile } from '@/lib/definitions';
 import api from '@/lib/api';
@@ -23,10 +18,10 @@ interface MemberProfileDialogProps {
 }
 
 const attributeToIconMap: Record<string, LucideIcon | undefined> = {
-    Forca: Sword,
-    Resistencia: ShieldCheck,
-    Sabedoria: GraduationCap,
-    Sorte: Sparkles,
+  Forca: Sword,
+  Resistencia: ShieldCheck,
+  Sabedoria: GraduationCap,
+  Sorte: Sparkles,
 };
 
 export function MemberProfileDialog({ isOpen, onClose, member }: MemberProfileDialogProps) {
@@ -37,7 +32,7 @@ export function MemberProfileDialog({ isOpen, onClose, member }: MemberProfileDi
     if (!member.id) return;
     setIsLoading(true);
     try {
-      const response = await api.get(`/gamification/profile/${member.id}`); 
+      const response = await api.get(`/gamification/profile/${member.id}`);
       setProfile(response.data);
     } catch (error) {
       console.error("Erro ao buscar perfil do membro:", error);
@@ -54,45 +49,41 @@ export function MemberProfileDialog({ isOpen, onClose, member }: MemberProfileDi
   }, [isOpen, fetchMemberProfile]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <div className="flex items-center gap-4">
-            <MemberAvatar avatarUrl={member.avatarUrl} name={member.name || ''} className="h-16 w-16" />
-            <div>
-              <DialogTitle className="text-2xl">{member.name}</DialogTitle>
-              <DialogDescription>Nível {member.level} - {profile?.heroClass || 'Aventureiro'}</DialogDescription>
-            </div>
+    <ResponsiveDialog
+      isOpen={isOpen}
+      setIsOpen={(open) => !open && onClose()}
+      title={member.name || 'Perfil do Membro'}
+      description={`Nível ${member.level || 1} - ${profile?.heroClass || 'Aventureiro'}`}
+    >
+      <div className="flex flex-col items-center gap-4 py-4">
+        <MemberAvatar avatarUrl={member.avatarUrl} name={member.name || ''} className="h-20 w-20" />
+
+        {isLoading ? (
+          <div className="flex justify-center items-center h-24 w-full">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
-        </DialogHeader>
-        <div className="py-4">
-          {isLoading ? (
-            <div className="flex justify-center items-center h-24">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : profile ? (
-            <div className="space-y-4">
-                {Object.entries(attributeToIconMap).map(([key, Icon]) => {
-                    const value = (profile as any)[key] || 0;
-                    const maxPoints = 100;
-                    const percentage = (value / maxPoints) * 100;
-                    return (
-                         <div key={key} className="flex flex-col gap-1.5">
-                            <div className="flex items-center gap-2 text-sm font-semibold">
-                                {Icon && <Icon className="h-4 w-4 text-accent" />}
-                                <span>{key}</span>
-                                <span className="ml-auto font-mono">{value}</span>
-                            </div>
-                            <Progress value={percentage} indicatorClassName="bg-accent" />
-                        </div>
-                    )
-                })}
-            </div>
-          ) : (
-            <p className="text-center text-muted-foreground">Não foi possível carregar os atributos.</p>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+        ) : profile ? (
+          <div className="space-y-4 w-full">
+            {Object.entries(attributeToIconMap).map(([key, Icon]) => {
+              const value = (profile as any)[key] || 0;
+              const maxPoints = 100;
+              const percentage = (value / maxPoints) * 100;
+              return (
+                <div key={key} className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    {Icon && <Icon className="h-4 w-4 text-accent" />}
+                    <span>{key}</span>
+                    <span className="ml-auto font-mono">{value}</span>
+                  </div>
+                  <Progress value={percentage} indicatorClassName="bg-accent" />
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-center text-muted-foreground">Não foi possível carregar os atributos.</p>
+        )}
+      </div>
+    </ResponsiveDialog>
   );
 }

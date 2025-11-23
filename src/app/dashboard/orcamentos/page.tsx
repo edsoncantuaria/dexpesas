@@ -5,7 +5,7 @@ import { format, addMonths, subMonths, startOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { ChevronLeft, ChevronRight, Plus, Target } from 'lucide-react';
 import api from '@/lib/api';
 import { BudgetList } from '@/components/dashboard/orcamentos/budget-list';
@@ -97,28 +97,27 @@ export default function BudgetsPage() {
                                 Crie um limite para uma categoria e acompanhe seus gastos.
                             </p>
                         </div>
-                        <Dialog open={isCreateOpen} onOpenChange={(open) => {
-                            setIsCreateOpen(open);
-                            if (!open) setEditingBudget(null);
-                        }}>
-                            <DialogTrigger asChild>
+                        <ResponsiveDialog
+                            isOpen={isCreateOpen}
+                            setIsOpen={(open) => {
+                                setIsCreateOpen(open);
+                                if (!open) setEditingBudget(null);
+                            }}
+                            title={editingBudget ? 'Editar Orçamento' : 'Novo Orçamento'}
+                            trigger={
                                 <Button>
                                     <Plus className="mr-2 h-4 w-4" />
                                     Novo Orçamento
                                 </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>{editingBudget ? 'Editar Orçamento' : 'Novo Orçamento'}</DialogTitle>
-                                </DialogHeader>
-                                <BudgetForm
-                                    budget={editingBudget}
-                                    onSuccess={handleSuccess}
-                                    onClose={() => setIsCreateOpen(false)}
-                                    month={currentMonthStr}
-                                />
-                            </DialogContent>
-                        </Dialog>
+                            }
+                        >
+                            <BudgetForm
+                                budget={editingBudget}
+                                onSuccess={handleSuccess}
+                                onClose={() => setIsCreateOpen(false)}
+                                month={currentMonthStr}
+                            />
+                        </ResponsiveDialog>
                     </CardContent>
                 </Card>
 

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { PlusCircle, Trash2, Loader2, Wand2, ArrowRight, Search, Zap } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -222,26 +222,25 @@ export default function RegrasPage() {
               </p>
             </div>
 
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-              <DialogTrigger asChild>
-                <Button size="lg" className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20 rounded-full px-8">
-                  <PlusCircle className="mr-2 h-5 w-5" />
-                  Nova Automação
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl font-headline flex items-center gap-2">
-                    <Wand2 className="h-6 w-6 text-primary" />
-                    Nova Regra Mágica
-                  </DialogTitle>
-                  <DialogDescription>
-                    Configure o fluxo de automação abaixo.
-                  </DialogDescription>
-                </DialogHeader>
+            <Button size="lg" className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg shadow-primary/20 rounded-full px-8" onClick={() => setIsFormOpen(true)}>
+              <PlusCircle className="mr-2 h-5 w-5" />
+              Nova Automação
+            </Button>
+            <ResponsiveDialog
+              isOpen={isFormOpen}
+              setIsOpen={setIsFormOpen}
+              title={
+                <div className="flex items-center gap-2">
+                  <Wand2 className="h-6 w-6 text-primary" />
+                  Nova Regra Mágica
+                </div>
+              }
+              description="Configure o fluxo de automação abaixo."
+            >
+              <div className="py-4">
                 <AddRuleForm categories={categories} onSave={handleSaveRule} isSaving={isSaving} />
-              </DialogContent>
-            </Dialog>
+              </div>
+            </ResponsiveDialog>
           </div>
 
           {/* Decorative BG */}

@@ -9,18 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 import api from '@/lib/api';
 import { handleApiError } from '@/lib/error-handler';
 import { LoadingScreen } from "@/components/ui/loading-screen";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger
-} from "@/components/ui/sheet";
+import { ResponsiveDialog } from "@/components/ui/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { AddCardForm } from "@/components/dashboard/cartoes/add-card-form";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 
 export default function CartoesPage() {
@@ -30,7 +21,6 @@ export default function CartoesPage() {
     const [editingCard, setEditingCard] = useState<Card | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
-    const isMobile = useIsMobile();
 
     const fetchCards = useCallback(async () => {
         setIsLoading(true);
@@ -117,61 +107,28 @@ export default function CartoesPage() {
                         <p className="text-muted-foreground mt-1">Gerencie seus cartões de crédito e acompanhe faturas.</p>
                     </div>
                 </div>
-                {isMobile ? (
-                    <Sheet open={isFormOpen} onOpenChange={handleFormOpenChange}>
-                        <SheetTrigger asChild>
-                            <Button
-                                onClick={() => handleOpenForm()}
-                                className="w-full sm:w-auto shadow-lg shadow-primary/20"
-                            >
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Novo Cartão
-                            </Button>
-                        </SheetTrigger>
-                        <SheetContent side="bottom" className="h-[90vh] overflow-y-auto sm:max-w-lg">
-                            <SheetHeader className="pb-4">
-                                <SheetTitle className="text-2xl">{editingCard ? 'Editar Cartão' : 'Adicionar Novo Cartão'}</SheetTitle>
-                                <SheetDescription>
-                                    {editingCard ? 'Atualize as informações do seu cartão.' : 'Preencha as informações para adicionar um novo cartão.'}
-                                </SheetDescription>
-                            </SheetHeader>
-                            <div className="px-1 pb-6">
-                                <AddCardForm
-                                    card={editingCard}
-                                    onSuccess={handleSaveCard}
-                                    onClose={handleCloseForm}
-                                    isSubmitting={isSubmitting}
-                                />
-                            </div>
-                        </SheetContent>
-                    </Sheet>
-                ) : (
-                    <Dialog open={isFormOpen} onOpenChange={handleFormOpenChange}>
-                        <DialogTrigger asChild>
-                            <Button
-                                onClick={() => handleOpenForm()}
-                                className="w-full sm:w-auto shadow-lg shadow-primary/20"
-                            >
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Novo Cartão
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-lg">
-                            <DialogHeader>
-                                <DialogTitle className="text-2xl">{editingCard ? 'Editar Cartão' : 'Adicionar Novo Cartão'}</DialogTitle>
-                                <DialogDescription>
-                                    {editingCard ? 'Atualize as informações do seu cartão.' : 'Preencha as informações para adicionar um novo cartão.'}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <AddCardForm
-                                card={editingCard}
-                                onSuccess={handleSaveCard}
-                                onClose={handleCloseForm}
-                                isSubmitting={isSubmitting}
-                            />
-                        </DialogContent>
-                    </Dialog>
-                )}
+                <ResponsiveDialog
+                    isOpen={isFormOpen}
+                    setIsOpen={handleFormOpenChange}
+                    title={editingCard ? 'Editar Cartão' : 'Adicionar Novo Cartão'}
+                    description={editingCard ? 'Atualize as informações do seu cartão.' : 'Preencha as informações para adicionar um novo cartão.'}
+                    trigger={
+                        <Button
+                            onClick={() => handleOpenForm()}
+                            className="w-full sm:w-auto shadow-lg shadow-primary/20"
+                        >
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Novo Cartão
+                        </Button>
+                    }
+                >
+                    <AddCardForm
+                        card={editingCard}
+                        onSuccess={handleSaveCard}
+                        onClose={handleCloseForm}
+                        isSubmitting={isSubmitting}
+                    />
+                </ResponsiveDialog>
             </div>
 
             <CardList

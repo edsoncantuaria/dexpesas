@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -36,7 +36,7 @@ const formSchema = z.object({
 export function GoalCreationDialog({ isOpen, onClose, clanId, onSuccess }: GoalCreationDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
-  
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: { name: '', targetAmount: 0 },
@@ -58,29 +58,28 @@ export function GoalCreationDialog({ isOpen, onClose, clanId, onSuccess }: GoalC
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Criar Nova Meta para a Família</DialogTitle>
-          <DialogDescription>Defina um objetivo financeiro para todos trabalharem juntos.</DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <FormField control={form.control} name="name" render={({ field }) => ( <FormItem><FormLabel>Nome da Meta</FormLabel><FormControl><Input placeholder="Ex: Viagem de Fim de Ano" {...field} /></FormControl><FormMessage /></FormItem> )}/>
-            <div className="grid grid-cols-2 gap-4">
-                 <FormField control={form.control} name="targetAmount" render={({ field }) => ( <FormItem><FormLabel>Valor Alvo</FormLabel><FormControl><CurrencyInput value={field.value} onValueChange={field.onChange} /></FormControl><FormMessage /></FormItem> )}/>
-                 <FormField control={form.control} name="deadline" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Prazo (Opcional)</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal',!field.value && 'text-muted-foreground')}>{field.value ? (format(field.value, 'PPP', { locale: ptBR })) : (<span>Escolha uma data</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)}/>
-            </div>
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Criar Meta
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <ResponsiveDialog
+      isOpen={isOpen}
+      setIsOpen={onClose}
+      title="Criar Nova Meta para a Família"
+      description="Defina um objetivo financeiro para todos trabalharem juntos."
+    >
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+          <FormField control={form.control} name="name" render={({ field }) => (<FormItem><FormLabel>Nome da Meta</FormLabel><FormControl><Input placeholder="Ex: Viagem de Fim de Ano" {...field} /></FormControl><FormMessage /></FormItem>)} />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField control={form.control} name="targetAmount" render={({ field }) => (<FormItem><FormLabel>Valor Alvo</FormLabel><FormControl><CurrencyInput value={field.value} onValueChange={field.onChange} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="deadline" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Prazo (Opcional)</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={'outline'} className={cn('w-full pl-3 text-left font-normal', !field.value && 'text-muted-foreground')}>{field.value ? (format(field.value, 'PPP', { locale: ptBR })) : (<span>Escolha uma data</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Criar Meta
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </ResponsiveDialog>
   );
 }

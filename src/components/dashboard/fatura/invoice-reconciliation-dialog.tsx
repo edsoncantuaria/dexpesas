@@ -2,13 +2,7 @@
 'use client';
 
 import { useState } from 'react';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Upload, CheckCircle2, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
@@ -176,195 +170,191 @@ export function InvoiceReconciliationDialog({
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={handleCancel}>
-            <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                    <DialogTitle className="text-xl">Reconciliar Fatura com OFX</DialogTitle>
-                    <DialogDescription>
-                        Faça upload do arquivo OFX/CSV da fatura de <strong>{format(invoiceMonth, 'MMMM/yyyy')}</strong>
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-4 py-4">
-                    {/* STEP: Upload */}
-                    {step === 'upload' && (
-                        <>
-                            <div
-                                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${file
-                                        ? 'border-green-500 bg-green-50 dark:bg-green-950'
-                                        : isDragging
-                                            ? 'border-primary bg-primary/5'
-                                            : 'border-muted-foreground/25 hover:border-primary/50'
-                                    }`}
-                                onDrop={handleDrop}
-                                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                                onDragLeave={() => setIsDragging(false)}
-                            >
-                                {file ? (
-                                    <>
-                                        <CheckCircle2 className="mx-auto h-12 w-12 text-green-500 mb-4" />
-                                        <p className="text-sm font-bold text-green-700 dark:text-green-400 mb-1">
-                                            Arquivo selecionado ✓
-                                        </p>
-                                        <p className="text-xs text-green-600 dark:text-green-500 mb-4">
-                                            {file.name}
-                                        </p>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                                        <p className="text-sm font-medium mb-2">
-                                            Arraste o arquivo OFX/CSV aqui
-                                        </p>
-                                        <p className="text-xs text-muted-foreground mb-4">
-                                            ou clique para selecionar
-                                        </p>
-                                    </>
-                                )}
-                                <input
-                                    type="file"
-                                    accept=".ofx,.csv"
-                                    onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
-                                    className="hidden"
-                                    id="file-upload"
-                                />
-                                <label htmlFor="file-upload">
-                                    <Button
-                                        type="button"
-                                        variant={file ? "secondary" : "outline"}
-                                        size="sm"
-                                        onClick={() => document.getElementById('file-upload')?.click()}
-                                    >
-                                        {file ? 'Trocar Arquivo' : 'Selecionar Arquivo'}
-                                    </Button>
-                                </label>
-                            </div>
-
-                            <Alert>
-                                <AlertTriangle className="h-4 w-4" />
-                                <AlertDescription>
-                                    <strong>Atenção:</strong> Esta ação irá <strong>deletar permanentemente TODAS as despesas manuais</strong> da fatura de {format(invoiceMonth, 'MMMM/yyyy')} e substituí-las pelas transações do arquivo OFX.
-                                </AlertDescription>
-                            </Alert>
-
-                            <div className="bg-muted p-3 rounded-lg space-y-1">
-                                <p className="text-sm font-medium">Total de despesas manuais:</p>
-                                <p className="text-2xl font-bold">{formatCurrency(invoiceTotalExpenses)}</p>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <Button onClick={handleCancel} variant="ghost" className="flex-1">
-                                    Cancelar
+        <ResponsiveDialog
+            isOpen={isOpen}
+            setIsOpen={handleCancel}
+            title="Reconciliar Fatura com OFX"
+            description={`Faça upload do arquivo OFX/CSV da fatura de ${format(invoiceMonth, 'MMMM/yyyy')}`}
+        >
+            <div className="space-y-4 py-4">
+                {/* STEP: Upload */}
+                {step === 'upload' && (
+                    <>
+                        <div
+                            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${file
+                                ? 'border-green-500 bg-green-50 dark:bg-green-950'
+                                : isDragging
+                                    ? 'border-primary bg-primary/5'
+                                    : 'border-muted-foreground/25 hover:border-primary/50'
+                                }`}
+                            onDrop={handleDrop}
+                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                            onDragLeave={() => setIsDragging(false)}
+                        >
+                            {file ? (
+                                <>
+                                    <CheckCircle2 className="mx-auto h-12 w-12 text-green-500 mb-4" />
+                                    <p className="text-sm font-bold text-green-700 dark:text-green-400 mb-1">
+                                        Arquivo selecionado ✓
+                                    </p>
+                                    <p className="text-xs text-green-600 dark:text-green-500 mb-4">
+                                        {file.name}
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                                    <p className="text-sm font-medium mb-2">
+                                        Arraste o arquivo OFX/CSV aqui
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mb-4">
+                                        ou clique para selecionar
+                                    </p>
+                                </>
+                            )}
+                            <input
+                                type="file"
+                                accept=".ofx,.csv"
+                                onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                                className="hidden"
+                                id="file-upload"
+                            />
+                            <label htmlFor="file-upload">
+                                <Button
+                                    type="button"
+                                    variant={file ? "secondary" : "outline"}
+                                    size="sm"
+                                    onClick={() => document.getElementById('file-upload')?.click()}
+                                >
+                                    {file ? 'Trocar Arquivo' : 'Selecionar Arquivo'}
                                 </Button>
-                                <Button onClick={handleUpload} disabled={!file} className="flex-1">
-                                    <Upload className="mr-2 h-4 w-4" />
-                                    Fazer Upload
-                                </Button>
-                            </div>
-                        </>
-                    )}
-
-                    {/* STEP: Validating */}
-                    {step === 'validating' && (
-                        <div className="flex flex-col items-center justify-center py-8">
-                            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                            <p className="text-sm font-medium">Processando arquivo...</p>
+                            </label>
                         </div>
-                    )}
 
-                    {/* STEP: Valid */}
-                    {step === 'valid' && validation && (
-                        <>
-                            <div className="flex items-center justify-center py-6">
-                                <CheckCircle2 className="h-16 w-16 text-green-500" />
-                            </div>
+                        <Alert>
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                                <strong>Atenção:</strong> Esta ação irá <strong>deletar permanentemente TODAS as despesas manuais</strong> da fatura de {format(invoiceMonth, 'MMMM/yyyy')} e substituí-las pelas transações do arquivo OFX.
+                            </AlertDescription>
+                        </Alert>
 
-                            <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
-                                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                <AlertDescription className="text-green-900 dark:text-green-100">
-                                    <strong>Valores conferem!</strong> Os totais batem perfeitamente.
-                                </AlertDescription>
-                            </Alert>
+                        <div className="bg-muted p-3 rounded-lg space-y-1">
+                            <p className="text-sm font-medium">Total de despesas manuais:</p>
+                            <p className="text-2xl font-bold">{formatCurrency(invoiceTotalExpenses)}</p>
+                        </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-muted p-3 rounded-lg">
-                                    <p className="text-xs text-muted-foreground mb-1">Despesas Manuais</p>
-                                    <p className="text-lg font-bold">{formatCurrency(validation.manualTotal)}</p>
-                                </div>
-                                <div className="bg-muted p-3 rounded-lg">
-                                    <p className="text-xs text-muted-foreground mb-1">Total OFX</p>
-                                    <p className="text-lg font-bold">{formatCurrency(validation.ofxTotal)}</p>
-                                </div>
-                            </div>
-
-                            <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
-                                <p className="text-sm text-blue-900 dark:text-blue-100">
-                                    <strong>{importedCount}</strong> transações serão importadas
-                                </p>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <Button onClick={handleCancel} variant="ghost" className="flex-1">
-                                    Cancelar
-                                </Button>
-                                <Button onClick={handleFinalize} variant="default" className="flex-1 bg-green-600 hover:bg-green-700">
-                                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                                    Confirmar e Substituir
-                                </Button>
-                            </div>
-                        </>
-                    )}
-
-                    {/* STEP: Invalid */}
-                    {step === 'invalid' && validation && (
-                        <>
-                            <div className="flex items-center justify-center py-6">
-                                <XCircle className="h-16 w-16 text-destructive" />
-                            </div>
-
-                            <Alert variant="destructive">
-                                <XCircle className="h-4 w-4" />
-                                <AlertDescription>
-                                    <strong>Valores não conferem!</strong> Diferença de {formatCurrency(validation.difference)}
-                                </AlertDescription>
-                            </Alert>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-muted p-3 rounded-lg">
-                                    <p className="text-xs text-muted-foreground mb-1">Despesas Manuais</p>
-                                    <p className="text-lg font-bold">{formatCurrency(validation.manualTotal)}</p>
-                                </div>
-                                <div className="bg-muted p-3 rounded-lg">
-                                    <p className="text-xs text-muted-foreground mb-1">Total OFX</p>
-                                    <p className="text-lg font-bold text-destructive">{formatCurrency(validation.ofxTotal)}</p>
-                                </div>
-                            </div>
-
-                            <Button onClick={handleCancel} variant="outline" className="w-full">
-                                Fechar
+                        <div className="flex gap-2">
+                            <Button onClick={handleCancel} variant="ghost" className="flex-1">
+                                Cancelar
                             </Button>
-                        </>
-                    )}
-
-                    {/* STEP: Processing */}
-                    {step === 'processing' && (
-                        <div className="flex flex-col items-center justify-center py-8">
-                            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-                            <p className="text-sm font-medium">Finalizando reconciliação...</p>
-                            <p className="text-xs text-muted-foreground">Deletando despesas e importando transações</p>
+                            <Button onClick={handleUpload} disabled={!file} className="flex-1">
+                                <Upload className="mr-2 h-4 w-4" />
+                                Fazer Upload
+                            </Button>
                         </div>
-                    )}
+                    </>
+                )}
 
-                    {/* STEP: Completed */}
-                    {step === 'completed' && (
-                        <div className="flex flex-col items-center justify-center py-8">
-                            <CheckCircle2 className="h-16 w-16 text-green-500 mb-4" />
-                            <p className="text-lg font-bold text-green-600">Reconciliação Concluída!</p>
-                            <p className="text-sm text-muted-foreground">Atualizando dados...</p>
+                {/* STEP: Validating */}
+                {step === 'validating' && (
+                    <div className="flex flex-col items-center justify-center py-8">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                        <p className="text-sm font-medium">Processando arquivo...</p>
+                    </div>
+                )}
+
+                {/* STEP: Valid */}
+                {step === 'valid' && validation && (
+                    <>
+                        <div className="flex items-center justify-center py-6">
+                            <CheckCircle2 className="h-16 w-16 text-green-500" />
                         </div>
-                    )}
-                </div>
-            </DialogContent>
-        </Dialog>
+
+                        <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            <AlertDescription className="text-green-900 dark:text-green-100">
+                                <strong>Valores conferem!</strong> Os totais batem perfeitamente.
+                            </AlertDescription>
+                        </Alert>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-muted p-3 rounded-lg">
+                                <p className="text-xs text-muted-foreground mb-1">Despesas Manuais</p>
+                                <p className="text-lg font-bold">{formatCurrency(validation.manualTotal)}</p>
+                            </div>
+                            <div className="bg-muted p-3 rounded-lg">
+                                <p className="text-xs text-muted-foreground mb-1">Total OFX</p>
+                                <p className="text-lg font-bold">{formatCurrency(validation.ofxTotal)}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
+                            <p className="text-sm text-blue-900 dark:text-blue-100">
+                                <strong>{importedCount}</strong> transações serão importadas
+                            </p>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <Button onClick={handleCancel} variant="ghost" className="flex-1">
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleFinalize} variant="default" className="flex-1 bg-green-600 hover:bg-green-700">
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Confirmar e Substituir
+                            </Button>
+                        </div>
+                    </>
+                )}
+
+                {/* STEP: Invalid */}
+                {step === 'invalid' && validation && (
+                    <>
+                        <div className="flex items-center justify-center py-6">
+                            <XCircle className="h-16 w-16 text-destructive" />
+                        </div>
+
+                        <Alert variant="destructive">
+                            <XCircle className="h-4 w-4" />
+                            <AlertDescription>
+                                <strong>Valores não conferem!</strong> Diferença de {formatCurrency(validation.difference)}
+                            </AlertDescription>
+                        </Alert>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-muted p-3 rounded-lg">
+                                <p className="text-xs text-muted-foreground mb-1">Despesas Manuais</p>
+                                <p className="text-lg font-bold">{formatCurrency(validation.manualTotal)}</p>
+                            </div>
+                            <div className="bg-muted p-3 rounded-lg">
+                                <p className="text-xs text-muted-foreground mb-1">Total OFX</p>
+                                <p className="text-lg font-bold text-destructive">{formatCurrency(validation.ofxTotal)}</p>
+                            </div>
+                        </div>
+
+                        <Button onClick={handleCancel} variant="outline" className="w-full">
+                            Fechar
+                        </Button>
+                    </>
+                )}
+
+                {/* STEP: Processing */}
+                {step === 'processing' && (
+                    <div className="flex flex-col items-center justify-center py-8">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                        <p className="text-sm font-medium">Finalizando reconciliação...</p>
+                        <p className="text-xs text-muted-foreground">Deletando despesas e importando transações</p>
+                    </div>
+                )}
+
+                {/* STEP: Completed */}
+                {step === 'completed' && (
+                    <div className="flex flex-col items-center justify-center py-8">
+                        <CheckCircle2 className="h-16 w-16 text-green-500 mb-4" />
+                        <p className="text-lg font-bold text-green-600">Reconciliação Concluída!</p>
+                        <p className="text-sm text-muted-foreground">Atualizando dados...</p>
+                    </div>
+                )}
+            </div>
+        </ResponsiveDialog>
     );
 }

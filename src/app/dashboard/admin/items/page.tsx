@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { PlusCircle, Gem } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Item } from '@/lib/definitions';
@@ -90,27 +90,24 @@ export default function AdminItemsPage() {
                         <p className="text-muted-foreground">Crie e edite os itens que os jogadores podem ganhar.</p>
                     </div>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button onClick={() => handleOpenDialog()}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Novo Item
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle>
-                            <DialogDescription>
-                                Preencha os detalhes do item que será usado como recompensa.
-                            </DialogDescription>
-                        </DialogHeader>
+                <Button onClick={() => handleOpenDialog()}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Novo Item
+                </Button>
+                <ResponsiveDialog
+                    isOpen={isDialogOpen}
+                    setIsOpen={setIsDialogOpen}
+                    title={editingItem ? 'Editar Item' : 'Novo Item'}
+                    description="Preencha os detalhes do item que será usado como recompensa."
+                >
+                    <div className="py-4">
                         <EditItemForm
                             item={editingItem}
                             isSubmitting={isSubmitting}
                             onSave={handleSave}
                         />
-                    </DialogContent>
-                </Dialog>
+                    </div>
+                </ResponsiveDialog>
             </div>
 
             <ItemsTable

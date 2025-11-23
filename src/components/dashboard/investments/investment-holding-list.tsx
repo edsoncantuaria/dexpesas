@@ -6,14 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -232,139 +225,135 @@ export function InvestmentHoldingList({
         )}
       </CardContent>
 
-      <Dialog open={isGoalDialogOpen} onOpenChange={setIsGoalDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Vincular meta</DialogTitle>
-            <DialogDescription>
-              Escolha uma meta financeira para acompanhar os aportes desse holding. Ganhe visibilidade sem duplicar dados.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleGoalSubmit} className="space-y-4">
+      <ResponsiveDialog
+        isOpen={isGoalDialogOpen}
+        setIsOpen={setIsGoalDialogOpen}
+        title="Vincular meta"
+        description="Escolha uma meta financeira para acompanhar os aportes desse holding. Ganhe visibilidade sem duplicar dados."
+      >
+        <form onSubmit={handleGoalSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Holding</Label>
+            <p className="text-sm font-medium">
+              {currentHolding?.account.nome} — {currentHolding?.assetClass}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="goalSelect">Meta</Label>
+            <Select value={selectedGoalId || 'none'} onValueChange={(value) => setSelectedGoalId(value === 'none' ? null : value)}>
+              <SelectTrigger id="goalSelect">
+                <SelectValue placeholder="Selecione uma meta (ou deixe vazio para remover)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Sem meta</SelectItem>
+                {goals.map((goal) => (
+                  <SelectItem key={goal.id} value={goal.id}>
+                    {goal.name} — {currencyFormatter.format(goal.currentAmount)} /{' '}
+                    {currencyFormatter.format(goal.targetAmount)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => setIsGoalDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={!selectedHoldingId || isSubmitting}>
+              {isSubmitting ? 'Salvando...' : 'Salvar vínculo'}
+            </Button>
+          </div>
+        </form>
+      </ResponsiveDialog>
+
+      <ResponsiveDialog
+        isOpen={isFormDialogOpen}
+        setIsOpen={setIsFormDialogOpen}
+        title={editingHoldingId ? 'Editar holding' : 'Adicionar holding'}
+        description="Defina a conta de investimento e os parâmetros da aplicação."
+      >
+        <form onSubmit={handleFormSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label>Conta de investimento</Label>
+            <Select
+              value={formState.accountId}
+              onValueChange={(value) => setFormState((prev) => ({ ...prev, accountId: value }))}
+              disabled={Boolean(editingHoldingId)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts
+                  .filter((account) => account.tipo === 'investimento')
+                  .map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.nome} — {account.instituicao}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Holding</Label>
-              <p className="text-sm font-medium">
-                {currentHolding?.account.nome} — {currentHolding?.assetClass}
-              </p>
+              <Label htmlFor="assetClass">Classe do ativo</Label>
+              <Input
+                id="assetClass"
+                value={formState.assetClass}
+                onChange={(event) => setFormState((prev) => ({ ...prev, assetClass: event.target.value }))}
+                required
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="goalSelect">Meta</Label>
-              <Select value={selectedGoalId || 'none'} onValueChange={(value) => setSelectedGoalId(value === 'none' ? null : value)}>
-                <SelectTrigger id="goalSelect">
-                  <SelectValue placeholder="Selecione uma meta (ou deixe vazio para remover)" />
+              <Label htmlFor="ticker">Ticker / Identificador</Label>
+              <Input
+                id="ticker"
+                value={formState.ticker}
+                onChange={(event) => setFormState((prev) => ({ ...prev, ticker: event.target.value }))}
+                placeholder="Ex: TESOURO, ETF11"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expectedReturn">Taxa esperada (% ano)</Label>
+              <Input
+                id="expectedReturn"
+                type="number"
+                step="0.01"
+                value={formState.expectedReturn}
+                onChange={(event) => setFormState((prev) => ({ ...prev, expectedReturn: event.target.value }))}
+                placeholder="Ex: 0.12"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="goalLink">Meta vinculada</Label>
+              <Select
+                value={formState.goalId || 'none'}
+                onValueChange={(value) => setFormState((prev) => ({ ...prev, goalId: value === 'none' ? '' : value }))}
+              >
+                <SelectTrigger id="goalLink">
+                  <SelectValue placeholder="Sem meta" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Sem meta</SelectItem>
                   {goals.map((goal) => (
                     <SelectItem key={goal.id} value={goal.id}>
-                      {goal.name} — {currencyFormatter.format(goal.currentAmount)} /{' '}
-                      {currencyFormatter.format(goal.targetAmount)}
+                      {goal.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsGoalDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={!selectedHoldingId || isSubmitting}>
-                {isSubmitting ? 'Salvando...' : 'Salvar vínculo'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingHoldingId ? 'Editar holding' : 'Adicionar holding'}</DialogTitle>
-            <DialogDescription>Defina a conta de investimento e os parâmetros da aplicação.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleFormSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Conta de investimento</Label>
-              <Select
-                value={formState.accountId}
-                onValueChange={(value) => setFormState((prev) => ({ ...prev, accountId: value }))}
-                disabled={Boolean(editingHoldingId)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {accounts
-                    .filter((account) => account.tipo === 'investimento')
-                    .map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.nome} — {account.instituicao}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="assetClass">Classe do ativo</Label>
-                <Input
-                  id="assetClass"
-                  value={formState.assetClass}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, assetClass: event.target.value }))}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ticker">Ticker / Identificador</Label>
-                <Input
-                  id="ticker"
-                  value={formState.ticker}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, ticker: event.target.value }))}
-                  placeholder="Ex: TESOURO, ETF11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="expectedReturn">Taxa esperada (% ano)</Label>
-                <Input
-                  id="expectedReturn"
-                  type="number"
-                  step="0.01"
-                  value={formState.expectedReturn}
-                  onChange={(event) => setFormState((prev) => ({ ...prev, expectedReturn: event.target.value }))}
-                  placeholder="Ex: 0.12"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="goalLink">Meta vinculada</Label>
-                <Select
-                  value={formState.goalId || 'none'}
-                  onValueChange={(value) => setFormState((prev) => ({ ...prev, goalId: value === 'none' ? '' : value }))}
-                >
-                  <SelectTrigger id="goalLink">
-                    <SelectValue placeholder="Sem meta" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sem meta</SelectItem>
-                    {goals.map((goal) => (
-                      <SelectItem key={goal.id} value={goal.id}>
-                        {goal.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsFormDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting || !formState.accountId}>
-                {isSubmitting ? 'Salvando...' : 'Salvar'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+          </div>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => setIsFormDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting || !formState.accountId}>
+              {isSubmitting ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
+        </form>
+      </ResponsiveDialog>
     </Card>
   );
 }

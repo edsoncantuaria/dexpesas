@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { AnimatePresence } from 'framer-motion';
 import { MigrationChoiceStep } from './migration-choice-step';
 import { AccountsStep } from './accounts-step';
@@ -158,93 +158,91 @@ export function MigrationWizard({ isOpen, onComplete }: MigrationWizardProps) {
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={() => { }} modal>
-            <DialogContent
-                className="max-w-4xl max-h-[90vh] overflow-y-auto p-0"
-                hideClose
-                onEscapeKeyDown={(e) => e.preventDefault()}
-                onPointerDownOutside={(e) => e.preventDefault()}
-            >
-                <DialogTitle className="sr-only">Migração Inicial de Dados Financeiros</DialogTitle>
-                <div className="p-6">
-                    {currentStep !== 'choice' && currentStep !== 'completion' && currentStep !== 'preview' && (
-                        <MigrationProgress
-                            currentStep={getStepNumber()}
-                            totalSteps={6}
+        <ResponsiveDialog
+            isOpen={isOpen}
+            setIsOpen={() => { }}
+            title="Migração Inicial de Dados Financeiros"
+            description="Configure suas contas, cartões e investimentos para começar."
+            hideClose
+        >
+            <div className="p-0 py-4 max-h-[80vh] overflow-y-auto">
+                {currentStep !== 'choice' && currentStep !== 'completion' && currentStep !== 'preview' && (
+                    <MigrationProgress
+                        currentStep={getStepNumber()}
+                        totalSteps={6}
+                    />
+                )}
+
+                <AnimatePresence mode="wait">
+                    {currentStep === 'choice' && (
+                        <MigrationChoiceStep key="choice" onChoice={handleChoice} />
+                    )}
+
+                    {currentStep === 'accounts' && (
+                        <AccountsStep
+                            key="accounts"
+                            onComplete={handleAccountsComplete}
+                            onBack={handleBack}
+                            initialData={
+                                migrationData.accounts.length > 0
+                                    ? migrationData.accounts.filter(acc => acc.tipo !== 'investimento')
+                                    : undefined
+                            }
                         />
                     )}
 
-                    <AnimatePresence mode="wait">
-                        {currentStep === 'choice' && (
-                            <MigrationChoiceStep key="choice" onChoice={handleChoice} />
-                        )}
+                    {currentStep === 'investments' && (
+                        <InvestmentsStep
+                            key="investments"
+                            onComplete={handleInvestmentsComplete}
+                            onBack={handleBack}
+                            initialData={
+                                migrationData.accounts.length > 0
+                                    ? migrationData.accounts.filter(acc => acc.tipo === 'investimento')
+                                    : undefined
+                            }
+                        />
+                    )}
 
-                        {currentStep === 'accounts' && (
-                            <AccountsStep
-                                key="accounts"
-                                onComplete={handleAccountsComplete}
-                                onBack={handleBack}
-                                initialData={
-                                    migrationData.accounts.length > 0
-                                        ? migrationData.accounts.filter(acc => acc.tipo !== 'investimento')
-                                        : undefined
-                                }
-                            />
-                        )}
+                    {currentStep === 'cards' && (
+                        <CardsStep
+                            key="cards"
+                            onComplete={handleCardsComplete}
+                            onBack={handleBack}
+                            initialData={migrationData.cards.length > 0 ? migrationData.cards : undefined}
+                            accounts={migrationData.accounts}
+                        />
+                    )}
 
-                        {currentStep === 'investments' && (
-                            <InvestmentsStep
-                                key="investments"
-                                onComplete={handleInvestmentsComplete}
-                                onBack={handleBack}
-                                initialData={
-                                    migrationData.accounts.length > 0
-                                        ? migrationData.accounts.filter(acc => acc.tipo === 'investimento')
-                                        : undefined
-                                }
-                            />
-                        )}
+                    {currentStep === 'card-history' && (
+                        <CardHistoryStep
+                            key="card-history"
+                            cards={migrationData.cards}
+                            onComplete={handleCardHistoryComplete}
+                            onBack={handleBack}
+                            initialData={migrationData.cardHistory}
+                        />
+                    )}
 
-                        {currentStep === 'cards' && (
-                            <CardsStep
-                                key="cards"
-                                onComplete={handleCardsComplete}
-                                onBack={handleBack}
-                                initialData={migrationData.cards.length > 0 ? migrationData.cards : undefined}
-                                accounts={migrationData.accounts}
-                            />
-                        )}
+                    {currentStep === 'preview' && (
+                        <PreviewStep
+                            key="preview"
+                            migrationData={migrationData}
+                            onEdit={handlePreviewEdit}
+                            onConfirm={handlePreviewConfirm}
+                            onBack={handleBack}
+                        />
+                    )}
 
-                        {currentStep === 'card-history' && (
-                            <CardHistoryStep
-                                key="card-history"
-                                cards={migrationData.cards}
-                                onComplete={handleCardHistoryComplete}
-                                onBack={handleBack}
-                                initialData={migrationData.cardHistory}
-                            />
-                        )}
-
-                        {currentStep === 'preview' && (
-                            <PreviewStep
-                                key="preview"
-                                migrationData={migrationData}
-                                onEdit={handlePreviewEdit}
-                                onConfirm={handlePreviewConfirm}
-                                onBack={handleBack}
-                            />
-                        )}
-
-                        {currentStep === 'completion' && (
-                            <CompletionStep
-                                key="completion"
-                                migrationData={migrationData}
-                                onComplete={handleFinalComplete}
-                            />
-                        )}
-                    </AnimatePresence>
-                </div>
-            </DialogContent>
-        </Dialog>
+                    {currentStep === 'completion' && (
+                        <CompletionStep
+                            key="completion"
+                            migrationData={migrationData}
+                            onComplete={handleFinalComplete}
+                        />
+                    )}
+                </AnimatePresence>
+            </div>
+        </ResponsiveDialog>
     );
 }

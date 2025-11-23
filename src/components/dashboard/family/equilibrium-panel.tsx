@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -243,17 +243,14 @@ export function EquilibriumPanel({
             </Card>
 
             {settlementContext && (
-                <Dialog open={Boolean(settlementContext)} onOpenChange={(open) => (!open ? closeDialog() : null)}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>
-                                {settlementContext.mode === 'PAY' ? 'Registrar pagamento' : 'Registrar recebimento'}
-                            </DialogTitle>
-                            <DialogDescription>
-                                Informe o valor e a pessoa envolvida para abater a dívida no sistema.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-2">
+                { settlementContext && (
+                    <ResponsiveDialog
+                        isOpen={Boolean(settlementContext)}
+                        setIsOpen={(open) => (!open ? closeDialog() : null)}
+                        title={settlementContext.mode === 'PAY' ? 'Registrar pagamento' : 'Registrar recebimento'}
+                        description="Informe o valor e a pessoa envolvida para abater a dívida no sistema."
+                    >
+                        <div className="space-y-4 py-4">
                             <div className="space-y-2">
                                 <Label>Pessoa {settlementContext.mode === 'PAY' ? 'que recebeu' : 'que pagou'}</Label>
                                 <Select
@@ -289,13 +286,13 @@ export function EquilibriumPanel({
                                 />
                             </div>
                         </div>
-                        <DialogFooter>
+                        <div className="flex justify-end pt-4">
                             <Button onClick={handleRegisterSettlement} disabled={isSubmitting}>
                                 {isSubmitting ? 'Salvando...' : 'Confirmar'}
                             </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                        </div>
+                    </ResponsiveDialog>
+                )}
             )}
         </>
     );

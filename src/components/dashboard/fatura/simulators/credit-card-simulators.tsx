@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -62,90 +62,89 @@ export function CreditCardSimulators() {
     };
 
     return (
-        <Dialog>
-            <DialogTrigger asChild>
+        <ResponsiveDialog
+            trigger={
                 <Button variant="outline" size="sm" className="gap-2">
                     <Calculator className="h-4 w-4" />
                     Simuladores
                 </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                    <DialogTitle>Simuladores de Crédito</DialogTitle>
-                </DialogHeader>
-                <Tabs defaultValue="installments" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="installments">Parcelamento</TabsTrigger>
-                        <TabsTrigger value="revolving">Rotativo</TabsTrigger>
-                    </TabsList>
+            }
+        >
+            <div className="space-y-2 mb-4">
+                <h2 className="text-xl font-semibold">Simuladores de Crédito</h2>
+            </div>
+            <Tabs defaultValue="installments" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="installments">Parcelamento</TabsTrigger>
+                    <TabsTrigger value="revolving">Rotativo</TabsTrigger>
+                </TabsList>
 
-                    <TabsContent value="installments" className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label>Valor da Compra (R$)</Label>
-                            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1000.00" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Número de Parcelas</Label>
-                            <Input type="number" value={months} onChange={(e) => setMonths(e.target.value)} placeholder="12" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Taxa de Juros Mensal (%)</Label>
-                            <Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="1.99" />
-                        </div>
-                        <Button onClick={calculateInstallments} className="w-full">Calcular</Button>
+                <TabsContent value="installments" className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Valor da Compra (R$)</Label>
+                        <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1000.00" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Número de Parcelas</Label>
+                        <Input type="number" value={months} onChange={(e) => setMonths(e.target.value)} placeholder="12" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Taxa de Juros Mensal (%)</Label>
+                        <Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="1.99" />
+                    </div>
+                    <Button onClick={calculateInstallments} className="w-full">Calcular</Button>
 
-                        {result && !result.isRevolving && (
-                            <div className="mt-4 p-4 bg-muted rounded-lg space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span>Parcela Mensal:</span>
-                                    <span className="font-bold">R$ {result.monthly.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span>Total Final:</span>
-                                    <span className="font-bold">R$ {result.total.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-red-500">
-                                    <span>Juros Totais:</span>
-                                    <span>R$ {result.interest.toFixed(2)}</span>
-                                </div>
+                    {result && !result.isRevolving && (
+                        <div className="mt-4 p-4 bg-muted rounded-lg space-y-2 text-sm">
+                            <div className="flex justify-between">
+                                <span>Parcela Mensal:</span>
+                                <span className="font-bold">R$ {result.monthly.toFixed(2)}</span>
                             </div>
-                        )}
-                    </TabsContent>
-
-                    <TabsContent value="revolving" className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label>Saldo Devedor (R$)</Label>
-                            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500.00" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Dias de Atraso</Label>
-                            <Input type="number" value={months} onChange={(e) => setMonths(e.target.value)} placeholder="30" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Taxa do Rotativo Mensal (%)</Label>
-                            <Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="14.00" />
-                        </div>
-                        <Button onClick={calculateRevolving} className="w-full">Calcular</Button>
-
-                        {result && result.isRevolving && (
-                            <div className="mt-4 p-4 bg-muted rounded-lg space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span>Valor Original:</span>
-                                    <span>R$ {parseFloat(amount).toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between text-red-500">
-                                    <span>Juros Acumulados:</span>
-                                    <span>R$ {result.interest.toFixed(2)}</span>
-                                </div>
-                                <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                                    <span>Total a Pagar:</span>
-                                    <span>R$ {result.total.toFixed(2)}</span>
-                                </div>
+                            <div className="flex justify-between">
+                                <span>Total Final:</span>
+                                <span className="font-bold">R$ {result.total.toFixed(2)}</span>
                             </div>
-                        )}
-                    </TabsContent>
-                </Tabs>
-            </DialogContent>
-        </Dialog>
+                            <div className="flex justify-between text-red-500">
+                                <span>Juros Totais:</span>
+                                <span>R$ {result.interest.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="revolving" className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>Saldo Devedor (R$)</Label>
+                        <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="500.00" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Dias de Atraso</Label>
+                        <Input type="number" value={months} onChange={(e) => setMonths(e.target.value)} placeholder="30" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Taxa do Rotativo Mensal (%)</Label>
+                        <Input type="number" value={rate} onChange={(e) => setRate(e.target.value)} placeholder="14.00" />
+                    </div>
+                    <Button onClick={calculateRevolving} className="w-full">Calcular</Button>
+
+                    {result && result.isRevolving && (
+                        <div className="mt-4 p-4 bg-muted rounded-lg space-y-2 text-sm">
+                            <div className="flex justify-between">
+                                <span>Valor Original:</span>
+                                <span>R$ {parseFloat(amount).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-red-500">
+                                <span>Juros Acumulados:</span>
+                                <span>R$ {result.interest.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between font-bold text-lg pt-2 border-t">
+                                <span>Total a Pagar:</span>
+                                <span>R$ {result.total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    )}
+                </TabsContent>
+            </Tabs>
+        </ResponsiveDialog>
     );
 }

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { PlusCircle, Shield, Trophy } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Achievement } from '@/lib/definitions';
@@ -89,27 +89,24 @@ export default function AdminAchievementsPage() {
                         <p className="text-muted-foreground">Crie, edite e remova as conquistas do jogo.</p>
                     </div>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button onClick={() => handleOpenDialog()}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Nova Conquista
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>{editingAchievement ? 'Editar Conquista' : 'Nova Conquista'}</DialogTitle>
-                            <DialogDescription>
-                                Preencha os detalhes para a nova conquista que os jogadores poderão desbloquear.
-                            </DialogDescription>
-                        </DialogHeader>
+                <Button onClick={() => handleOpenDialog()}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Nova Conquista
+                </Button>
+                <ResponsiveDialog
+                    isOpen={isDialogOpen}
+                    setIsOpen={setIsDialogOpen}
+                    title={editingAchievement ? 'Editar Conquista' : 'Nova Conquista'}
+                    description="Preencha os detalhes para a nova conquista que os jogadores poderão desbloquear."
+                >
+                    <div className="py-4">
                         <EditAchievementForm
                             achievement={editingAchievement}
                             isSubmitting={isSubmitting}
                             onSave={handleSave}
                         />
-                    </DialogContent>
-                </Dialog>
+                    </div>
+                </ResponsiveDialog>
             </div>
 
             <AchievementsTable

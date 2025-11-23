@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -177,134 +177,133 @@ export function NewSharedExpenseDialog({
     const hasSelection = Object.values(selectedMembers).some(Boolean);
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Nova Despesa Compartilhada</DialogTitle>
-                    <DialogDescription>Registre uma conta para dividir com a família.</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-2">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Descrição</Label>
-                            <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ex: Aluguel" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Categoria</Label>
-                            <Select value={form.categoryId} onValueChange={(value) => setForm({ ...form, categoryId: value })}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={isLoadingCategories ? 'Carregando...' : 'Selecione...'} />
+        <ResponsiveDialog
+            isOpen={open}
+            setIsOpen={onOpenChange}
+            title="Nova Despesa Compartilhada"
+            description="Registre uma conta para dividir com a família."
+        >
+            <div className="space-y-4 py-2 overflow-y-auto max-h-[70vh]">
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                        <Label>Descrição</Label>
+                        <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ex: Aluguel" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Categoria</Label>
+                        <Select value={form.categoryId} onValueChange={(value) => setForm({ ...form, categoryId: value })}>
+                            <SelectTrigger>
+                                <SelectValue placeholder={isLoadingCategories ? 'Carregando...' : 'Selecione...'} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {categories.map((cat) => (
+                                    <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                        <Label>Valor Total</Label>
+                        <Input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0,00" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Data</Label>
+                        <Input type="date" value={form.expenseDate} onChange={(e) => setForm({ ...form, expenseDate: e.target.value })} />
+                    </div>
+                </div>
+
+                <div className="space-y-3 rounded-md border p-3">
+                    <div className="flex items-center justify-between">
+                        <Label>Divisão</Label>
+                        <div className="flex items-center gap-2">
+                            <Select value={mode} onValueChange={(val: 'EQUAL' | 'CUSTOM') => setMode(val)}>
+                                <SelectTrigger className="w-32 h-8 text-xs">
+                                    <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {categories.map((cat) => (
-                                        <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
-                                    ))}
+                                    <SelectItem value="EQUAL">Igualitária</SelectItem>
+                                    <SelectItem value="CUSTOM">Personalizada</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Valor Total</Label>
-                            <Input type="number" value={form.totalAmount} onChange={(e) => setForm({ ...form, totalAmount: e.target.value })} placeholder="0,00" />
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>Participantes</span>
+                            <span className={!totalsMatch && total > 0 ? 'text-destructive' : 'text-green-600'}>
+                                Soma: {toCurrency(splitSum)} {totalsMatch ? '' : '(ajuste necessário)'}
+                            </span>
                         </div>
-                        <div className="space-y-2">
-                            <Label>Data</Label>
-                            <Input type="date" value={form.expenseDate} onChange={(e) => setForm({ ...form, expenseDate: e.target.value })} />
-                        </div>
-                    </div>
-
-                    <div className="space-y-3 rounded-md border p-3">
-                        <div className="flex items-center justify-between">
-                            <Label>Divisão</Label>
-                            <div className="flex items-center gap-2">
-                                <Select value={mode} onValueChange={(val: 'EQUAL' | 'CUSTOM') => setMode(val)}>
-                                    <SelectTrigger className="w-32 h-8 text-xs">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="EQUAL">Igualitária</SelectItem>
-                                        <SelectItem value="CUSTOM">Personalizada</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <span>Participantes</span>
-                                <span className={!totalsMatch && total > 0 ? 'text-destructive' : 'text-green-600'}>
-                                    Soma: {toCurrency(splitSum)} {totalsMatch ? '' : '(ajuste necessário)'}
-                                </span>
-                            </div>
-                            <div className="space-y-3">
-                                {members.map((member) => {
-                                    const memberAccounts = accountsByMember[member.userId] || [];
-                                    const hasAccount = memberAccounts.length > 0;
-                                    const isChecked = Boolean(selectedMembers[member.userId] && hasAccount);
-                                    return (
-                                        <div key={member.userId} className={`rounded-lg border p-3 space-y-2 text-sm ${isChecked ? 'bg-accent/20' : ''}`}>
-                                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                                <div className="flex items-center gap-2">
-                                                    <Checkbox
-                                                        checked={isChecked}
-                                                        disabled={!hasAccount}
-                                                        onCheckedChange={(checked) => {
-                                                            if (!hasAccount) {
-                                                                toast({ variant: 'destructive', title: 'Vincule uma conta para incluir este membro.' });
-                                                                return;
-                                                            }
-                                                            setSelectedMembers(prev => ({ ...prev, [member.userId]: Boolean(checked) }));
-                                                            if (checked && !selectedAccounts[member.userId]) {
-                                                                setSelectedAccounts(prev => ({ ...prev, [member.userId]: memberAccounts[0]?.id || '' }));
-                                                            }
-                                                        }}
-                                                    />
-                                                    <span>{member.user?.name || 'Membro'}</span>
-                                                </div>
-                                                {hasAccount ? (
-                                                    <Select
-                                                        value={selectedAccounts[member.userId] || memberAccounts[0]?.id || ''}
-                                                        onValueChange={(value) => setSelectedAccounts(prev => ({ ...prev, [member.userId]: value }))}
-                                                        disabled={!isChecked}
-                                                    >
-                                                        <SelectTrigger className="w-full sm:w-48 h-8">
-                                                            <SelectValue placeholder="Conta de origem" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {memberAccounts.map((acc) => (
-                                                                <SelectItem key={acc.id} value={acc.id}>{acc.nome}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                ) : (
-                                                    <p className="text-xs text-muted-foreground">Sem conta compartilhada</p>
-                                                )}
+                        <div className="space-y-3">
+                            {members.map((member) => {
+                                const memberAccounts = accountsByMember[member.userId] || [];
+                                const hasAccount = memberAccounts.length > 0;
+                                const isChecked = Boolean(selectedMembers[member.userId] && hasAccount);
+                                return (
+                                    <div key={member.userId} className={`rounded-lg border p-3 space-y-2 text-sm ${isChecked ? 'bg-accent/20' : ''}`}>
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Checkbox
+                                                    checked={isChecked}
+                                                    disabled={!hasAccount}
+                                                    onCheckedChange={(checked) => {
+                                                        if (!hasAccount) {
+                                                            toast({ variant: 'destructive', title: 'Vincule uma conta para incluir este membro.' });
+                                                            return;
+                                                        }
+                                                        setSelectedMembers(prev => ({ ...prev, [member.userId]: Boolean(checked) }));
+                                                        if (checked && !selectedAccounts[member.userId]) {
+                                                            setSelectedAccounts(prev => ({ ...prev, [member.userId]: memberAccounts[0]?.id || '' }));
+                                                        }
+                                                    }}
+                                                />
+                                                <span>{member.user?.name || 'Membro'}</span>
                                             </div>
-                                            <Input
-                                                className="sm:w-40 ml-auto"
-                                                type="number"
-                                                min={0}
-                                                value={splits[member.userId] ?? ''}
-                                                onChange={(e) => setSplits(prev => ({ ...prev, [member.userId]: e.target.value }))}
-                                                disabled={mode === 'EQUAL' || !isChecked}
-                                                placeholder="0,00"
-                                            />
+                                            {hasAccount ? (
+                                                <Select
+                                                    value={selectedAccounts[member.userId] || memberAccounts[0]?.id || ''}
+                                                    onValueChange={(value) => setSelectedAccounts(prev => ({ ...prev, [member.userId]: value }))}
+                                                    disabled={!isChecked}
+                                                >
+                                                    <SelectTrigger className="w-full sm:w-48 h-8">
+                                                        <SelectValue placeholder="Conta de origem" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {memberAccounts.map((acc) => (
+                                                            <SelectItem key={acc.id} value={acc.id}>{acc.nome}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground">Sem conta compartilhada</p>
+                                            )}
                                         </div>
-                                    );
-                                })}
-                            </div>
-                            {!hasSelection && <p className="text-xs text-destructive">Inclua ao menos um membro com conta vinculada.</p>}
+                                        <Input
+                                            className="sm:w-40 ml-auto"
+                                            type="number"
+                                            min={0}
+                                            value={splits[member.userId] ?? ''}
+                                            onChange={(e) => setSplits(prev => ({ ...prev, [member.userId]: e.target.value }))}
+                                            disabled={mode === 'EQUAL' || !isChecked}
+                                            placeholder="0,00"
+                                        />
+                                    </div>
+                                );
+                            })}
                         </div>
+                        {!hasSelection && <p className="text-xs text-destructive">Inclua ao menos um membro com conta vinculada.</p>}
                     </div>
                 </div>
-                <DialogFooter>
-                    <Button onClick={handleSubmit} disabled={isSubmitting}>
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        {isSubmitting ? 'Criando...' : 'Cadastrar Despesa'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            </div>
+            <div className="flex justify-end pt-4">
+                <Button onClick={handleSubmit} disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isSubmitting ? 'Criando...' : 'Cadastrar Despesa'}
+                </Button>
+            </div>
+        </ResponsiveDialog>
     );
 }
 
@@ -382,43 +381,42 @@ export function SettleSharedExpenseDialog({
     const amount = toCurrency(target.participant.amountOwed);
 
     return (
-        <Dialog open={Boolean(target)} onOpenChange={(open) => (!open ? onClose() : null)}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Registrar pagamento</DialogTitle>
-                    <DialogDescription>{target.description}</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-3">
-                    <div>
-                        <Label>Valor a pagar</Label>
-                        <Input value={amount} disabled className="font-bold" />
-                    </div>
-                    <div>
-                        <Label>Conta utilizada</Label>
-                        {isLoadingAccounts ? (
-                            <p className="text-sm text-muted-foreground">Carregando contas...</p>
-                        ) : accounts.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">Você não possui contas cadastradas.</p>
-                        ) : (
-                            <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione uma conta" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {accounts.map((account) => (
-                                        <SelectItem key={account.id} value={account.id}>{account.nome}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        )}
-                    </div>
+        <ResponsiveDialog
+            isOpen={Boolean(target)}
+            setIsOpen={(open) => (!open ? onClose() : null)}
+            title="Registrar pagamento"
+            description={target.description}
+        >
+            <div className="space-y-3 py-4">
+                <div>
+                    <Label>Valor a pagar</Label>
+                    <Input value={amount} disabled className="font-bold" />
                 </div>
-                <DialogFooter>
-                    <Button onClick={handleSubmit} disabled={isSubmitting || accounts.length === 0}>
-                        {isSubmitting ? 'Salvando...' : 'Confirmar pagamento'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                <div>
+                    <Label>Conta utilizada</Label>
+                    {isLoadingAccounts ? (
+                        <p className="text-sm text-muted-foreground">Carregando contas...</p>
+                    ) : accounts.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Você não possui contas cadastradas.</p>
+                    ) : (
+                        <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Selecione uma conta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {accounts.map((account) => (
+                                    <SelectItem key={account.id} value={account.id}>{account.nome}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                </div>
+            </div>
+            <div className="flex justify-end pt-4">
+                <Button onClick={handleSubmit} disabled={isSubmitting || accounts.length === 0}>
+                    {isSubmitting ? 'Salvando...' : 'Confirmar pagamento'}
+                </Button>
+            </div>
+        </ResponsiveDialog>
     );
 }

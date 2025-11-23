@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { PlusCircle, Target } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Mission, Item } from '@/lib/definitions';
@@ -95,28 +95,25 @@ export default function AdminMissionsPage() {
                         <p className="text-muted-foreground">Crie e edite os desafios para os jogadores.</p>
                     </div>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button onClick={() => handleOpenDialog()}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Nova Missão
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-2xl">
-                        <DialogHeader>
-                            <DialogTitle>{editingMission ? 'Editar Missão' : 'Nova Missão'}</DialogTitle>
-                            <DialogDescription>
-                                Preencha os detalhes e a condição para completar a missão.
-                            </DialogDescription>
-                        </DialogHeader>
+                <Button onClick={() => handleOpenDialog()}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Nova Missão
+                </Button>
+                <ResponsiveDialog
+                    isOpen={isDialogOpen}
+                    setIsOpen={setIsDialogOpen}
+                    title={editingMission ? 'Editar Missão' : 'Nova Missão'}
+                    description="Preencha os detalhes e a condição para completar a missão."
+                >
+                    <div className="py-4">
                         <EditMissionForm
                             mission={editingMission}
                             items={items}
                             isSubmitting={isSubmitting}
                             onSave={handleSave}
                         />
-                    </DialogContent>
-                </Dialog>
+                    </div>
+                </ResponsiveDialog>
             </div>
 
             <MissionsTable

@@ -64,7 +64,7 @@ export function ResponsiveDialog({
                     <DrawerTitle>{title}</DrawerTitle>
                     {description && <DrawerDescription>{description}</DrawerDescription>}
                 </DrawerHeader>
-                <div className="px-4 pb-4 overflow-x-hidden">
+                <div className="overflow-y-auto overflow-x-hidden px-4 pb-4" style={{ maxHeight: 'calc(96vh - 120px)' }}>
                     {children}
                 </div>
                 <DrawerFooter className="pt-2">

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { PlusCircle, Skull } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Boss } from '@/lib/definitions';
@@ -89,27 +89,24 @@ export default function AdminBossesPage() {
                         <p className="text-muted-foreground">Crie e ative as batalhas de chefe para os jogadores.</p>
                     </div>
                 </div>
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button onClick={() => handleOpenDialog()}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Novo Chefe
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-2xl">
-                        <DialogHeader>
-                            <DialogTitle>{editingBoss ? 'Editar Chefe' : 'Novo Chefe'}</DialogTitle>
-                            <DialogDescription>
-                                Defina o HP, recompensas e período de atividade do chefe.
-                            </DialogDescription>
-                        </DialogHeader>
+                <Button onClick={() => handleOpenDialog()}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Novo Chefe
+                </Button>
+                <ResponsiveDialog
+                    isOpen={isDialogOpen}
+                    setIsOpen={setIsDialogOpen}
+                    title={editingBoss ? 'Editar Chefe' : 'Novo Chefe'}
+                    description="Defina o HP, recompensas e período de atividade do chefe."
+                >
+                    <div className="py-4">
                         <EditBossForm
                             boss={editingBoss}
                             isSubmitting={isSubmitting}
                             onSave={handleSave}
                         />
-                    </DialogContent>
-                </Dialog>
+                    </div>
+                </ResponsiveDialog>
             </div>
 
             <BossesTable
