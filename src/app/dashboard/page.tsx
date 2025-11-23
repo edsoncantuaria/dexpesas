@@ -24,6 +24,7 @@ import { QuickActions } from '@/components/dashboard/quick-actions';
 import { PrivacyProvider } from '@/contexts/PrivacyContext';
 import { TutorialOverlay } from '@/components/dashboard/tutorial/tutorial-overlay';
 import { FutureInstallmentsWidget } from '@/components/dashboard/widgets/future-installments-widget';
+import { InsightsPanel } from '@/components/dashboard/insights-panel';
 
 const cardComponents: { [key: string]: React.ComponentType<any> } = {
   account_book: AccountBookCard,
@@ -293,7 +294,7 @@ function DashboardPageContent() {
           unlockedAchievements={unlockedAchievements}
         />
       )}
-
+      {/* Overview Section */}
       <SmartSummary accounts={accounts} transactions={transactions} budgets={budgets} cards={cards} />
       <QuickActions />
 
@@ -343,6 +344,8 @@ function DashboardPageContent() {
           )}
         </div>
       </div>
+      {/* Insights Panel - Bottom */}
+      <InsightsPanel />
     </div>
   );
 }

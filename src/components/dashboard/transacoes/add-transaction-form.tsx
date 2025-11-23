@@ -40,6 +40,7 @@ import { TagInput } from './tag-input';
 import { DescricaoInteligente, type SugestaoTransacao } from './descricao-inteligente';
 import { Textarea } from '@/components/ui/textarea';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useDebts } from '@/hooks/use-debts';
 
 
 // Schema único e robusto com validação condicional
@@ -115,6 +116,7 @@ const formSchema = z.object({
   interestRate: z.coerce.number().optional(),
   fromAccountId: z.string().optional(),
   toAccountId: z.string().optional(),
+  debtId: z.string().optional(),
 })
   .refine(data => {
     if (data.tipo === 'transferencia') {
@@ -190,6 +192,7 @@ const OPTIONAL_FIELD_SECTION: Partial<Record<keyof FormValues, OptionalSectionNa
   tags: 'extras',
   attachmentUrl: 'extras',
   notes: 'extras',
+  debtId: 'extras',
 };
 
 const computeOptionalSectionState = (values: Partial<FormValues>): Record<OptionalSectionName, boolean> => ({
@@ -199,7 +202,8 @@ const computeOptionalSectionState = (values: Partial<FormValues>): Record<Option
     (values.tags && values.tags.length > 0) ||
     values.categoryId ||
     values.attachmentUrl ||
-    (values.notes && values.notes.length > 0)
+    (values.notes && values.notes.length > 0) ||
+    values.debtId
   ),
 });
 
@@ -245,6 +249,7 @@ export function AddTransactionForm({
     totalInstallments: 2,
     withInterest: false,
     interestRate: 0,
+    debtId: undefined,
   };
   const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -252,6 +257,7 @@ export function AddTransactionForm({
     computeOptionalSectionState(defaultValues as FormValues)
   );
   const { toast } = useToast();
+  const { debts } = useDebts();
   const fieldRefs = useRef<Partial<Record<keyof FormValues, HTMLDivElement | null>>>({});
   const registerFieldRef = useCallback(
     (name: keyof FormValues) => (node: HTMLDivElement | null) => {
@@ -327,6 +333,7 @@ export function AddTransactionForm({
         totalInstallments: transaction.totalInstallments || 2,
         withInterest: !!transaction.withInterest,
         interestRate: transaction.interestRate || 0,
+        debtId: transaction.debtId || undefined,
       };
       const mergedValues = { ...(defaultValues as FormValues), ...valuesToReset };
       form.reset(mergedValues as FormValues);
@@ -1084,6 +1091,34 @@ export function AddTransactionForm({
                       }}
                     />
                   </div>
+
+                  {watchTipo === 'despesa' && (
+                    <FormField
+                      control={form.control}
+                      name="debtId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Vincular Pagamento de Dívida (Opcional)</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <FormControl>
+                              <SelectTrigger className="bg-card/50 border-muted-foreground/20">
+                                <SelectValue placeholder="Selecione uma dívida para abater" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">Nenhuma</SelectItem>
+                              {debts.filter(d => d.status === 'ACTIVE').map((debt) => (
+                                <SelectItem key={debt.id} value={debt.id}>
+                                  {debt.name} ({new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(debt.currentBalance))})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <div className="scroll-mt-28" ref={registerFieldRef('tags')}>
                     <FormField
                       control={form.control}

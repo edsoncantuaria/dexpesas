@@ -51,6 +51,37 @@ const achievements = {
             // Considera "em dia" se for pago na data de vencimento ou antes.
             return transaction && !transaction.pago && new Date() <= new Date(transaction.data);
         }
+    },
+    'DEBT_PAID_OFF': {
+        id: 'debt_paid_off_v1',
+        name: 'Quebrador de Correntes',
+        message: 'Você quitou uma dívida! A liberdade está mais próxima.',
+        xp: 300,
+        check: async (tx, userId, debtId) => {
+            if (!debtId) return false;
+            const debt = await tx.debt.findUnique({ where: { id: debtId } });
+            return debt && debt.status === 'PAID_OFF';
+        }
+    },
+    'DEBT_FREE': {
+        id: 'debt_free_v1',
+        name: 'Livre e Desimpedido',
+        message: 'Você quitou TODAS as suas dívidas! Parabéns pela liberdade financeira!',
+        xp: 1000,
+        check: async (tx, userId) => {
+            // Check if user has ANY debts first to avoid awarding to new users with 0 debts
+            const totalDebts = await tx.debt.count({ where: { userId } });
+            if (totalDebts === 0) return false;
+
+            const activeDebts = await tx.debt.count({ 
+                where: { 
+                    userId, 
+                    status: 'ACTIVE', 
+                    currentBalance: { gt: 0.01 } 
+                } 
+            });
+            return activeDebts === 0;
+        }
     }
 };
 

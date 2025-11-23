@@ -29,14 +29,16 @@ export function AddTransactionSheet({ isOpen, onClose, transaction }: AddTransac
     if (isOpen) {
       const fetchData = async () => {
         try {
-          const [accRes, cardRes] = await Promise.all([
+          const [accRes, cardRes, debtRes] = await Promise.all([
             api.get('/accounts'),
             api.get('/cards'),
+            api.get('/debts'),
           ]);
           setAccounts(accRes.data);
           setCards(cardRes.data);
+          setDebts(debtRes.data);
         } catch (error) {
-          console.error("Failed to fetch accounts/cards for form", error);
+          console.error("Failed to fetch data for form", error);
         }
       };
       fetchData();

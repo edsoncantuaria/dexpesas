@@ -471,6 +471,43 @@ class UserController {
             next(error);
         }
     }
+
+    async getBackup(req, res, next) {
+        const userId = req.user.id;
+
+        try {
+            const BackupService = (await import('../services/backupService.js')).default;
+            const backup = await BackupService.createBackup(userId);
+
+            res.setHeader('Content-Type', 'application/json');
+            res.setHeader('Content-Disposition', 'attachment; filename=dexpesas_backup.json');
+            res.json(backup);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async restoreBackup(req, res, next) {
+        const userId = req.user.id;
+        const backupData = req.body;
+
+        try {
+            const BackupService = (await import('../services/backupService.js')).default;
+
+            // Validate backup
+            if (!backupData.version) {
+                return res.status(400).json({ message: 'Arquivo de backup inválido' });
+            }
+
+            const result = await BackupService.restoreBackup(userId, backupData);
+            res.json(result);
+        } catch (error) {
+            if (error.message === 'Versão de backup incompatível') {
+                return res.status(400).json({ message: error.message });
+            }
+            next(error);
+        }
+    }
 }
 
 export default new UserController();

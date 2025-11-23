@@ -10,9 +10,11 @@ const router = express.Router();
 router.use(authMiddleware);
 
 router.get('/summary', transactionController.getMonthlySummary);
+router.get('/cashflow-analysis', transactionController.getCashflowAnalysis);
 router.get('/future-installments/summary', transactionController.getFutureInstallmentsSummary);
 router.get('/', transactionController.getTransactions);
 router.post('/export', transactionController.exportTransactions);
+router.post('/export-excel', transactionController.exportToExcel);
 
 // Aplica o middleware de validação antes do controller
 router.post('/', validate(transactionSchema), transactionController.createTransaction);

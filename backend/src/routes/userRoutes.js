@@ -25,8 +25,10 @@ router.post('/complete-onboarding', userController.completeOnboarding);
 router.get('/legacy-ruins', userController.getLegacyRuins);
 
 // Rota para destacar/remover destaque de uma conquista
-router.patch('/achievements/:achievementId', userController.toggleAchievementHighlight);
+router.put('/unlocked-achievements/:achievementId/highlight', userController.toggleAchievementHighlight);
+
+// Backup routes
+router.get('/backup', userController.getBackup);
+router.post('/restore', userController.restoreBackup);
 
 export default router;
-
-

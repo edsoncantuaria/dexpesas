@@ -56,6 +56,10 @@ const preferencesSchema = z.object({
   enableReconciliationAi: z.boolean(),
   enableGoalProjection: z.boolean(),
   habilitarDescricaoInteligente: z.boolean(),
+  billReminders: z.boolean(),
+  budgetAlerts: z.boolean(),
+  goalReminders: z.boolean(),
+  unusualTransactions: z.boolean(),
 });
 
 const gamificationModeSchema = z.object({
@@ -175,14 +179,28 @@ function PreferencesForm({ user }: { user: User }) {
       enableDailySummary: user.enableDailySummary ?? false,
       enableBudgetSuggestion: user.enableBudgetSuggestion ?? false,
       enableReconciliationAi: user.enableReconciliationAi ?? false,
-      enableGoalProjection: user.enableGoalProjection ?? false,
+      enableGoalProjection: user.enableGoalProjection ?? true,
       habilitarDescricaoInteligente: user.habilitarDescricaoInteligente ?? true,
+      billReminders: user.notificationPreferences?.billReminders ?? true,
+      budgetAlerts: user.notificationPreferences?.budgetAlerts ?? true,
+      goalReminders: user.notificationPreferences?.goalReminders ?? true,
+      unusualTransactions: user.notificationPreferences?.unusualTransactions ?? true,
     }
   });
 
-  const onSubmit = async (data: z.infer<typeof preferencesSchema>) => {
+  const onSubmit: SubmitHandler<z.infer<typeof preferencesSchema>> = async (data) => {
     try {
-      await api.put('/user/preferences', data);
+      const { billReminders, budgetAlerts, goalReminders, unusualTransactions, ...otherPrefs } = data;
+
+      await api.put('/user/preferences', {
+        ...otherPrefs,
+        notificationPreferences: {
+          billReminders,
+          budgetAlerts,
+          goalReminders,
+          unusualTransactions
+        }
+      });
       toast({ title: 'Preferências salvas!' });
       form.reset(data, { keepDirty: false });
     } catch (error) {
@@ -273,6 +291,15 @@ function PreferencesForm({ user }: { user: User }) {
             <FormField control={form.control} name="enableBudgetNotifications" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><FormLabel>Alertas de Orçamento Excedido</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
             <FormField control={form.control} name="enableLimitAlerts" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><FormLabel>Alertas de Limite do Cartão</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
             <FormField control={form.control} name="enableAchievementNotifications" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><FormLabel>Notificações de Conquistas</FormLabel><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
+
+            <Separator className="my-3" />
+            <div className="text-sm font-medium mb-2">Alertas Inteligentes</div>
+            <CardDescription className="text-xs mb-3">Alertas processados automaticamente todos os dias às 9h</CardDescription>
+
+            <FormField control={form.control} name="billReminders" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><div><FormLabel>Lembretes de Contas</FormLabel><CardDescription className="text-xs pr-4">Notificações 1, 3 e 7 dias antes do vencimento</CardDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
+            <FormField control={form.control} name="budgetAlerts" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><div><FormLabel>Alertas de Orçamento</FormLabel><CardDescription className="text-xs pr-4">Notificações ao atingir 80% e 100% do limite</CardDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
+            <FormField control={form.control} name="goalReminders" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><div><FormLabel>Lembretes de Metas</FormLabel><CardDescription className="text-xs pr-4">Lembrete se passar 30 dias sem contribuir</CardDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
+            <FormField control={form.control} name="unusualTransactions" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><div><FormLabel>Transações Incomuns</FormLabel><CardDescription className="text-xs pr-4">Alertas de despesas 2x maiores que sua média</CardDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
           </CardContent>
         </Card>
 

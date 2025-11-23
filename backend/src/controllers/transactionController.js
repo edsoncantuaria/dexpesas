@@ -8,11 +8,13 @@ import AutomationService from '../services/automationService.js';
 import CategorizationService from '../services/categorizationService.js';
 import ReconciliationService from '../services/reconciliationService.js';
 import { stringify as stringifyCsv } from 'csv-stringify/sync';
+import ExcelExportService from '../services/excelExportService.js';
 import AuditService from '../services/auditService.js';
 import GamificationService from '../services/gamificationService.js';
 import { suggestCategoryFlow } from '../ai/flows/category-suggestion-flow.js';
 import CardBalanceService from '../services/cardBalanceService.js';
 import { getInvoicePeriod } from '../utils/date-helpers.js';
+import debtService from '../services/debtService.js';
 
 
 const prisma = new PrismaClient();
@@ -32,7 +34,7 @@ async function createTransactionLogic(tx, userId, data) {
         descricao, valor, tipo, data: transactionDateStr, categoryId, metodoPagamento, pago,
         contaCartaoId, entryType, totalInstallments,
         withInterest, interestRate, recurrenceType, attachmentUrl, notes,
-        tags
+        tags, debtId
     } = data;
 
     const valorOriginal = parseFloat(valor);
@@ -206,6 +208,22 @@ async function createTransactionLogic(tx, userId, data) {
                 tags: tagsToConnect,
             }
         });
+
+        // INTEGRATION: Record Debt Payment if debtId is provided (only for single expense transactions)
+        if (debtId && debtId !== 'none' && tipo === 'despesa') {
+            try {
+                await debtService.recordPayment(userId, debtId, {
+                    amount: valorOriginal,
+                    transactionId: newTransaction.id,
+                    paymentDate: transactionDate,
+                    notes: `Pagamento via transação: ${descricao}`,
+                    isExtraPayment: false
+                });
+            } catch (error) {
+                console.error('Error recording debt payment:', error);
+            }
+        }
+
         return [newTransaction];
     }
 }
@@ -578,6 +596,25 @@ class TransactionController {
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', 'attachment; filename=jornada_financeira_export.csv');
             res.status(200).send(csv);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async exportToExcel(req, res, next) {
+        const userId = req.user.id;
+        const filters = req.body;
+
+        try {
+            const workbook = await ExcelExportService.generateReport(userId, filters);
+
+            // Set response headers
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', 'attachment; filename=relatorio_financeiro.xlsx');
+
+            // Write to response
+            await workbook.xlsx.write(res);
+            res.end();
         } catch (error) {
             next(error);
         }
@@ -1094,6 +1131,98 @@ class TransactionController {
         } catch (error) {
             console.error('Erro ao vincular parcelas:', error);
             res.status(500).json({ message: 'Erro ao vincular parcelas.' });
+        }
+    }
+
+    /**
+     * Get cashflow analysis for Sankey diagram
+     * Returns nodes and links representing cash flow
+     */
+    async getCashflowAnalysis(req, res, next) {
+        const userId = req.user.id;
+        const { startDate, endDate } = req.query;
+
+        try {
+            const where = { userId };
+
+            if (startDate || endDate) {
+                where.data = {};
+                if (startDate) where.data.gte = new Date(startDate);
+                if (endDate) where.data.lte = new Date(endDate);
+            }
+
+            const transactions = await prisma.transaction.findMany({
+                where,
+                include: {
+                    account: true,
+                    card: true,
+                    category: {
+                        include: {
+                            parentCategory: true
+                        }
+                    }
+                }
+            });
+
+            // Aggregate data for Sankey
+            const nodes = new Set();
+            const linkMap = new Map();
+
+            const addLink = (source, target, value) => {
+                const key = `${source}|${target}`;
+                linkMap.set(key, (linkMap.get(key) || 0) + value);
+                nodes.add(source);
+                nodes.add(target);
+            };
+
+            transactions.forEach(transaction => {
+                const value = Math.abs(Number(transaction.valor));
+
+                if (transaction.tipo === 'receita') {
+                    // Income flow
+                    const categoryName = transaction.category?.label || transaction.categoria || 'Outras Receitas';
+                    const fullCategoryName = transaction.category?.parentCategory
+                        ? `${transaction.category.parentCategory.label} > ${transaction.category.label}`
+                        : categoryName;
+
+                    const accountName = transaction.account?.nome || 'Conta Principal';
+
+                    // Source (Income Category) → Account
+                    addLink(fullCategoryName, accountName, value);
+
+                } else if (transaction.tipo === 'despesa') {
+                    // Expense flow
+                    const accountOrCard = transaction.card?.nome || transaction.account?.nome || 'Conta Principal';
+
+                    const categoryName = transaction.category?.label || transaction.categoria || 'Outras Despesas';
+                    const fullCategoryName = transaction.category?.parentCategory
+                        ? `${transaction.category.parentCategory.label} > ${transaction.category.label}`
+                        : categoryName;
+
+                    // Account/Card → Destination (Expense Category)
+                    addLink(accountOrCard, fullCategoryName, value);
+                }
+            });
+
+            // Convert to array format for Sankey
+            const nodesList = Array.from(nodes).map((name, index) => ({ id: index, name }));
+            const nodeIndexMap = new Map(nodesList.map(n => [n.name, n.id]));
+
+            const links = Array.from(linkMap.entries()).map(([key, value]) => {
+                const [source, target] = key.split('|');
+                return {
+                    source: nodeIndexMap.get(source),
+                    target: nodeIndexMap.get(target),
+                    value: Number(value.toFixed(2))
+                };
+            });
+
+            res.json({
+                nodes: nodesList,
+                links: links.sort((a, b) => b.value - a.value)
+            });
+        } catch (error) {
+            next(error);
         }
     }
 }

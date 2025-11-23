@@ -33,6 +33,8 @@ import investmentRoutes from './routes/investmentRoutes.js';
 import migrationRoutes from './routes/migrationRoutes.js';
 import cardAlertRoutes from './routes/cardAlertRoutes.js';
 import categoryClassificationRoutes from './routes/categoryClassificationRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
+import debtRoutes from './routes/debtRoutes.js';
 
 const app = express();
 
@@ -96,6 +98,7 @@ app.use('/api/budgets', budgetRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/automations', automationRoutes);
 app.use('/api/rules/categorization', categorizationRuleRoutes);
+app.use('/api/debts', debtRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/reconcile', reconciliationRoutes);
 app.use('/api/familia', cellRoutes);
@@ -114,6 +117,7 @@ app.use('/api/investments', investmentRoutes);
 app.use('/api/migration', migrationRoutes);
 app.use('/api/card-alerts', cardAlertRoutes);
 app.use('/api/category-classifications', categoryClassificationRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/api', dataRoutes);
 app.use('/api/health', healthRoutes);
 

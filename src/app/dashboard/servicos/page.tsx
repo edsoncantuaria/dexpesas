@@ -2,7 +2,7 @@
 'use client';
 
 import Link from "next/link";
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import {
     Grid3x3,
@@ -26,13 +26,18 @@ import {
     TriangleAlert,
 
     Calendar,
-    Layers
+    Layers,
+    TrendingDown,
+    HelpCircle
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
 import { useUser } from '@/contexts/UserContext';
 import { MigrationResumeCard } from '@/components/migration/migration-resume-card';
 import { useRouter } from 'next/navigation';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 type ServiceItem = {
     href: string;
@@ -40,6 +45,12 @@ type ServiceItem = {
     description: string;
     Icon: LucideIcon;
     iconBgClass: string;
+    modal?: {
+        title: string;
+        description: string;
+        features: string[];
+        integration: string;
+    };
 };
 
 // Ordem revisada para melhor agrupamento e harmonia
@@ -88,6 +99,32 @@ const baseServiceItems: ServiceItem[] = [
         iconBgClass: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400'
     },
     // Ferramentas de Análise e Automação
+    {
+        href: '/dashboard/dividas',
+        title: 'Gestão de Dívidas',
+        description: 'Calculadora de quitação e planejamento',
+        Icon: TrendingDown,
+        iconBgClass: 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400',
+        modal: {
+            title: 'Gestão de Dívidas',
+            description: 'Ferramenta completa para planejar e visualizar a quitação de suas dívidas usando estratégias comprovadas.',
+            features: [
+                'Cadastro de múltiplas dívidas com juros e parcelas',
+                'Comparação Snowball vs Avalanche',
+                'Cálculo de juros e tempo de quitação',
+                'Timeline visual de pagamento',
+                'Simulação de pagamento extra'
+            ],
+            integration: 'Esta ferramenta é independente dos seus dados reais. Você pode usar para simular estratégias de pagamento sem afetar suas transações ou contas. É perfeito para planejar como quitar dívidas de cartões, empréstimos e financiamentos da forma mais eficiente.'
+        }
+    },
+    {
+        href: '/dashboard/orcamentos',
+        title: 'Orçamentos',
+        description: 'Controle seus gastos por categoria',
+        Icon: Target,
+        iconBgClass: 'bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400'
+    },
     {
         href: '/dashboard/relatorios',
         title: 'Relatórios',
@@ -148,10 +185,12 @@ const baseServiceItems: ServiceItem[] = [
     },
 ];
 
-export default function ServicosPage() {
+export default function ServicesPage() {
+    const { user, fetchUser } = useUser();
+    const router = useRouter();
     const { isClassic, isLite } = useGamificationMode();
     const { toast } = useToast();
-    const router = useRouter();
+    const [selectedService, setSelectedService] = useState<ServiceItem | null>(null);
 
     const serviceItems = useMemo(() => {
         const liteOverrides: Record<string, Pick<ServiceItem, 'title' | 'description'>> = {
@@ -180,17 +219,19 @@ export default function ServicosPage() {
             });
     }, [isClassic, isLite]);
 
-    const { user, fetchUser } = useUser();
     const finalServiceItems = useMemo(() => {
-        const items = [...serviceItems];
-        if (user?.isAdmin) {
-            items.push({
-                href: '/dashboard/admin',
-                title: 'Painel Admin',
-                description: 'Gerencie usuários, conquistas e configurações do sistema',
-                Icon: Shield,
-                iconBgClass: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-            });
+        let items = serviceItems;
+
+        if (user?.emailVerified === false) {
+            items = items.map(item => (
+                ['cells', 'investimentos', 'regras', 'habitos', 'automacoes', 'reconcile'].some(locked => item.href.includes(locked))
+                    ? {
+                        ...item,
+                        title: item.title + ' 🔒',
+                        iconBgClass: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }
+                    : item
+            ));
         }
         return items;
     }, [serviceItems, user]);
@@ -263,21 +304,96 @@ export default function ServicosPage() {
                     }
 
                     return (
-                        <Link href={item.href} key={item.href} className="group">
-                            <div className="bg-card p-4 rounded-lg border flex items-center gap-4 transition-all group-hover:border-primary group-hover:bg-primary/5 h-full">
-                                <div className={`p - 3 rounded - lg ${item.iconBgClass} `}>
-                                    <item.Icon className="h-6 w-6" />
+                        <Link key={item.href} href={item.href}>
+                            <div className="group h-full flex flex-col gap-3 rounded-lg border bg-card p-4 hover:shadow-md transition-all hover:border-primary/50">
+                                <div className="flex items-start justify-between">
+                                    <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${item.iconBgClass}`}>
+                                        <item.Icon className="w-5 h-5" />
+                                    </div>
+                                    {item.modal && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                setSelectedService(item);
+                                            }}
+                                            className="p-1 hover:bg-muted rounded-full transition-colors"
+                                        >
+                                            <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                                        </button>
+                                    )}
                                 </div>
                                 <div className="flex-1">
-                                    <h3 className="font-semibold">{item.title}</h3>
-                                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                                    <h3 className="font-semibold text-foreground transition-colors group-hover:text-primary">{item.title}</h3>
+                                    <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
                                 </div>
-                                <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                                <div className="flex items-center text-sm text-muted-foreground group-hover:text-primary transition-colors">
+                                    <span>Acessar</span>
+                                    <ChevronRight className="ml-1 h-4 w-4" />
+                                </div>
                             </div>
                         </Link>
                     );
                 })}
             </div>
+
+            {/* Modal de Explicação */}
+            {selectedService?.modal && (
+                <Dialog open={!!selectedService} onOpenChange={() => setSelectedService(null)}>
+                    <DialogContent className="sm:max-w-[550px]">
+                        <DialogHeader>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className={`flex items-center justify-center w-12 h-12 rounded-lg ${selectedService.iconBgClass}`}>
+                                    <selectedService.Icon className="w-6 h-6" />
+                                </div>
+                                <DialogTitle className="text-2xl">{selectedService.modal.title}</DialogTitle>
+                            </div>
+                            <DialogDescription className="text-base">
+                                {selectedService.modal.description}
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="space-y-4 mt-4">
+                            <div>
+                                <h4 className="font-semibold mb-2 flex items-center gap-2">
+                                    <Badge variant="outline">Funcionalidades</Badge>
+                                </h4>
+                                <ul className="space-y-2">
+                                    {selectedService.modal.features.map((feature, idx) => (
+                                        <li key={idx} className="flex items-start gap-2 text-sm">
+                                            <span className="text-primary mt-0.5">✓</span>
+                                            <span>{feature}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+
+                            <div className="bg-muted/50 p-4 rounded-lg">
+                                <h4 className="font-semibold mb-2 text-sm">Como se integra?</h4>
+                                <p className="text-sm text-muted-foreground">
+                                    {selectedService.modal.integration}
+                                </p>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setSelectedService(null)}
+                                    className="flex-1"
+                                >
+                                    Fechar
+                                </Button>
+                                <Link href={selectedService.href} className="flex-1">
+                                    <Button className="w-full">
+                                        Acessar Agora
+                                    </Button>
+                                </Link>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
         </div>
     );
 }

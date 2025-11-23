@@ -6,6 +6,7 @@ const { PrismaClient } = pkg;
 import { redisClient } from './src/config/redis.js';
 import minioClient from './src/config/minioClient.js';
 import { scheduleDefaultCellJobs } from './src/queues/cellJobsQueue.js';
+import { scheduleDailyNotificationCheck } from './src/jobs/dailyNotificationCheck.js';
 
 const prisma = new PrismaClient();
 
@@ -46,6 +47,9 @@ const startServer = async () => {
             console.error('⚠️  Não foi possível agendar os jobs das famílias:', err);
         });
 
+        // Start daily notification check
+        scheduleDailyNotificationCheck();
+
         // 3. Testa MinIO e garante bucket
         console.log('Validando conexão com o MinIO...');
         const bucketName = config.minio.bucketName;
@@ -67,7 +71,7 @@ const startServer = async () => {
         } else {
             console.log(`✅ [OK] Conectado ao MinIO. Bucket "${bucketName}" disponível.`);
         }
-        
+
         // 4. Inicia o servidor Express
         app.listen(config.port, () => {
             console.log('-----------------------------------------');

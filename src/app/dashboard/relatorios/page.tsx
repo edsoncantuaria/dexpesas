@@ -28,6 +28,9 @@ import { GoalsFundsOverview } from '@/components/dashboard/relatorios/goals-fund
 import { CardInsightsCard } from '@/components/dashboard/relatorios/card-insights-card';
 import { TagInsightsCard } from '@/components/dashboard/relatorios/tag-insights-card';
 import { ReportsHero } from '@/components/dashboard/relatorios/reports-hero';
+import { SankeyCashFlowChart } from '@/components/dashboard/relatorios/sankey-cash-flow-chart';
+import { PatrimonyEvolutionChart } from '@/components/dashboard/relatorios/patrimony-evolution-chart';
+import { ExportMenu } from '@/components/dashboard/relatorios/export-menu';
 import { motion } from 'framer-motion';
 import { handleApiError } from '@/lib/error-handler';
 
@@ -400,7 +403,12 @@ export default function RelatoriosPage() {
       </div>
 
       {/* Hero Section */}
-      <ReportsHero transactions={filteredTransactions} />
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <ReportsHero transactions={filteredTransactions} />
+        </div>
+        <ExportMenu filters={filters} />
+      </div>
 
       {/* Main Content - Tabs */}
       <Tabs defaultValue="expenses" className="space-y-6">
@@ -441,11 +449,13 @@ export default function RelatoriosPage() {
           </TabsContent>
 
           <TabsContent value="flow" className="space-y-6 mt-0">
+            <SankeyCashFlowChart startDate={filters.dateRange?.from} endDate={filters.dateRange?.to} />
             <DailyFlowChart transactions={filteredTransactions} />
             <CashflowForecastChart transactions={allTransactions} accounts={accounts} />
           </TabsContent>
 
           <TabsContent value="assets" className="space-y-6 mt-0">
+            <PatrimonyEvolutionChart />
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <NetWorthCard transactions={allTransactions} accounts={accounts} />
               <GoalSummaryCard goals={goals} />
