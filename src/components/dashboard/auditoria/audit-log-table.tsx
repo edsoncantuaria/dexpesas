@@ -2,15 +2,17 @@
 // src/components/dashboard/auditoria/audit-log-table.tsx
 'use client';
 
+import { useState } from 'react';
 import type { AuditLog } from '@/lib/definitions';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ChevronsRight } from 'lucide-react';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronsRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { AuditLogDetails } from '@/components/dashboard/auditoria/audit-log-details';
+import { cn } from '@/lib/utils';
 
 interface AuditLogTableProps {
     logs: AuditLog[];
@@ -75,6 +77,54 @@ const translate = (key: string, map: Record<string, string>): string => {
     return map[key] || key;
 };
 
+function AuditLogRow({ log }: { log: AuditLog }) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    return (
+        <>
+            <TableRow className="transition-colors hover:bg-muted/50">
+                <TableCell className="font-medium">{translate(log.action, actionTranslations)}</TableCell>
+                <TableCell>
+                    <span className="text-muted-foreground">{translate(log.entity, entityTranslations)}</span>
+                    <span className="text-xs text-muted-foreground/70"> ({log.entityId.substring(0, 8)}...)</span>
+                </TableCell>
+                <TableCell>{format(new Date(log.createdAt), "dd/MM/yy HH:mm:ss", { locale: ptBR })}</TableCell>
+                <TableCell>
+                    <Badge variant={log.status === 'SUCCESS' ? 'default' : 'destructive'}>
+                        {translate(log.status, statusTranslations)}
+                    </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                    {log.details && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="transition-colors"
+                            onClick={() => setIsOpen(!isOpen)}
+                        >
+                            Ver Detalhes
+                            {isOpen ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
+                        </Button>
+                    )}
+                </TableCell>
+            </TableRow>
+            {log.details && (
+                <TableRow className={cn("hover:bg-transparent border-0", !isOpen && "hidden")}>
+                    <TableCell colSpan={5} className="p-0 border-0">
+                        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+                            <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                                <div className="p-4 bg-muted/50">
+                                    <AuditLogDetails details={log.details} />
+                                </div>
+                            </CollapsibleContent>
+                        </Collapsible>
+                    </TableCell>
+                </TableRow>
+            )}
+        </>
+    );
+}
+
 export function AuditLogTable({ logs }: AuditLogTableProps) {
     return (
         <div className="border rounded-md overflow-x-auto">
@@ -90,42 +140,11 @@ export function AuditLogTable({ logs }: AuditLogTableProps) {
                 </TableHeader>
                 <TableBody>
                     {logs.map((log) => (
-                        <Collapsible key={log.id} asChild>
-                            <>
-                                <TableRow className="transition-colors hover:bg-muted/50">
-                                    <TableCell className="font-medium">{translate(log.action, actionTranslations)}</TableCell>
-                                    <TableCell>
-                                        <span className="text-muted-foreground">{translate(log.entity, entityTranslations)}</span>
-                                        <span className="text-xs text-muted-foreground/70"> ({log.entityId.substring(0, 8)}...)</span>
-                                    </TableCell>
-                                    <TableCell>{format(new Date(log.createdAt), "dd/MM/yy HH:mm:ss", { locale: ptBR })}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={log.status === 'SUCCESS' ? 'default' : 'destructive'}>
-                                            {translate(log.status, statusTranslations)}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        {log.details && (
-                                            <CollapsibleTrigger asChild>
-                                                <Button variant="ghost" size="sm" className="transition-colors">Ver Detalhes <ChevronsRight className="h-4 w-4 ml-2"/></Button>
-                                            </CollapsibleTrigger>
-                                        )}
-                                    </TableCell>
-                                </TableRow>
-                                <CollapsibleContent asChild>
-                                    <tr className="bg-muted/50 hover:bg-muted/50">
-                                        <TableCell colSpan={5} className="p-4">
-                                            <AuditLogDetails details={log.details} />
-                                        </TableCell>
-                                    </tr>
-                                </CollapsibleContent>
-                            </>
-                        </Collapsible>
+                        <AuditLogRow key={log.id} log={log} />
                     ))}
                 </TableBody>
             </Table>
         </div>
     );
 }
-    
-    
+

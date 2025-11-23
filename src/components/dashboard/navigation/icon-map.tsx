@@ -8,7 +8,8 @@ import {
     Users,
     TrendingUp,
     Lock,
-    Calendar
+    Calendar,
+    Layers
 } from 'lucide-react';
 
 export const iconMap: Record<string, any> = {
@@ -21,5 +22,6 @@ export const iconMap: Record<string, any> = {
     Users,
     TrendingUp,
     Lock,
-    Calendar
+    Calendar,
+    Layers
 };

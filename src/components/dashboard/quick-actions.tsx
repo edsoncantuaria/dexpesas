@@ -49,6 +49,15 @@ export function QuickActions() {
                     <span className="text-xs font-medium">Relatórios</span>
                 </Button>
             </Link>
+
+            <Link href="/dashboard/subcategorias">
+                <Button variant="outline" className="h-auto flex-col gap-2 p-4 min-w-[100px] hover:bg-primary/5 hover:border-primary/50 transition-all">
+                    <div className="p-2 bg-pink-500/10 rounded-full">
+                        <Target className="h-5 w-5 text-pink-500" />
+                    </div>
+                    <span className="text-xs font-medium">Subcategorias</span>
+                </Button>
+            </Link>
         </div>
     );
 }

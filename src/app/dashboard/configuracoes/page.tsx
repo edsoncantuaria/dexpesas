@@ -27,6 +27,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
 import { useUser } from '@/contexts/UserContext';
+import { PremiumSubcategoryManager } from '@/components/settings/premium-subcategory-manager';
 
 // Schemas para cada formulário
 const accountInfoSchema = z.object({

@@ -60,6 +60,7 @@ export async function resetCategoriesData(prismaClient = prisma) {
             label: defaultCategory.label,
             icon: defaultCategory.icon,
             type: defaultCategory.type,
+            parentCategoryId: defaultCategory.parentCategoryId,
           },
         });
         operations.updated += 1;
@@ -88,6 +89,7 @@ export async function resetCategoriesData(prismaClient = prisma) {
             label: defaultCategory.label,
             icon: defaultCategory.icon,
             type: defaultCategory.type,
+            parentCategoryId: defaultCategory.parentCategoryId,
           },
         });
         operations.created += 1;
@@ -120,6 +122,7 @@ export async function resetCategoriesData(prismaClient = prisma) {
           label: defaultCategory.label,
           icon: defaultCategory.icon,
           type: defaultCategory.type,
+          parentCategoryId: defaultCategory.parentCategoryId,
         },
       });
       operations.created += 1;

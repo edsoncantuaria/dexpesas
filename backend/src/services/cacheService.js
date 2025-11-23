@@ -47,4 +47,15 @@ class CacheService {
   }
 }
 
+export const CACHE_KEYS = {
+  CATEGORIES: 'categories',
+  TRANSACTIONS: 'transactions',
+  DASHBOARD: 'dashboard',
+  GOALS: 'goals',
+  BUDGETS: 'budgets',
+  ACCOUNTS: 'accounts',
+  CARDS: 'cards',
+};
+
+export { CacheService };
 export default CacheService;

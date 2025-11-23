@@ -307,7 +307,7 @@ export function AddTransactionForm({
       const category = categories.find(c => c.id === transaction.categoryId);
       let entryType: 'single' | 'installment' | 'recurring' = 'single';
       if (transaction.installment) entryType = 'installment';
-      else if (transaction.recurrenceType && transaction.recurrenceType !== 'NONE') entryType = 'recurring';
+      else if (transaction.recurrenceType) entryType = 'recurring';
 
       const valuesToReset: Partial<FormValues> = {
         tipo: transaction.tipo,
@@ -319,7 +319,7 @@ export function AddTransactionForm({
         attachmentUrl: transaction.attachmentUrl,
         tags: transaction.tags?.map(t => t.id) || [],
         notes: transaction.notes || '',
-        metodoPagamento: transaction.metodoPagamento,
+        metodoPagamento: (transaction.metodoPagamento === 'transferencia' ? 'debito' : transaction.metodoPagamento) as any,
         contaCartaoId: transaction.accountId || transaction.cardId || '',
         entryType: entryType,
         recurrenceType: transaction.recurrenceType || 'NONE',
@@ -503,12 +503,20 @@ export function AddTransactionForm({
                     <div className="relative flex items-center justify-center">
                       <span className="text-3xl sm:text-4xl font-bold text-muted-foreground mr-2">R$</span>
                       <input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="numeric"
                         placeholder="0,00"
                         className="bg-transparent text-5xl sm:text-6xl font-bold text-center w-full max-w-[250px] sm:max-w-[300px] outline-none placeholder:text-muted-foreground/30"
-                        value={field.value || ''}
-                        onChange={(e) => field.onChange(parseFloat(e.target.value))}
+                        value={new Intl.NumberFormat('pt-BR', {
+                          style: 'decimal',
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }).format(field.value || 0)}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          const realValue = Number(value) / 100;
+                          field.onChange(realValue);
+                        }}
                         autoFocus
                       />
                     </div>
@@ -973,47 +981,107 @@ export function AddTransactionForm({
                     <FormField
                       control={form.control}
                       name="categoryId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Categoria</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="bg-card/50 border-muted-foreground/20">
-                                <SelectValue placeholder="Selecione a categoria" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {filteredCategories.map((cat) => (
-                                <SelectItem key={cat.id} value={cat.id}>
-                                  {cat.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {favoriteCategorySuggestions.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              <span className="w-full text-[11px] uppercase tracking-wide text-muted-foreground">
-                                Sugestões
-                              </span>
-                              {favoriteCategorySuggestions.map((cat) => (
-                                <Button
-                                  key={cat.id}
-                                  type="button"
-                                  size="xs"
-                                  variant={field.value === cat.id ? 'default' : 'outline'}
-                                  onClick={(event) => {
-                                    event.preventDefault();
-                                    field.onChange(cat.id);
-                                  }}
-                                >
-                                  {cat.label}
-                                </Button>
-                              ))}
+                      render={({ field }) => {
+                        const selectedCategoryId = field.value;
+                        const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+
+                        // Determine current parent and sub selection
+                        let currentParentId: string | undefined;
+                        let currentSubId: string | undefined;
+
+                        if (selectedCategory) {
+                          if (selectedCategory.parentCategoryId) {
+                            currentParentId = selectedCategory.parentCategoryId;
+                            currentSubId = selectedCategory.id;
+                          } else {
+                            currentParentId = selectedCategory.id;
+                            currentSubId = undefined;
+                          }
+                        }
+
+                        const parentCategories = useMemo(() =>
+                          filteredCategories.filter(c => !c.parentCategoryId),
+                          [filteredCategories]
+                        );
+
+                        const subCategories = useMemo(() =>
+                          currentParentId ? filteredCategories.filter(c => c.parentCategoryId === currentParentId) : [],
+                          [filteredCategories, currentParentId]
+                        );
+
+                        return (
+                          <FormItem>
+                            <FormLabel>Categoria</FormLabel>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {/* Parent Select */}
+                              <Select
+                                value={currentParentId}
+                                onValueChange={(val) => field.onChange(val)}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="bg-card/50 border-muted-foreground/20">
+                                    <SelectValue placeholder="Categoria Principal" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {parentCategories.map(cat => (
+                                    <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+
+                              {/* Subcategory Select */}
+                              <Select
+                                value={currentSubId || "none"}
+                                onValueChange={(val) => {
+                                  if (val === "none") {
+                                    field.onChange(currentParentId);
+                                  } else {
+                                    field.onChange(val);
+                                  }
+                                }}
+                                disabled={!currentParentId || subCategories.length === 0}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="bg-card/50 border-muted-foreground/20">
+                                    <SelectValue placeholder="Subcategoria (Opcional)" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="none">Sem subcategoria</SelectItem>
+                                  {subCategories.map(cat => (
+                                    <SelectItem key={cat.id} value={cat.id}>{cat.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
-                          )}
-                          <FormMessage />
-                        </FormItem>
-                      )}
+
+                            {favoriteCategorySuggestions.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <span className="w-full text-[11px] uppercase tracking-wide text-muted-foreground">
+                                  Sugestões
+                                </span>
+                                {favoriteCategorySuggestions.map((cat) => (
+                                  <Button
+                                    key={cat.id}
+                                    type="button"
+                                    size="sm"
+                                    className="h-6 text-xs px-2"
+                                    variant={field.value === cat.id ? 'default' : 'outline'}
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      field.onChange(cat.id);
+                                    }}
+                                  >
+                                    {cat.label}
+                                  </Button>
+                                ))}
+                              </div>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   </div>
                   <div className="scroll-mt-28" ref={registerFieldRef('tags')}>

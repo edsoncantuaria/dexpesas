@@ -24,7 +24,9 @@ import {
     TrendingUp,
     Shield,
     TriangleAlert,
-    Calendar
+
+    Calendar,
+    Layers
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
@@ -63,6 +65,13 @@ const baseServiceItems: ServiceItem[] = [
         description: 'Visualize todas as parcelas e recorrências',
         Icon: Calendar,
         iconBgClass: 'bg-orange-100 dark:bg-orange-900/50 text-orange-600 dark:text-orange-400'
+    },
+    {
+        href: '/dashboard/subcategorias',
+        title: 'Subcategorias',
+        description: 'Gerencie subcategorias e ícones',
+        Icon: Layers,
+        iconBgClass: 'bg-pink-100 dark:bg-pink-900/50 text-pink-600 dark:text-pink-400'
     },
     {
         href: '/dashboard/metas',
