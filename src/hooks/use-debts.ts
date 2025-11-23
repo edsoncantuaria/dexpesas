@@ -21,7 +21,7 @@ export interface Debt {
         id: string;
         nome: string;
         icon: string;
-        color: string;
+        color?: string;
     };
 }
 

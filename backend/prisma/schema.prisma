@@ -300,6 +300,7 @@ enum DebtType {
   AUTO_LOAN
   STUDENT_LOAN
   MEDICAL
+  OVERDRAFT
   OTHER
 }
 
@@ -800,6 +801,7 @@ model Account {
   icone         String?
   isArchived    Boolean      @default(false)
   userId        String
+  overdraftLimit Decimal      @default(0) @db.Decimal(18, 4)
 
   // --- Relações ---
   user                               User                       @relation(fields: [userId], references: [id], onDelete: Cascade)

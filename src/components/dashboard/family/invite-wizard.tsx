@@ -128,7 +128,6 @@ export function InviteWizard({ cellId, open, onClose, onSuccess }: InviteWizardP
     ];
 
     return (
-    return (
         <ResponsiveDialog
             isOpen={open}
             setIsOpen={(val) => !val && onClose()}
@@ -265,7 +264,5 @@ export function InviteWizard({ cellId, open, onClose, onSuccess }: InviteWizardP
                 </div>
             </div>
         </ResponsiveDialog>
-    );
-}
     );
 }

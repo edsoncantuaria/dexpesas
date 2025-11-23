@@ -47,8 +47,7 @@ class DebtService {
                     select: {
                         id: true,
                         nome: true,
-                        icon: true,
-                        color: true
+                        icon: true
                     }
                 },
                 milestones: {

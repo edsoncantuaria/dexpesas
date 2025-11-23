@@ -197,18 +197,23 @@ function AccountCard({
 
             <CardContent className="p-0 relative z-10 space-y-2 [text-shadow:_1px_1px_2px_rgb(0_0_0_/_0.3)]">
               <div>
-                <p className="text-xs opacity-75 mb-1">Saldo disponível</p>
+                <p className="text-xs opacity-75 mb-1">Saldo disponível {account.overdraftLimit && account.overdraftLimit > 0 ? '(+ Cheque Esp.)' : ''}</p>
                 <motion.p
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: index * 0.1 + 0.2 }}
                   className="text-3xl font-bold tracking-tight"
                 >
-                  {availableBalance.toLocaleString('pt-BR', {
+                  {(availableBalance + (Number(account.overdraftLimit) || 0)).toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL',
                   })}
                 </motion.p>
+                {account.overdraftLimit && Number(account.overdraftLimit) > 0 && (
+                  <p className="text-xs opacity-70 mt-1">
+                    Limite: {Number(account.overdraftLimit).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-between items-end">

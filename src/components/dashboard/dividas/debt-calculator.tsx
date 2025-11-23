@@ -1,17 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Trash2, Calculator } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-
+import { Plus, Trash2, Calculator, ArrowDownCircle } from 'lucide-react';
 import { useDebts } from '@/hooks/use-debts';
-import { useEffect } from 'react';
+import { useAccounts } from '@/hooks/use-accounts';
 
 interface Debt {
     id: string;
@@ -35,6 +33,7 @@ interface PayoffResult {
 
 export function DebtCalculator() {
     const { debts: apiDebts, fetchDebts, createDebt, deleteDebt } = useDebts();
+    const { accounts } = useAccounts();
     const [extraPayment, setExtraPayment] = useState(0);
     const [newDebt, setNewDebt] = useState({
         name: '',
@@ -79,6 +78,33 @@ export function DebtCalculator() {
     const handleRemoveDebt = async (id: string) => {
         await deleteDebt(id);
     };
+
+    const handleImportNegativeAccounts = async () => {
+        const negativeAccounts = accounts.filter(acc => (acc.saldo || 0) < 0);
+
+        for (const acc of negativeAccounts) {
+            const balance = Math.abs(acc.saldo || 0);
+            // Check if debt already exists for this account (heuristic by name)
+            const exists = debts.some(d => d.name === `Cheque Especial - ${acc.nome}`);
+
+            if (!exists) {
+                try {
+                    await createDebt({
+                        name: `Cheque Especial - ${acc.nome}`,
+                        currentBalance: balance,
+                        interestRate: 8.0, // Default interest for overdraft (can be edited)
+                        minimumPayment: balance * 0.15, // Estimate 15% min payment
+                        originalAmount: balance,
+                        debtType: 'OVERDRAFT'
+                    });
+                } catch (error) {
+                    console.error("Failed to import debt", error);
+                }
+            }
+        }
+    };
+
+    const negativeAccountsCount = accounts.filter(acc => (acc.saldo || 0) < 0).length;
 
     const calculateSnowball = (): PayoffResult => {
         // Sort by balance (smallest first)
@@ -191,15 +217,42 @@ export function DebtCalculator() {
             {/* Add Debt Form */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Plus className="h-5 w-5" />
-                        Adicionar Dívida
-                    </CardTitle>
-                    <CardDescription>
-                        Informe os detalhes de cada dívida que deseja quitar
-                    </CardDescription>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Plus className="h-5 w-5" />
+                                Adicionar Dívida
+                            </CardTitle>
+                            <CardDescription>
+                                Informe os detalhes de cada dívida que deseja quitar
+                            </CardDescription>
+                        </div>
+                        {negativeAccountsCount > 0 && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleImportNegativeAccounts}
+                                className="hidden md:flex gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                            >
+                                <ArrowDownCircle className="h-4 w-4" />
+                                Importar {negativeAccountsCount} {negativeAccountsCount === 1 ? 'conta negativa' : 'contas negativas'}
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent>
+                    {negativeAccountsCount > 0 && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleImportNegativeAccounts}
+                            className="flex md:hidden w-full mb-4 gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                        >
+                            <ArrowDownCircle className="h-4 w-4" />
+                            Importar {negativeAccountsCount} {negativeAccountsCount === 1 ? 'conta negativa' : 'contas negativas'}
+                        </Button>
+                    )}
+
                     <div className="grid gap-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
@@ -221,6 +274,7 @@ export function DebtCalculator() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                                        <SelectItem value="OVERDRAFT">Cheque Especial</SelectItem>
                                         <SelectItem value="PERSONAL_LOAN">Empréstimo Pessoal</SelectItem>
                                         <SelectItem value="MORTGAGE">Financiamento Imobiliário</SelectItem>
                                         <SelectItem value="AUTO_LOAN">Financiamento Veículo</SelectItem>
@@ -320,7 +374,7 @@ export function DebtCalculator() {
                     </CardHeader>
                     <CardContent>
                         <Tabs defaultValue="snowball" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2">
+                            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 h-auto">
                                 <TabsTrigger value="snowball">
                                     Snowball (Menor Saldo)
                                 </TabsTrigger>

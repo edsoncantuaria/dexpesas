@@ -10,7 +10,15 @@ import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { TrendingUp } from 'lucide-react';
+import { MoreHorizontal, TrendingUp } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { Account, Goal, InvestmentHolding } from '@/lib/definitions';
 
 const currencyFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -163,59 +171,73 @@ export function InvestmentHoldingList({
           </div>
         ) : (
           <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Conta</TableHead>
-                  <TableHead>Classe</TableHead>
-                  <TableHead>Meta vinculada</TableHead>
-                  <TableHead className="text-right">Saldo</TableHead>
-                  <TableHead></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {holdings.map((holding) => (
-                  <TableRow key={holding.id}>
-                    <TableCell>
-                      <div className="font-semibold">{holding.account.nome}</div>
-                      <div className="text-xs text-muted-foreground">{holding.account.instituicao}</div>
-                    </TableCell>
-                    <TableCell className="text-sm">{holding.assetClass}</TableCell>
-                    <TableCell className="text-sm">
-                      {holding.goal ? (
-                        <span className="font-medium">{holding.goal.name}</span>
-                      ) : (
-                        <span className="text-muted-foreground">Sem meta</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {currencyFormatter.format(Number(holding.currentAmount || 0))}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedGoalId(holding.goalId || '');
-                            setSelectedHoldingId(holding.id);
-                            setIsGoalDialogOpen(true);
-                          }}
-                        >
-                          Meta
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => openFormDialog(holding)}>
-                          Editar
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDelete(holding.id)} disabled={isSubmitting}>
-                          Remover
-                        </Button>
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Conta</TableHead>
+                    <TableHead className="hidden md:table-cell">Classe</TableHead>
+                    <TableHead className="hidden md:table-cell">Meta vinculada</TableHead>
+                    <TableHead className="text-right">Saldo</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {holdings.map((holding) => (
+                    <TableRow key={holding.id}>
+                      <TableCell>
+                        <div className="font-semibold">{holding.account.nome}</div>
+                        <div className="text-xs text-muted-foreground">{holding.account.instituicao}</div>
+                      </TableCell>
+                      <TableCell className="text-sm hidden md:table-cell">{holding.assetClass}</TableCell>
+                      <TableCell className="text-sm hidden md:table-cell">
+                        {holding.goal ? (
+                          <span className="font-medium">{holding.goal.name}</span>
+                        ) : (
+                          <span className="text-muted-foreground">Sem meta</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {currencyFormatter.format(Number(holding.currentAmount || 0))}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Abrir menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setSelectedGoalId(holding.goalId || '');
+                                setSelectedHoldingId(holding.id);
+                                setIsGoalDialogOpen(true);
+                              }}
+                            >
+                              Vincular Meta
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openFormDialog(holding)}>
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleDelete(holding.id)}
+                              disabled={isSubmitting}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              Remover
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
 
             <div className="mt-4 flex items-center justify-between rounded-xl border bg-gradient-to-r from-emerald-500/10 to-green-500/5 border-emerald-500/20 p-4 text-sm">
               <span className="font-semibold">Total mapeado</span>

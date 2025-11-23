@@ -242,7 +242,7 @@ export function EquilibriumPanel({
                 </CardContent>
             </Card>
 
-            {settlementContext && (
+            
                 { settlementContext && (
                     <ResponsiveDialog
                         isOpen={Boolean(settlementContext)}

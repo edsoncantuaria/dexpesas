@@ -130,6 +130,7 @@ export type Account = {
     isArchived: boolean;
     saldo?: number;
     saldoPago?: number;
+    overdraftLimit?: number;
 };
 
 export type Card = {
