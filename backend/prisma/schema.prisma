@@ -286,6 +286,13 @@ enum AlertSeverity {
   CRITICAL
 }
 
+enum CategoryClassificationType {
+  ESSENTIAL
+  LEISURE
+  INVESTMENT
+  OTHER
+}
+
 model User {
   id                                 String           @id @default(cuid())
   name                               String
@@ -383,6 +390,7 @@ model User {
   investmentSnapshots           InvestmentSnapshot[]
   investmentNudgeConversions    InvestmentNudgeConversion[]
   cardAlerts                    CardAlert[]                 @relation("User_CardAlerts")
+  categoryClassifications       CategoryClassification[]
 }
 
 model Clan {
@@ -1030,16 +1038,17 @@ model Category {
   userId           String?
 
   // --- Relações ---
-  transactions        Transaction[]          @relation("Transaction_category")
-  budgets             Budget[]               @relation("Budget_category")
-  categorizationRules CategorizationRule[]   @relation("CategorizationRule_category")
-  sharedExpenses      SharedExpense[]        @relation("Category_SharedExpense")
-  recurringBills      RecurringBill[]        @relation("RecurringBill_category")
+  transactions        Transaction[]              @relation("Transaction_category")
+  budgets             Budget[]                   @relation("Budget_category")
+  categorizationRules CategorizationRule[]       @relation("CategorizationRule_category")
+  sharedExpenses      SharedExpense[]            @relation("Category_SharedExpense")
+  recurringBills      RecurringBill[]            @relation("RecurringBill_category")
   cellBudgets         CellBudget[]
-  parentCategory      Category?              @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  subcategories       Category[]             @relation("CategoryHierarchy")
+  parentCategory      Category?                  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subcategories       Category[]                 @relation("CategoryHierarchy")
   favoriteUsers       UserFavoriteCategory[]
-  user                User?                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classifications     CategoryClassification[]
+  user                User?                      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, nome])
   @@index([parentCategoryId])
@@ -1363,6 +1372,25 @@ model UserFavoriteCategory {
   @@unique([userId, categoryId])
   @@map("user_favorite_categories")
 }
+
+model CategoryClassification {
+  id             String                     @id @default(cuid())
+  userId         String
+  categoryId     String
+  classification CategoryClassificationType @default(OTHER)
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  // --- Relações ---
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId])
+  @@index([userId])
+  @@index([userId, classification])
+  @@map("category_classifications")
+}
+
 
 model UserDevice {
   id          String   @id @default(cuid())

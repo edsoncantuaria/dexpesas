@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, ShieldCheck, Repeat, Loader2, Palette, FileClock, LayoutDashboard, Tags, Sparkles } from 'lucide-react';
+import { Settings, ShieldCheck, Repeat, Loader2, Palette, FileClock, LayoutDashboard, Tags, Sparkles, TrendingUp } from 'lucide-react';
 import { useEffect, useState, useCallback, type ReactNode, useRef, useMemo } from 'react';
 import type { User } from '@/lib/definitions';
 import api from '@/lib/api';
@@ -509,6 +509,33 @@ export default function ConfiguracoesPage() {
               </CardContent>
             </Card>
           </div>
+        ),
+      },
+      {
+        id: 'investments',
+        title: 'Investimentos',
+        description: 'Configure como suas categorias são classificadas para análises de investimentos mais precisas.',
+        icon: TrendingUp,
+        content: (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Classificação de Categorias</CardTitle>
+                <CardDescription>Personalize quais categorias são essenciais, lazer ou investimento.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Configure suas categorias para obter análises mais precisas de quanto você pode investir vs gastar com lazer.
+                </p>
+                <Button asChild variant="outline">
+                  <Link href="/dashboard/configuracoes/categorias">
+                    <TrendingUp className="mr-2 h-4 w-4" />
+                    Gerenciar classificações
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div >
         ),
       },
       {

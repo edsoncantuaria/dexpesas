@@ -2,6 +2,7 @@
 import pkg from '@prisma/client';
 const { PrismaClient, InvestmentContributionStatus, InvestmentContributionSource } = pkg;
 import AuditService from './auditService.js';
+import CategoryClassificationService from './categoryClassificationService.js';
 
 const prisma = new PrismaClient();
 
@@ -148,10 +149,10 @@ function serializeContribution(contribution) {
             : null,
         holding: contribution.holding
             ? {
-                  id: contribution.holding.id,
-                  assetClass: contribution.holding.assetClass,
-                  ticker: contribution.holding.ticker,
-              }
+                id: contribution.holding.id,
+                assetClass: contribution.holding.assetClass,
+                ticker: contribution.holding.ticker,
+            }
             : null,
     };
 }
@@ -273,6 +274,13 @@ class InvestmentPlannerService {
         const { monthKey, startDate, endDate } = getMonthRange(month);
         const plan = planRecord ? serializePlan(planRecord) : { ...DEFAULT_PLAN, id: null, userId };
 
+        // Obter IDs de categorias classificadas pelo usuário
+        const [essentialCategoryIds, leisureCategoryIds, investmentCategoryIds] = await Promise.all([
+            CategoryClassificationService.getCategoryIdsByType(userId, 'ESSENTIAL'),
+            CategoryClassificationService.getCategoryIdsByType(userId, 'LEISURE'),
+            CategoryClassificationService.getCategoryIdsByType(userId, 'INVESTMENT'),
+        ]);
+
         const [user, budgets, incomeAggregate, spendingAggregate] = await Promise.all([
             prisma.user.findUnique({ where: { id: userId }, select: { fixedMonthlyIncome: true } }),
             prisma.budget.findMany({
@@ -301,12 +309,12 @@ class InvestmentPlannerService {
 
         const netIncome = toNumber(incomeAggregate._sum.valor);
         const totalSpent = toNumber(spendingAggregate._sum.valor);
-        const essentialBudgets = budgets.filter((budget) => {
-            const catName = budget.category?.nome || budget.category?.label || '';
-            return ESSENTIAL_CATEGORY_LABELS.some((label) => catName.toLowerCase().includes(label.toLowerCase()));
-        });
+
+        // Usar classificações dinâmicas em vez de hardcoded
+        const essentialBudgets = budgets.filter((budget) =>
+            essentialCategoryIds.includes(budget.categoryId)
+        );
         const essentialBudget = essentialBudgets.reduce((acc, budget) => acc + toNumber(budget.limit), 0);
-        const essentialCategoryIds = essentialBudgets.map((budget) => budget.categoryId).filter(Boolean);
 
         let essentialSpent = 0;
         const essentialSpentMap = new Map();
@@ -362,7 +370,38 @@ class InvestmentPlannerService {
         }
 
         const leisureSuggested = Math.max(leisureFloor, available - suggestedInvestment);
-        const leisureSpent = Math.max(0, totalSpent - essentialSpent);
+
+        // Calcular gastos de lazer usando categorias classificadas (FIX: era totalSpent - essentialSpent)
+        let leisureSpent = 0;
+        if (leisureCategoryIds.length > 0) {
+            const leisureAggregate = await prisma.transaction.aggregate({
+                _sum: { valor: true },
+                where: {
+                    userId,
+                    tipo: 'despesa',
+                    pago: true,
+                    categoryId: { in: leisureCategoryIds },
+                    data: { gte: startDate, lte: endDate },
+                },
+            });
+            leisureSpent = toNumber(leisureAggregate._sum.valor);
+        }
+
+        // Calcular gastos de investimento
+        let investmentSpent = 0;
+        if (investmentCategoryIds.length > 0) {
+            const investmentAggregate = await prisma.transaction.aggregate({
+                _sum: { valor: true },
+                where: {
+                    userId,
+                    tipo: 'despesa',
+                    pago: true,
+                    categoryId: { in: investmentCategoryIds },
+                    data: { gte: startDate, lte: endDate },
+                },
+            });
+            investmentSpent = toNumber(investmentAggregate._sum.valor);
+        }
         const basicNeeds = TRACKED_BASIC_NEEDS.map((config) => {
             const matchedBudget = budgets.find((budget) => {
                 const catName = normalizeCategoryName(budget.category?.nome || budget.category?.label || '');
@@ -395,6 +434,7 @@ class InvestmentPlannerService {
             essentialBudget,
             essentialSpent,
             leisureSpent,
+            investmentSpent, // Novo campo
             safetyBuffer,
             available,
             rawAvailable,
@@ -497,8 +537,8 @@ class InvestmentPlannerService {
 
             const holding = payload.holdingId
                 ? await tx.investmentHolding.findFirst({
-                      where: { id: payload.holdingId, planId: planRecord.id, userId },
-                  })
+                    where: { id: payload.holdingId, planId: planRecord.id, userId },
+                })
                 : null;
 
             const createdContribution = await tx.investmentContribution.create({

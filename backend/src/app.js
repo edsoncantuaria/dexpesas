@@ -32,6 +32,7 @@ import categoryAdminRoutes from './routes/categoryAdminRoutes.js';
 import investmentRoutes from './routes/investmentRoutes.js';
 import migrationRoutes from './routes/migrationRoutes.js';
 import cardAlertRoutes from './routes/cardAlertRoutes.js';
+import categoryClassificationRoutes from './routes/categoryClassificationRoutes.js';
 
 const app = express();
 
@@ -112,6 +113,7 @@ app.use('/api/admin/categories', categoryAdminRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/migration', migrationRoutes);
 app.use('/api/card-alerts', cardAlertRoutes);
+app.use('/api/category-classifications', categoryClassificationRoutes);
 app.use('/api', dataRoutes);
 app.use('/api/health', healthRoutes);
 

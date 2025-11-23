@@ -1,10 +1,11 @@
 // src/app/layout.tsx
-import type {Metadata} from 'next';
+import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
 import { PushNotificationProvider } from '@/contexts/PushNotificationProvider';
 import { RootClientShell } from '@/components/layout/root-client-shell';
+import { QueryProvider } from '@/providers/query-provider';
 
 export const metadata: Metadata = {
   title: 'Cloudive • Dexpesas',
@@ -26,9 +27,9 @@ export default function RootLayout({
         <meta name="theme-color" content="#3B82F6" />
       </head>
       <body>
-         <script
-            dangerouslySetInnerHTML={{
-              __html: `
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
                 (function() {
                   function setTheme(theme) {
                     document.documentElement.classList.remove('light', 'dark');
@@ -41,19 +42,21 @@ export default function RootLayout({
                   setTheme(theme);
                 })();
               `,
-            }}
-          />
+          }}
+        />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
           storageKey="vite-ui-theme"
         >
-          <RootClientShell>
-            <PushNotificationProvider>
-              {children}
-              <Toaster />
-            </PushNotificationProvider>
-          </RootClientShell>
+          <QueryProvider>
+            <RootClientShell>
+              <PushNotificationProvider>
+                {children}
+                <Toaster />
+              </PushNotificationProvider>
+            </RootClientShell>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>
