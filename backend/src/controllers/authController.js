@@ -10,6 +10,7 @@ import { defaultCategories } from '../config/seedData.js';
 import { encryptValue } from '../utils/fieldEncryption.js';
 import SecurityService from '../services/securityService.js';
 import EmailService from '../services/emailService.js';
+import CategoryClassificationService from '../services/categoryClassificationService.js';
 
 
 const prisma = new PrismaClient();
@@ -68,7 +69,10 @@ class AuthController {
                     skipDuplicates: true, // Não falha se a categoria já existir
                 });
 
-                console.log(`✨ Usuário ${newUser.id} criado com sucesso. Categorias padrão verificadas.`);
+                // 3. Inicializa as classificações de categoria (Essencial, Lazer, Investimento)
+                await CategoryClassificationService.initializeDefaults(newUser.id);
+
+                console.log(`✨ Usuário ${newUser.id} criado com sucesso. Categorias padrão verificadas e classificadas.`);
 
                 return newUser;
             }, {

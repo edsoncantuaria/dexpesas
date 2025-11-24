@@ -73,11 +73,47 @@ const startServer = async () => {
         }
 
         // 4. Inicia o servidor Express
-        app.listen(config.port, () => {
+        const server = app.listen(config.port, () => {
             console.log('-----------------------------------------');
             console.log(`🚀 Servidor Express rodando na porta ${config.port}`);
             console.log('-----------------------------------------');
         });
+
+        // Graceful shutdown function
+        const gracefulShutdown = async (signal) => {
+            console.log(`\n${signal} recebido. Encerrando servidor elegantemente...`);
+
+            server.close(() => {
+                console.log('🛑 Servidor HTTP fechado.');
+            });
+
+            try {
+                await prisma.$disconnect();
+                console.log('✅ Conexão com Prisma fechada.');
+
+                if (redisClient.status === 'ready') {
+                    await redisClient.quit();
+                    console.log('✅ Conexão com Redis fechada.');
+                }
+
+                console.log('👋 Processo encerrado.');
+                if (signal === 'SIGUSR2') {
+                    process.kill(process.pid, 'SIGUSR2');
+                } else {
+                    process.exit(0);
+                }
+            } catch (err) {
+                console.error('❌ Erro durante o encerramento:', err);
+                process.exit(1);
+            }
+        };
+
+        // Handle signals
+        process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+        process.once('SIGINT', () => gracefulShutdown('SIGINT'));
+
+        // For nodemon restarts
+        process.once('SIGUSR2', () => gracefulShutdown('SIGUSR2'));
 
     } catch (error) {
         console.error('❌ Falha crítica ao iniciar o servidor:', error);
@@ -86,12 +122,3 @@ const startServer = async () => {
 };
 
 startServer();
-
-// Garante que a conexão com o Prisma e Redis seja fechada elegantemente
-process.on('SIGINT', async () => {
-    console.log('\n🔌 Encerrando conexões...');
-    await prisma.$disconnect();
-    redisClient.quit();
-    console.log('✅ Conexões com Prisma e Redis fechadas.');
-    process.exit(0);
-});

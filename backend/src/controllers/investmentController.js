@@ -1,145 +1,156 @@
-// backend/src/controllers/investmentController.js
-import pkg from '@prisma/client';
-import InvestmentPlannerService from '../services/investmentPlannerService.js';
-import AuditService from '../services/auditService.js';
-
-const { PrismaClient } = pkg;
-const prisma = new PrismaClient();
+import PortfolioService from '../services/portfolioService.js';
+import PositionService from '../services/positionService.js';
+import PerformanceService from '../services/performanceService.js';
+import RiskService from '../services/riskService.js';
+import GoalService from '../services/goalService.js';
+import RecommendationService from '../services/recommendationService.js';
+import SimulationService from '../services/simulationService.js';
+import MarketDataService from '../services/marketDataService.js';
+import InvestmentImportService from '../services/investmentImportService.js';
 
 class InvestmentController {
-    async getPlan(req, res, next) {
+    // --- Portfolios ---
+    async getOverview(req, res, next) {
         try {
-            const { month } = req.query;
-            const payload = await InvestmentPlannerService.getPlanWithAnalysis(req.user.id, month);
-            res.json(payload);
+            const overview = await PortfolioService.getPortfolioOverview(req.user.id);
+            res.json(overview);
         } catch (error) {
             next(error);
         }
     }
 
-    async upsertPlan(req, res, next) {
+    async listPortfolios(req, res, next) {
         try {
-            const result = await InvestmentPlannerService.upsertPlan(req.user.id, req.body || {});
-            await AuditService.log({
-                userId: req.user.id,
-                action: result.created ? 'CREATE_INVESTMENT_PLAN' : 'UPDATE_INVESTMENT_PLAN',
-                entity: 'INVESTMENT_PLAN',
-                entityId: result.plan.id || req.user.id,
-                details: { plan: result.plan },
-                ipAddress: req.ip,
-            });
-            res.status(result.created ? 201 : 200).json(result);
+            const portfolios = await PortfolioService.listPortfolios(req.user.id);
+            res.json(portfolios);
         } catch (error) {
             next(error);
         }
     }
 
-    async createContribution(req, res, next) {
+    async createPortfolio(req, res, next) {
         try {
-            const contribution = await InvestmentPlannerService.recordContribution(req.user.id, req.body || {});
-            res.status(201).json(contribution);
+            const portfolio = await PortfolioService.createPortfolio(req.user.id, req.body);
+            res.status(201).json(portfolio);
         } catch (error) {
             next(error);
         }
     }
 
+    // --- Positions & Trades ---
+    async recordTrade(req, res, next) {
+        try {
+            const trade = await PositionService.recordTrade(req.user.id, req.body);
+            res.status(201).json(trade);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getPositions(req, res, next) {
+        try {
+            const { portfolioId } = req.query;
+            if (!portfolioId) return res.status(400).json({ message: 'Portfolio ID required' });
+            const positions = await PositionService.getPositions(portfolioId);
+            res.json(positions);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // --- Performance & Risk ---
     async getPerformance(req, res, next) {
         try {
-            const { month } = req.query;
-            const data = await InvestmentPlannerService.getPerformance(req.user.id, month);
-            res.json(data);
+            const { portfolioId } = req.query;
+            if (!portfolioId) return res.status(400).json({ message: 'Portfolio ID required' });
+            const performance = await PerformanceService.getPerformanceSummary(portfolioId);
+            res.json(performance);
         } catch (error) {
             next(error);
         }
     }
 
-    async getHoldings(req, res, next) {
+    async getRiskAnalysis(req, res, next) {
         try {
-            const holdings = await InvestmentPlannerService.getHoldings(req.user.id);
-            res.json(holdings);
+            const risk = await RiskService.analyzeRisk(req.user.id);
+            res.json(risk);
         } catch (error) {
             next(error);
         }
     }
 
-    async createHolding(req, res, next) {
+    // --- Goals ---
+    async listGoals(req, res, next) {
         try {
-            const holding = await InvestmentPlannerService.createHolding(req.user.id, req.body || {});
-            res.status(201).json(holding);
+            const goals = await GoalService.listGoals(req.user.id);
+            res.json(goals);
         } catch (error) {
             next(error);
         }
     }
 
-    async updateHolding(req, res, next) {
+    async createGoal(req, res, next) {
         try {
-            const { id } = req.params;
-            const holding = await InvestmentPlannerService.updateHolding(req.user.id, id, req.body || {});
-            res.json(holding);
+            const goal = await GoalService.createGoal(req.user.id, req.body);
+            res.status(201).json(goal);
         } catch (error) {
             next(error);
         }
     }
 
-    async deleteHolding(req, res, next) {
+    // --- Recommendations & Simulation ---
+    async getRecommendations(req, res, next) {
         try {
-            const { id } = req.params;
-            await InvestmentPlannerService.deleteHolding(req.user.id, id);
-            res.status(204).send();
+            const recs = await RecommendationService.getRecommendations(req.user.id);
+            res.json(recs);
         } catch (error) {
             next(error);
         }
     }
 
-    async getMetrics(req, res, next) {
+    async simulate(req, res, next) {
         try {
-            const { month } = req.query;
-            let snapshot = null;
-            if (month) {
-                snapshot = await prisma.investmentMetricSnapshot.findUnique({ where: { month } });
+            const { scenarios } = req.body;
+            const results = await SimulationService.simulateScenarios(req.user.id, scenarios);
+            res.json(results);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // --- Market Data ---
+    async getQuote(req, res, next) {
+        try {
+            const { ticker } = req.query;
+            if (!ticker) return res.status(400).json({ message: 'Ticker required' });
+            const quote = await MarketDataService.getQuote(ticker);
+            res.json(quote);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async getRates(req, res, next) {
+        try {
+            const rates = await MarketDataService.getOfficialRates();
+            res.json(rates);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    // --- Import ---
+    async importTransactions(req, res, next) {
+        try {
+            if (!req.file) {
+                return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
             }
-            if (!snapshot) {
-                snapshot = await prisma.investmentMetricSnapshot.findFirst({ orderBy: { month: 'desc' } });
-            }
-            res.json(snapshot || {});
-        } catch (error) {
-            next(error);
-        }
-    }
-
-    async startOnboarding(req, res, next) {
-        try {
-            const { fixedMonthlyIncome, month, ...planPayload } = req.body || {};
-            if (fixedMonthlyIncome === undefined || fixedMonthlyIncome === null) {
-                return res.status(400).json({ message: 'Informe a renda fixa mensal para personalizar o plano.' });
-            }
-
-            await prisma.user.update({
-                where: { id: req.user.id },
-                data: { fixedMonthlyIncome: parseFloat(fixedMonthlyIncome) },
-            });
-
-            const result = await InvestmentPlannerService.upsertPlan(req.user.id, planPayload);
-            const freshPlanRecord = await InvestmentPlannerService.getPlanRecord(req.user.id);
-            const analysis = await InvestmentPlannerService.calculateFreeToInvest(
-                req.user.id,
-                month,
-                freshPlanRecord,
+            const result = await InvestmentImportService.importB3File(
+                req.file.buffer,
+                req.file.mimetype,
+                req.user.id
             );
-
-            await AuditService.log({
-                userId: req.user.id,
-                action: 'INVESTMENT_ONBOARDING',
-                entity: 'INVESTMENT_PLAN',
-                entityId: result.plan?.id || req.user.id,
-                details: { fixedMonthlyIncome, plan: result.plan },
-                ipAddress: req.ip,
-            });
-
-            res.status(201).json({
-                plan: result.plan,
-                analysis,
-            });
+            res.json(result);
         } catch (error) {
             next(error);
         }

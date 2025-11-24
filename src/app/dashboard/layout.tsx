@@ -14,18 +14,9 @@ function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const { user, fetchUser } = useUser();
   const [showMigrationWizard, setShowMigrationWizard] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      // Mostra wizard se:
-      // 1. Completou o tutorial OU não é primeiro acesso
-      // 2. Status de migração é 0 (não iniciado)
-      const shouldShowMigration =
-        (user.hasCompletedTutorial === true || user.firstOpen === false) &&
-        user.hasCompletedMigration === 0;
+  // Effect removido para não mostrar o wizard automaticamente no início
+  // O wizard agora é acessado apenas via Serviços
 
-      setShowMigrationWizard(shouldShowMigration);
-    }
-  }, [user]);
 
   const handleMigrationComplete = async () => {
     setShowMigrationWizard(false);

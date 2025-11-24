@@ -7,6 +7,7 @@ import { Rocket, Sparkles, ArrowRight } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUser } from '@/contexts/UserContext';
 
 interface MigrationResumeCardProps {
     onResume: () => void;
@@ -15,6 +16,19 @@ interface MigrationResumeCardProps {
 export function MigrationResumeCard({ onResume }: MigrationResumeCardProps) {
     const [isLoading, setIsLoading] = useState(false);
     const { toast } = useToast();
+    const { user } = useUser();
+
+    const isNew = user?.hasCompletedMigration === 0;
+
+    const texts = {
+        title: isNew ? "Bem-vindo ao Dexpesas!" : "Migração Inicial Pendente",
+        badge: isNew ? "Primeiros Passos" : "Ação Recomendada",
+        description: isNew
+            ? "Para aproveitar ao máximo a plataforma, vamos configurar sua conta e importar seus dados iniciais."
+            : "Você adiou a importação dos seus dados financeiros.",
+        cta: isNew ? "Começar Agora em poucos minutos" : "Complete agora em poucos minutos",
+        button: isNew ? "Iniciar Configuração" : "Retomar Migração"
+    };
 
     const handleResume = async () => {
         setIsLoading(true);
@@ -61,14 +75,14 @@ export function MigrationResumeCard({ onResume }: MigrationResumeCardProps) {
 
                             <div className="flex-1 space-y-2">
                                 <div className="flex items-center gap-2">
-                                    <h3 className="text-2xl font-bold">Migração Inicial Pendente</h3>
+                                    <h3 className="text-2xl font-bold">{texts.title}</h3>
                                     <span className="px-2 py-1 text-xs font-semibold bg-primary/20 text-primary rounded-full">
-                                        Ação Recomendada
+                                        {texts.badge}
                                     </span>
                                 </div>
                                 <p className="text-muted-foreground">
-                                    Você adiou a importação dos seus dados financeiros.
-                                    <strong className="text-foreground"> Complete agora em poucos minutos</strong> e tenha uma visão completa das suas finanças!
+                                    {texts.description}
+                                    <strong className="text-foreground"> {texts.cta}</strong> e tenha uma visão completa das suas finanças!
                                 </p>
                                 <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                                     <div className="flex items-center gap-1">
@@ -94,7 +108,7 @@ export function MigrationResumeCard({ onResume }: MigrationResumeCardProps) {
                                     className="group relative overflow-hidden"
                                 >
                                     <span className="relative z-10 flex items-center gap-2">
-                                        {isLoading ? 'Abrindo...' : 'Retomar Migração'}
+                                        {isLoading ? 'Abrindo...' : texts.button}
                                         <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                                     </span>
                                     <div className="absolute inset-0 bg-gradient-to-r from-primary to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" />

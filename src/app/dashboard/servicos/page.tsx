@@ -258,7 +258,7 @@ export default function ServicesPage() {
         '/dashboard/reconcile'
     ];
 
-    const showMigrationCard = user?.hasCompletedMigration === 2;
+    const showMigrationCard = user?.hasCompletedMigration === 0 || user?.hasCompletedMigration === 2;
 
     return (
         <div className="space-y-6">
