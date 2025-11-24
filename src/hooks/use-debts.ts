@@ -11,6 +11,7 @@ export interface Debt {
     interestRate: number;
     minimumPayment: number;
     status: string;
+    lastPaymentAt?: Date;
     card?: {
         id: string;
         nome: string;
@@ -39,6 +40,50 @@ export interface CreateDebtData {
     extraMonthlyPayment?: number;
 }
 
+export interface DebtPaymentData {
+    amount: number;
+    paymentDate?: Date;
+    transactionId?: string;
+    isExtraPayment?: boolean;
+    notes?: string;
+}
+
+export interface DebtAdjustmentData {
+    amount: number;
+    reason: 'LATE_FEE' | 'RENEGOTIATION' | 'INTEREST_INCREASE' | 'OTHER';
+    description: string;
+}
+
+export interface DebtTrend {
+    debtId: string;
+    debtName: string;
+    isSnowballing: boolean;
+    monthlyChangeRate: number;
+    projectedNextMonth: number;
+    riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    alerts: string[];
+    avgMonthlyPayment?: number;
+}
+
+export interface DebtTrends {
+    summary: {
+        totalDebts: number;
+        snowballingDebts: number;
+        highRiskDebts: number;
+    };
+    debts: DebtTrend[];
+}
+
+export interface DebtRecommendations {
+    suggestedStrategy: 'SNOWBALL' | 'AVALANCHE' | 'HYBRID' | 'NONE';
+    priorityDebts: string[];
+    suggestedExtraPayment: number;
+    avgMonthlyIncome: number;
+    currentDTI: number;
+    reasoning: string[];
+    warnings: string[];
+}
+
 export interface DebtAnalytics {
     totalDebt: number;
     totalMonthlyMin: number;
@@ -53,6 +98,20 @@ export interface DebtAnalytics {
         snowball: string;
         avalanche: string;
     };
+}
+
+export interface ScenarioSimulation {
+    scenarios: Array<{
+        name: string;
+        strategy: string;
+        extraMonthly: number;
+        totalMonths: number;
+        totalInterest: number;
+        payoffDate: Date;
+        monthlyPayment: number;
+    }>;
+    bestOption: any;
+    savings: number;
 }
 
 export function useDebts() {
@@ -85,6 +144,8 @@ export function useDebts() {
                 title: 'Dívida criada',
                 description: 'Sua dívida foi adicionada com sucesso.',
             });
+            // Auto-reload to ensure fresh data
+            await fetchDebts();
             return response.data;
         } catch (error) {
             console.error('Error creating debt:', error);
@@ -136,6 +197,88 @@ export function useDebts() {
         }
     };
 
+    const recordPayment = async (id: string, paymentData: DebtPaymentData) => {
+        try {
+            const response = await api.post(`/debts/${id}/payments`, paymentData);
+            toast({
+                title: 'Pagamento registrado',
+                description: 'Seu pagamento foi registrado com sucesso.',
+            });
+            // Refresh debts to get updated balance
+            await fetchDebts();
+            return response.data;
+        } catch (error) {
+            console.error('Error recording payment:', error);
+            toast({
+                title: 'Erro ao registrar pagamento',
+                description: 'Não foi possível registrar o pagamento.',
+                variant: 'destructive',
+            });
+            throw error;
+        }
+    };
+
+    const recordAdjustment = async (id: string, adjustmentData: DebtAdjustmentData) => {
+        try {
+            const response = await api.post(`/debts/${id}/adjustments`, adjustmentData);
+            toast({
+                title: 'Ajuste registrado',
+                description: 'O ajuste foi registrado com sucesso.',
+            });
+            // Refresh debts to get updated balance
+            await fetchDebts();
+            return response.data;
+        } catch (error) {
+            console.error('Error recording adjustment:', error);
+            toast({
+                title: 'Erro ao registrar ajuste',
+                description: 'Não foi possível registrar o ajuste.',
+                variant: 'destructive',
+            });
+            throw error;
+        }
+    };
+
+    const getTrends = async (): Promise<DebtTrends> => {
+        try {
+            const response = await api.get('/debts/trends');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching trends:', error);
+            throw error;
+        }
+    };
+
+    const getRecommendations = async (): Promise<DebtRecommendations> => {
+        try {
+            const response = await api.get('/debts/recommendations');
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching recommendations:', error);
+            throw error;
+        }
+    };
+
+    const getPaymentHistory = async (id: string) => {
+        try {
+            const response = await api.get(`/debts/${id}/payment-history`);
+            return response.data;
+        } catch (error) {
+            console.error('Error fetching payment history:', error);
+            throw error;
+        }
+    };
+
+    const simulateScenarios = async (scenarios: Array<{ strategy?: string; extraMonthly?: number; name?: string }>): Promise<ScenarioSimulation> => {
+        try {
+            const response = await api.post('/debts/simulate', { scenarios });
+            return response.data;
+        } catch (error) {
+            console.error('Error simulating scenarios:', error);
+            throw error;
+        }
+    };
+
     const getAnalytics = async (): Promise<DebtAnalytics> => {
         try {
             const response = await api.get('/debts/analytics');
@@ -153,6 +296,12 @@ export function useDebts() {
         createDebt,
         updateDebt,
         deleteDebt,
+        recordPayment,
+        recordAdjustment,
+        getTrends,
+        getRecommendations,
+        getPaymentHistory,
+        simulateScenarios,
         getAnalytics,
     };
 }

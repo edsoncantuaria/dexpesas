@@ -84,6 +84,57 @@ class DebtController {
             res.status(500).json({ error: 'Failed to get analytics' });
         }
     }
+
+    async recordAdjustment(req, res) {
+        try {
+            const result = await debtService.recordAdjustment(req.user.id, req.params.id, req.body);
+            res.status(201).json(result);
+        } catch (error) {
+            console.error('Error recording adjustment:', error);
+            res.status(500).json({ error: 'Failed to record adjustment' });
+        }
+    }
+
+    async getTrends(req, res) {
+        try {
+            const trends = await debtService.analyzeTrends(req.user.id);
+            res.json(trends);
+        } catch (error) {
+            console.error('Error getting trends:', error);
+            res.status(500).json({ error: 'Failed to analyze trends' });
+        }
+    }
+
+    async getRecommendations(req, res) {
+        try {
+            const recommendations = await debtService.getRecommendations(req.user.id);
+            res.json(recommendations);
+        } catch (error) {
+            console.error('Error getting recommendations:', error);
+            res.status(500).json({ error: 'Failed to get recommendations' });
+        }
+    }
+
+    async getPaymentHistory(req, res) {
+        try {
+            const history = await debtService.getPaymentHistory(req.user.id, req.params.id);
+            res.json(history);
+        } catch (error) {
+            console.error('Error getting payment history:', error);
+            res.status(500).json({ error: 'Failed to get payment history' });
+        }
+    }
+
+    async simulateScenarios(req, res) {
+        try {
+            const { scenarios } = req.body;
+            const simulation = await debtService.simulateScenarios(req.user.id, scenarios);
+            res.json(simulation);
+        } catch (error) {
+            console.error('Error simulating scenarios:', error);
+            res.status(500).json({ error: 'Failed to simulate scenarios' });
+        }
+    }
 }
 
 export default new DebtController();

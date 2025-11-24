@@ -786,21 +786,21 @@ model UserItem {
 }
 
 model Account {
-  id            String       @id @default(cuid())
-  nome          String
-  instituicao   String
-  bankCode      String?
-  agencyNumber  String?
-  agencyDigit   String?
-  accountNumber String?
-  accountDigit  String?
-  tipo          AccountType
-  currency      CurrencyType @default(BRL)
-  saldoInicial  Decimal      @db.Decimal(18, 4)
-  color         String?
-  icone         String?
-  isArchived    Boolean      @default(false)
-  userId        String
+  id             String       @id @default(cuid())
+  nome           String
+  instituicao    String
+  bankCode       String?
+  agencyNumber   String?
+  agencyDigit    String?
+  accountNumber  String?
+  accountDigit   String?
+  tipo           AccountType
+  currency       CurrencyType @default(BRL)
+  saldoInicial   Decimal      @db.Decimal(18, 4)
+  color          String?
+  icone          String?
+  isArchived     Boolean      @default(false)
+  userId         String
   overdraftLimit Decimal      @default(0) @db.Decimal(18, 4)
 
   // --- Relações ---
@@ -885,15 +885,23 @@ model Debt {
   status    DebtStatus @default(ACTIVE)
   paidOffAt DateTime?
 
+  // Analysis and Tracking
+  lastReviewedAt    DateTime?
+  lastPaymentAt     DateTime?
+  alertConfig       Json? // Configurações de alerta personalizadas
+  adjustmentHistory Json? // Histórico de ajustes/imprevistos
+  metadata          Json? // Dados de análise (tendências, etc)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  card       Card?           @relation(fields: [cardId], references: [id], onDelete: SetNull)
-  category   Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  payments   DebtPayment[]
-  milestones DebtMilestone[]
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card        Card?            @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  category    Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  payments    DebtPayment[]
+  milestones  DebtMilestone[]
+  adjustments DebtAdjustment[]
 
   @@index([userId])
   @@index([status])
@@ -941,6 +949,21 @@ model DebtMilestone {
 
   @@index([debtId])
   @@map("debt_milestones")
+}
+
+model DebtAdjustment {
+  id          String   @id @default(cuid())
+  debtId      String
+  amount      Decimal  @db.Decimal(12, 2)
+  reason      String // "LATE_FEE", "RENEGOTIATION", "INTEREST_INCREASE", "OTHER"
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  // Relations
+  debt Debt @relation(fields: [debtId], references: [id], onDelete: Cascade)
+
+  @@index([debtId])
+  @@map("debt_adjustments")
 }
 
 model Transaction {

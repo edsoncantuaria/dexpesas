@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2, Calculator, ArrowDownCircle } from 'lucide-react';
 import { useDebts } from '@/hooks/use-debts';
 import { useAccounts } from '@/hooks/use-accounts';
+import { useCategories } from '@/hooks/use-categories';
 
 interface Debt {
     id: string;
@@ -34,14 +35,21 @@ interface PayoffResult {
 export function DebtCalculator() {
     const { debts: apiDebts, fetchDebts, createDebt, deleteDebt } = useDebts();
     const { accounts } = useAccounts();
+    const { data: categoriesData } = useCategories();
     const [extraPayment, setExtraPayment] = useState(0);
     const [newDebt, setNewDebt] = useState({
         name: '',
         balance: 0,
         interestRate: 0,
         minimumPayment: 0,
-        debtType: 'CREDIT_CARD'
+        debtType: 'CREDIT_CARD',
+        categoryId: ''
     });
+
+    // Filter for parent categories only (despesa type)
+    const parentCategories = (categoriesData || []).filter(
+        cat => cat.type === 'despesa' && !cat.parentCategoryId
+    );
 
     useEffect(() => {
         fetchDebts();
@@ -67,9 +75,10 @@ export function DebtCalculator() {
                 interestRate: newDebt.interestRate,
                 minimumPayment: newDebt.minimumPayment,
                 originalAmount: newDebt.balance, // Assuming starting with current balance
-                debtType: newDebt.debtType
+                debtType: newDebt.debtType,
+                categoryId: newDebt.categoryId || undefined
             });
-            setNewDebt({ name: '', balance: 0, interestRate: 0, minimumPayment: 0, debtType: 'CREDIT_CARD' });
+            setNewDebt({ name: '', balance: 0, interestRate: 0, minimumPayment: 0, debtType: 'CREDIT_CARD', categoryId: '' });
         } catch (error) {
             // Error handling is done in the hook
         }
@@ -283,6 +292,31 @@ export function DebtCalculator() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Categoria (opcional)</Label>
+                            <Select
+                                value={newDebt.categoryId}
+                                onValueChange={(value) => setNewDebt({ ...newDebt, categoryId: value })}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Selecione uma categoria" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="">Nenhuma</SelectItem>
+                                    {parentCategories.map((cat) => (
+                                        <SelectItem key={cat.id} value={cat.id}>
+                                            <div className="flex items-center gap-2">
+                                                {cat.icon && <span>{cat.icon}</span>}
+                                                <span>{cat.label || cat.nome}</span>
+                                            </div>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                Vincule esta dívida a uma categoria de despesa para melhor organização
+                            </p>
                         </div>
                         <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2">

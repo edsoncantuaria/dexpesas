@@ -48,8 +48,8 @@ class CellBudgetService {
     const startDate = startOfMonth(baseDate);
     const endDate = endOfMonth(baseDate);
 
-    const expenses = await prisma.sharedExpense.groupBy({
-      by: ['categoryId'],
+    // Get all expenses for the period
+    const expenses = await prisma.sharedExpense.findMany({
       where: {
         clanId: cellId,
         createdAt: {
@@ -57,12 +57,35 @@ class CellBudgetService {
           lte: endDate,
         },
       },
-      _sum: { totalAmount: true },
+      select: {
+        categoryId: true,
+        totalAmount: true,
+      },
     });
 
-    const spentMap = new Map(
-      expenses.map((item) => [item.categoryId, Number(item._sum.totalAmount || 0)]),
+    // Load all categories to map subcategories to parents
+    const allCategories = await prisma.category.findMany({
+      select: {
+        id: true,
+        parentCategoryId: true,
+      },
+    });
+
+    const categoryMap = new Map(
+      allCategories.map(cat => [cat.id, cat.parentCategoryId])
     );
+
+    // Map expenses to parent categories (if subcategory, use parent)
+    const spentMap = new Map();
+    for (const expense of expenses) {
+      if (!expense.categoryId) continue;
+
+      // Get the parent category ID (or use current if already parent)
+      const parentId = categoryMap.get(expense.categoryId) || expense.categoryId;
+
+      const currentSpent = spentMap.get(parentId) || 0;
+      spentMap.set(parentId, currentSpent + Number(expense.totalAmount || 0));
+    }
 
     return budgets.map((budget) => {
       const limitValue =
@@ -130,14 +153,14 @@ class CellBudgetService {
         payload.effectiveFrom === undefined
           ? undefined
           : payload.effectiveFrom
-          ? new Date(payload.effectiveFrom)
-          : null,
+            ? new Date(payload.effectiveFrom)
+            : null,
       effectiveTo:
         payload.effectiveTo === undefined
           ? undefined
           : payload.effectiveTo
-          ? new Date(payload.effectiveTo)
-          : null,
+            ? new Date(payload.effectiveTo)
+            : null,
     };
 
     const updated = await prisma.cellBudget.update({

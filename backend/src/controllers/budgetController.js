@@ -32,7 +32,7 @@ class BudgetController {
         const currentMonthDate = parseISO(`${month}-01`);
         const startDate = startOfMonth(currentMonthDate);
         const endDate = endOfMonth(startDate);
-        
+
         // Correção Lógica de Rollover: Precisamos olhar para o mês anterior
         const previousMonthDate = subMonths(currentMonthDate, 1);
         const prevMonthStr = previousMonthDate.toISOString().slice(0, 7);
@@ -48,16 +48,16 @@ class BudgetController {
                     category: true, // Inclui os dados da categoria
                 }
             });
-            
+
             const categoryIds = budgets.map(b => b.categoryId);
             if (categoryIds.length === 0) return res.json([]);
-            
+
             const mirroredBudgetIds = budgets.filter((budget) => budget.cellBudgetId).map((budget) => budget.cellBudgetId);
             const cellBudgetsMeta = mirroredBudgetIds.length
                 ? await prisma.cellBudget.findMany({
-                      where: { id: { in: mirroredBudgetIds } },
-                      select: { id: true, cellId: true, categoryId: true, lastSyncedAt: true, updatedAt: true },
-                  })
+                    where: { id: { in: mirroredBudgetIds } },
+                    select: { id: true, cellId: true, categoryId: true, lastSyncedAt: true, updatedAt: true },
+                })
                 : [];
             const cellBudgetsMap = new Map(cellBudgetsMeta.map((meta) => [meta.id, meta]));
 
@@ -85,28 +85,51 @@ class BudgetController {
                     );
                 }
             }
-            
+
+
             // Busca dados atuais e do mês anterior em paralelo para eficiência
-            const [currentExpenses, previousBudgets, previousExpenses] = await Promise.all([
-                 prisma.transaction.groupBy({
-                    by: ['categoryId'],
-                    where: { userId, pago: true, tipo: 'despesa', data: { gte: startDate, lte: endDate }, categoryId: { in: categoryIds } },
-                    _sum: { valor: true },
+            // IMPORTANTE: Não agrupamos por categoryId aqui, pois precisamos mapear subcategorias para pais
+            const [currentTransactions, previousBudgets, previousTransactions, allCategories] = await Promise.all([
+                prisma.transaction.findMany({
+                    where: { userId, pago: true, tipo: 'despesa', data: { gte: startDate, lte: endDate } },
+                    select: { categoryId: true, valor: true },
                 }),
                 // Busca orçamentos do mês anterior que tinham rollover ativo
                 prisma.budget.findMany({
                     where: { userId, month: prevMonthStr, categoryId: { in: categoryIds }, rollover: true }
                 }),
                 // Busca despesas do mês anterior para calcular o saldo do rollover
-                prisma.transaction.groupBy({
-                    by: ['categoryId'],
-                    where: { userId, pago: true, tipo: 'despesa', data: { gte: prevMonthStartDate, lte: prevMonthEndDate }, categoryId: { in: categoryIds } },
-                    _sum: { valor: true },
+                prisma.transaction.findMany({
+                    where: { userId, pago: true, tipo: 'despesa', data: { gte: prevMonthStartDate, lte: prevMonthEndDate } },
+                    select: { categoryId: true, valor: true },
+                }),
+                // Busca todas as categorias para mapear subcategorias aos pais
+                prisma.category.findMany({
+                    select: { id: true, parentCategoryId: true },
                 }),
             ]);
-            
-            const currentSpentMap = new Map(currentExpenses.map(e => [e.categoryId, e._sum.valor || 0]));
-            const previousSpentMap = new Map(previousExpenses.map(e => [e.categoryId, e._sum.valor || 0]));
+
+            // Cria mapa de subcategoria -> categoria pai
+            const categoryParentMap = new Map(
+                allCategories.map(cat => [cat.id, cat.parentCategoryId || cat.id])
+            );
+
+            // Função helper para mapear transações para categorias pai
+            const mapTransactionsByParentCategory = (transactions) => {
+                const spentMap = new Map();
+                for (const transaction of transactions) {
+                    if (!transaction.categoryId) continue;
+
+                    // Mapeia para categoria pai se for subcategoria
+                    const parentCategoryId = categoryParentMap.get(transaction.categoryId) || transaction.categoryId;
+                    const currentSpent = spentMap.get(parentCategoryId) || 0;
+                    spentMap.set(parentCategoryId, Number(currentSpent) + Number(transaction.valor || 0));
+                }
+                return spentMap;
+            };
+
+            const currentSpentMap = mapTransactionsByParentCategory(currentTransactions);
+            const previousSpentMap = mapTransactionsByParentCategory(previousTransactions);
             const previousBudgetMap = new Map(previousBudgets.map(b => [b.categoryId, b.limit]));
 
             const budgetsWithProgress = budgets.map(budget => {
@@ -207,8 +230,8 @@ class BudgetController {
         const userId = req.user.id;
 
         try {
-            const originalBudget = await prisma.budget.findUnique({ where: { id: id, userId: userId }});
-             if (!originalBudget) {
+            const originalBudget = await prisma.budget.findUnique({ where: { id: id, userId: userId } });
+            if (!originalBudget) {
                 return res.status(404).json({ message: 'Orçamento não encontrado.' });
             }
 
@@ -246,8 +269,8 @@ class BudgetController {
         const userId = req.user.id;
 
         try {
-             const budgetToDelete = await prisma.budget.findUnique({ where: { id: id, userId: userId }});
-             if (!budgetToDelete) {
+            const budgetToDelete = await prisma.budget.findUnique({ where: { id: id, userId: userId } });
+            if (!budgetToDelete) {
                 return res.status(404).json({ message: 'Orçamento não encontrado.' });
             }
 

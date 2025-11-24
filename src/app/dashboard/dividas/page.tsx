@@ -6,8 +6,11 @@ import { DebtTimeline } from '@/components/dashboard/dividas/debt-timeline';
 import { DebtDashboardOverview } from '@/components/dashboard/dividas/debt-dashboard-overview';
 import { ActiveDebtsList } from '@/components/dashboard/dividas/active-debts-list';
 import { DebtInsightsWidget } from '@/components/dashboard/dividas/debt-insights-widget';
+import { DebtTrendsCard } from '@/components/dashboard/dividas/debt-trends-card';
+import { DebtRecommendationsPanel } from '@/components/dashboard/dividas/debt-recommendations-panel';
+import { DebtSimulatorCard } from '@/components/dashboard/dividas/debt-simulator-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calculator, TrendingDown, LayoutDashboard, List, BarChart3 } from 'lucide-react';
+import { Calculator, TrendingDown, LayoutDashboard, List, BarChart3, Lightbulb } from 'lucide-react';
 import { useDebts } from '@/hooks/use-debts';
 
 export default function DebtManagementPage() {
@@ -50,6 +53,10 @@ export default function DebtManagementPage() {
                         <LayoutDashboard className="h-4 w-4" />
                         Visão Geral
                     </TabsTrigger>
+                    <TabsTrigger value="recommendations" className="flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4" />
+                        Recomendações
+                    </TabsTrigger>
                     <TabsTrigger value="calculator" className="flex items-center gap-2">
                         <Calculator className="h-4 w-4" />
                         Simulador & Cadastro
@@ -74,6 +81,14 @@ export default function DebtManagementPage() {
                             <DebtTimeline debts={timelineDebts} strategy="snowball" extraPayment={0} />
                         </div>
                     </div>
+                </TabsContent>
+
+                <TabsContent value="recommendations" className="space-y-4">
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        <DebtTrendsCard />
+                        <DebtRecommendationsPanel />
+                    </div>
+                    <DebtSimulatorCard />
                 </TabsContent>
 
                 <TabsContent value="calculator">

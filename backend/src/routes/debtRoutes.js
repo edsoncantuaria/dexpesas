@@ -15,6 +15,11 @@ router.put('/:id', debtController.update);
 router.delete('/:id', debtController.delete);
 
 router.post('/:id/payments', debtController.recordPayment);
+router.post('/:id/adjustments', debtController.recordAdjustment);
+router.get('/:id/payment-history', debtController.getPaymentHistory);
+router.get('/trends', debtController.getTrends);
+router.get('/recommendations', debtController.getRecommendations);
+router.post('/simulate', debtController.simulateScenarios);
 router.post('/calculate-plan', debtController.calculatePlan);
 
 export default router;
