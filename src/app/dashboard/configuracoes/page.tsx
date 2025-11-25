@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, ShieldCheck, Repeat, Loader2, Palette, FileClock, LayoutDashboard, Tags, Sparkles, TrendingUp } from 'lucide-react';
+import { Settings, ShieldCheck, Repeat, Loader2, Palette, FileClock, LayoutDashboard, Tags, Sparkles, TrendingUp, Trash2 } from 'lucide-react';
 import { useEffect, useState, useCallback, type ReactNode, useRef, useMemo } from 'react';
 import type { User } from '@/lib/definitions';
 import api from '@/lib/api';
@@ -28,6 +28,7 @@ import { Separator } from '@/components/ui/separator';
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
 import { useUser } from '@/contexts/UserContext';
 import { PremiumSubcategoryManager } from '@/components/settings/premium-subcategory-manager';
+import { DeleteAccountDialog } from '@/components/settings/delete-account-dialog';
 
 // Schemas para cada formulário
 const accountInfoSchema = z.object({
@@ -442,6 +443,7 @@ function AppearanceForm() {
 export default function ConfiguracoesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const { toast } = useToast();
 
   const fetchUser = useCallback(async () => {
@@ -610,6 +612,39 @@ export default function ConfiguracoesPage() {
           </div>
         ),
       },
+      {
+        id: 'danger-zone',
+        title: 'Zona de perigo',
+        description: 'Ações irreversíveis que afetam permanentemente sua conta.',
+        icon: Trash2,
+        content: (
+          <div className="space-y-6">
+            <Card className="border-destructive/50">
+              <CardHeader>
+                <CardTitle className="text-destructive">Excluir Conta</CardTitle>
+                <CardDescription>Remover permanentemente sua conta e todos os dados associados.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Após a exclusão, seu usuário e email serão removidos e você não poderá mais acessar esta conta.
+                      Esta ação não pode ser desfeita.
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    onClick={() => setDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Excluir Minha Conta
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ),
+      },
     ];
   }, [user, dashboardCardCopy]);
 
@@ -720,6 +755,11 @@ export default function ConfiguracoesPage() {
           ))}
         </div>
       </div>
+
+      <DeleteAccountDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+      />
     </div>
   );
 }

@@ -382,7 +382,8 @@ class MigrationController {
                 select: { hasCompletedMigration: true },
             });
 
-            if (user.hasCompletedMigration !== 2) {
+            // Se já estiver em 0 (não iniciado), permite "retomar" (idempotente)
+            if (user.hasCompletedMigration !== 2 && user.hasCompletedMigration !== 0) {
                 return res.status(400).json({
                     message: 'Migração não está no estado "adiada".',
                 });

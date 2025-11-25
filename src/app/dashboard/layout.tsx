@@ -1,7 +1,7 @@
 // src/app/dashboard/layout.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { MainNav } from '@/components/dashboard/navigation/main-nav';
 import { Header } from '@/components/dashboard/header';
@@ -13,10 +13,20 @@ import { MigrationWizard } from '@/components/onboarding/migration-wizard/migrat
 function DashboardLayoutContent({ children }: { children: ReactNode }) {
   const { user, fetchUser } = useUser();
   const [showMigrationWizard, setShowMigrationWizard] = useState(false);
+  const hasOpenedWizardRef = useRef(false);
 
-  // Effect removido para não mostrar o wizard automaticamente no início
-  // O wizard agora é acessado apenas via Serviços
-
+  // Effect para mostrar o wizard automaticamente se a migração não foi feita (0)
+  // Isso garante que ao clicar em "Retomar" (que seta 0), o wizard abra.
+  useEffect(() => {
+    if (user?.hasCompletedMigration === 0) {
+      if (!hasOpenedWizardRef.current) {
+        setShowMigrationWizard(true);
+        hasOpenedWizardRef.current = true;
+      }
+    } else if (user?.hasCompletedMigration !== undefined) {
+      hasOpenedWizardRef.current = false;
+    }
+  }, [user?.hasCompletedMigration]);
 
   const handleMigrationComplete = async () => {
     setShowMigrationWizard(false);

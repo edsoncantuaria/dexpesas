@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `SplitExpense` ADD COLUMN `attachmentUrl` VARCHAR(191) NULL,
+    ADD COLUMN `splitType` ENUM('EQUAL', 'PERCENTAGE', 'EXACT') NOT NULL DEFAULT 'EQUAL';

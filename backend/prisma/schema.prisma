@@ -329,9 +329,10 @@ enum MilestoneType {
 model User {
   id                                 String           @id @default(cuid())
   name                               String
-  username                           String           @unique
-  email                              String           @unique
+  username                           String?          @unique
+  email                              String?          @unique
   password                           String
+  deletedAt                          DateTime?
   age                                Int?
   gender                             String?
   avatarUrl                          String?
@@ -432,6 +433,146 @@ model User {
   portfolios                    Portfolio[]
   investmentGoals               InvestmentGoal[]
   investmentAlerts              InvestmentAlert[]
+  createdSplitGroups   SplitGroup[]
+  splitGroupMemberships SplitGroupMember[]
+  splitActivities       SplitGroupActivity[]
+}
+
+model SplitGroup {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  category    String?  // TRIP, HOUSE, COUPLE, OTHER
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String
+
+  // Relations
+  creator     User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  members     SplitGroupMember[]
+  expenses    SplitExpense[]
+  settlements SplitSettlement[]
+  activities  SplitGroupActivity[]
+
+  @@index([createdBy])
+}
+
+model SplitGroupMember {
+  id           String   @id @default(cuid())
+  name         String
+  inviteStatus String   @default("PENDING") // PENDING, ACCEPTED
+  joinedAt     DateTime @default(now())
+
+  userId       String?
+  groupId      String
+
+  // Relations
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  group        SplitGroup   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  paidExpenses SplitExpense[]
+  splits       SplitExpenseSplit[]
+
+  sentSettlements     SplitSettlement[] @relation("SettlementFrom")
+  receivedSettlements SplitSettlement[] @relation("SettlementTo")
+  payments            SplitExpensePayer[]
+
+  @@unique([groupId, userId])
+  @@index([groupId])
+  @@index([userId])
+}
+
+enum SplitType {
+  EQUAL
+  PERCENTAGE
+  EXACT
+}
+
+model SplitExpense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  date        DateTime @default(now())
+  category    String?
+  splitType   SplitType @default(EQUAL)
+  attachmentUrl String?
+
+  paidById    String?
+  groupId     String
+
+  // Relations
+  paidBy      SplitGroupMember? @relation(fields: [paidById], references: [id], onDelete: Cascade)
+  group       SplitGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  splits      SplitExpenseSplit[]
+  payers      SplitExpensePayer[]
+
+  @@index([paidById])
+  @@index([groupId])
+}
+
+model SplitExpenseSplit {
+  id        String  @id @default(cuid())
+  amount    Decimal @db.Decimal(10, 2)
+  percentage Decimal? @db.Decimal(5, 2)
+
+  memberId  String
+  expenseId String
+
+  // Relations
+  member    SplitGroupMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  expense   SplitExpense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([expenseId])
+}
+
+model SplitSettlement {
+  id        String   @id @default(cuid())
+  amount    Decimal  @db.Decimal(10, 2)
+  date      DateTime @default(now())
+
+  fromId    String
+  toId      String
+  groupId   String
+
+  // Relations
+  from      SplitGroupMember @relation("SettlementFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  to        SplitGroupMember @relation("SettlementTo", fields: [toId], references: [id], onDelete: Cascade)
+  group     SplitGroup       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([fromId])
+  @@index([toId])
+  @@index([groupId])
+}
+
+model SplitExpensePayer {
+  id        String  @id @default(cuid())
+  amount    Decimal @db.Decimal(10, 2)
+
+  memberId  String
+  expenseId String
+
+  // Relations
+  member    SplitGroupMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  expense   SplitExpense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([expenseId])
+}
+
+model SplitGroupActivity {
+  id        String   @id @default(cuid())
+  groupId   String
+  action    String   // CREATE_EXPENSE, UPDATE_EXPENSE, DELETE_EXPENSE, SETTLE_DEBT, ADD_MEMBER
+  details   Json?    // Stores relevant details like expense name, amount, who paid, etc.
+  createdAt DateTime @default(now())
+  userId    String   // User who performed the action
+
+  // Relations
+  group     SplitGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([userId])
 }
 
 model Clan {

@@ -836,3 +836,78 @@ export type Boss = {
     startAt?: string | null;
     endAt?: string | null;
 }
+
+export type SplitGroup = {
+    id: string;
+    name: string;
+    description?: string | null;
+    category?: string | null;
+    splitType?: 'EQUAL' | 'PERCENTAGE' | 'EXACT';
+    attachmentUrl?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    createdBy: string;
+    members?: SplitGroupMember[];
+    expenses?: SplitExpense[];
+    settlements?: SplitSettlement[];
+    _count?: {
+        expenses: number;
+    };
+};
+
+export type SplitGroupMember = {
+    id: string;
+    name: string;
+    inviteStatus: string;
+    joinedAt: string;
+    userId?: string | null;
+    groupId: string;
+    user?: {
+        id: string;
+        name: string;
+        avatarUrl?: string | null;
+    } | null;
+};
+
+export type SplitExpense = {
+    id: string;
+    description: string;
+    amount: number;
+    date: string;
+    category?: string | null;
+    splitType?: 'EQUAL' | 'PERCENTAGE' | 'EXACT';
+    attachmentUrl?: string | null;
+    paidById: string;
+    groupId: string;
+    paidBy?: SplitGroupMember;
+    splits?: SplitExpenseSplit[];
+    payers?: SplitExpensePayer[];
+};
+
+export type SplitExpensePayer = {
+    id: string;
+    amount: number;
+    memberId: string;
+    expenseId: string;
+    member?: SplitGroupMember;
+};
+
+export type SplitExpenseSplit = {
+    id: string;
+    amount: number;
+    percentage?: number | null;
+    memberId: string;
+    expenseId: string;
+    member?: SplitGroupMember;
+};
+
+export type SplitSettlement = {
+    id: string;
+    amount: number;
+    date: string;
+    fromId: string;
+    toId: string;
+    groupId: string;
+    from?: SplitGroupMember;
+    to?: SplitGroupMember;
+};

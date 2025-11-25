@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Upload, FileSpreadsheet, AlertCircle } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
+import { Upload, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import api from '@/lib/api';
 
 interface ImportInvestmentsModalProps {
@@ -58,79 +58,74 @@ export default function ImportInvestmentsModal({ isOpen, onClose, onSuccess }: I
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                    <DialogTitle>Importar da B3</DialogTitle>
-                    <DialogDescription>
-                        Faça o upload do arquivo Excel ou CSV exportado da área do investidor da B3.
-                    </DialogDescription>
-                </DialogHeader>
-
-                {!result ? (
-                    <div className="grid gap-4 py-4">
-                        <div className="flex items-center justify-center w-full">
-                            <Label
-                                htmlFor="dropzone-file"
-                                className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent/50"
-                            >
-                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                    <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
-                                    <p className="text-sm text-muted-foreground">
-                                        <span className="font-semibold">Clique para enviar</span> ou arraste o arquivo
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">XLSX ou CSV</p>
-                                </div>
-                                <Input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.xls,.csv" />
-                            </Label>
-                        </div>
-                        {file && (
-                            <div className="flex items-center gap-2 text-sm text-green-600">
-                                <FileSpreadsheet className="h-4 w-4" />
-                                {file.name}
+        <ResponsiveDialog
+            isOpen={isOpen}
+            setIsOpen={onClose}
+            title="Importar da B3"
+            description="Faça o upload do arquivo Excel ou CSV exportado da área do investidor da B3."
+        >
+            {!result ? (
+                <div className="grid gap-4 py-4">
+                    <div className="flex items-center justify-center w-full">
+                        <Label
+                            htmlFor="dropzone-file"
+                            className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-accent/50"
+                        >
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
+                                <p className="text-sm text-muted-foreground">
+                                    <span className="font-semibold">Clique para enviar</span> ou arraste o arquivo
+                                </p>
+                                <p className="text-xs text-muted-foreground">XLSX ou CSV</p>
                             </div>
-                        )}
+                            <Input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange} accept=".xlsx,.xls,.csv" />
+                        </Label>
                     </div>
-                ) : (
-                    <div className="py-4 space-y-4">
-                        <div className="flex items-center gap-2 text-green-600 font-medium">
-                            <CheckCircle2 className="h-5 w-5" />
-                            Processamento Concluído
+                    {file && (
+                        <div className="flex items-center gap-2 text-sm text-green-600">
+                            <FileSpreadsheet className="h-4 w-4" />
+                            {file.name}
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div className="bg-green-50 p-3 rounded-md border border-green-100">
-                                <span className="block text-green-700 font-bold text-lg">{result.success}</span>
-                                <span className="text-green-600">Registros importados</span>
-                            </div>
-                            <div className="bg-red-50 p-3 rounded-md border border-red-100">
-                                <span className="block text-red-700 font-bold text-lg">{result.errors}</span>
-                                <span className="text-red-600">Erros</span>
-                            </div>
-                        </div>
-                        {result.details && result.details.length > 0 && (
-                            <div className="bg-slate-50 p-3 rounded-md text-xs max-h-32 overflow-y-auto border">
-                                <p className="font-semibold mb-1">Detalhes:</p>
-                                {result.details.map((msg: string, i: number) => (
-                                    <div key={i} className="text-muted-foreground">{msg}</div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                <DialogFooter>
-                    {!result && (
+                    )}
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="outline" onClick={onClose}>
+                            Cancelar
+                        </Button>
                         <Button onClick={handleUpload} disabled={!file || loading}>
                             {loading ? 'Processando...' : 'Importar'}
                         </Button>
+                    </div>
+                </div>
+            ) : (
+                <div className="py-4 space-y-4">
+                    <div className="flex items-center gap-2 text-green-600 font-medium">
+                        <CheckCircle2 className="h-5 w-5" />
+                        Processamento Concluído
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="bg-green-50 p-3 rounded-md border border-green-100">
+                            <span className="block text-green-700 font-bold text-lg">{result.success}</span>
+                            <span className="text-green-600">Registros importados</span>
+                        </div>
+                        <div className="bg-red-50 p-3 rounded-md border border-red-100">
+                            <span className="block text-red-700 font-bold text-lg">{result.errors}</span>
+                            <span className="text-red-600">Erros</span>
+                        </div>
+                    </div>
+                    {result.details && result.details.length > 0 && (
+                        <div className="bg-slate-50 p-3 rounded-md text-xs max-h-32 overflow-y-auto border">
+                            <p className="font-semibold mb-1">Detalhes:</p>
+                            {result.details.map((msg: string, i: number) => (
+                                <div key={i} className="text-muted-foreground">{msg}</div>
+                            ))}
+                        </div>
                     )}
-                    {result && (
+                    <div className="flex justify-end pt-4">
                         <Button onClick={onClose}>Fechar</Button>
-                    )}
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    </div>
+                </div>
+            )}
+        </ResponsiveDialog>
     );
 }
 
-import { CheckCircle2 } from 'lucide-react';

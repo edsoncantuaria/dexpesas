@@ -9,7 +9,8 @@ import {
     TrendingUp,
     Lock,
     Calendar,
-    Layers
+    Layers,
+    Receipt
 } from 'lucide-react';
 
 export const iconMap: Record<string, any> = {
@@ -23,5 +24,6 @@ export const iconMap: Record<string, any> = {
     TrendingUp,
     Lock,
     Calendar,
-    Layers
+    Layers,
+    Receipt
 };

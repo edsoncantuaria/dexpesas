@@ -38,6 +38,9 @@ function parseDatabaseUrl(url) {
 
 async function backupDatabase() {
     try {
+        // Verifica se é modo data-only
+        const dataOnly = process.argv.includes('--data-only');
+
         // Carrega as variáveis de ambiente
         const dotenv = await import('dotenv');
         dotenv.config({ path: path.resolve(__dirname, '../.env') });
@@ -58,17 +61,30 @@ async function backupDatabase() {
 
         // Gera nome do arquivo com timestamp
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-        const backupFileName = `backup-${dbConfig.database}-${timestamp}.sql`;
+        const suffix = dataOnly ? '-data-only' : '';
+        const backupFileName = `backup-${dbConfig.database}-${timestamp}${suffix}.sql`;
         const backupPath = path.join(backupDir, backupFileName);
 
         console.log('🔄 Iniciando backup do banco de dados...');
         console.log(`📦 Database: ${dbConfig.database}`);
         console.log(`💾 Arquivo: ${backupFileName}`);
+        console.log(`📋 Modo: ${dataOnly ? 'Somente Dados (sem DROP/CREATE)' : 'Completo (estrutura + dados)'}`);
         console.log(`⚠️  Nota: Tabela _prisma_migrations será excluída do backup`);
 
-        // Comando mysqldump excluindo a tabela _prisma_migrations
-        // Isso permite que migrations sejam aplicadas após restore
-        const command = `mysqldump -h ${dbConfig.host} -P ${dbConfig.port} -u ${dbConfig.user} -p${dbConfig.password} --ignore-table=${dbConfig.database}._prisma_migrations ${dbConfig.database} > "${backupPath}"`;
+        // Comando mysqldump
+        let command;
+
+        if (dataOnly) {
+            // Modo data-only: sem DROP TABLE, sem CREATE TABLE
+            // Usa --no-create-info (não inclui CREATE TABLE)
+            // Usa --skip-add-drop-table (não inclui DROP TABLE)
+            // Usa --insert-ignore (INSERT IGNORE para evitar erros de duplicação)
+            // Usa --complete-insert (inclui nomes das colunas no INSERT - essencial para schema drift!)
+            command = `mysqldump -h ${dbConfig.host} -P ${dbConfig.port} -u ${dbConfig.user} -p${dbConfig.password} --no-create-info --skip-add-drop-table --insert-ignore --complete-insert --ignore-table=${dbConfig.database}._prisma_migrations ${dbConfig.database} > "${backupPath}"`;
+        } else {
+            // Modo completo: inclui estrutura e dados
+            command = `mysqldump -h ${dbConfig.host} -P ${dbConfig.port} -u ${dbConfig.user} -p${dbConfig.password} --ignore-table=${dbConfig.database}._prisma_migrations ${dbConfig.database} > "${backupPath}"`;
+        }
 
         await execAsync(command);
 
@@ -79,7 +95,16 @@ async function backupDatabase() {
         console.log('✅ Backup concluído com sucesso!');
         console.log(`📁 Local: ${backupPath}`);
         console.log(`📊 Tamanho: ${fileSizeInMB} MB`);
-        console.log(`🔧 Migrations preservadas: Ao restaurar, execute 'npx prisma migrate deploy'`);
+
+        if (dataOnly) {
+            console.log('');
+            console.log('📝 Instruções para restaurar (após drift):');
+            console.log('   1. npx prisma migrate reset --skip-seed');
+            console.log('   2. npm run restore:db');
+            console.log('   3. Selecione o backup data-only');
+        } else {
+            console.log(`🔧 Migrations preservadas: Ao restaurar, execute 'npx prisma migrate deploy'`);
+        }
 
         return backupPath;
     } catch (error) {

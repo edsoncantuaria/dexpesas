@@ -35,6 +35,7 @@ import cardAlertRoutes from './routes/cardAlertRoutes.js';
 import categoryClassificationRoutes from './routes/categoryClassificationRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import debtRoutes from './routes/debtRoutes.js';
+import splitBillRoutes from './routes/splitBillRoutes.js';
 
 const app = express();
 
@@ -99,6 +100,7 @@ app.use('/api/goals', goalRoutes);
 app.use('/api/automations', automationRoutes);
 app.use('/api/rules/categorization', categorizationRuleRoutes);
 app.use('/api/debts', debtRoutes);
+app.use('/api/rachar', splitBillRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/reconcile', reconciliationRoutes);
 app.use('/api/familia', cellRoutes);

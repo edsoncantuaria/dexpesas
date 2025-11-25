@@ -296,14 +296,14 @@ export function DebtCalculator() {
                         <div className="space-y-2">
                             <Label>Categoria (opcional)</Label>
                             <Select
-                                value={newDebt.categoryId}
-                                onValueChange={(value) => setNewDebt({ ...newDebt, categoryId: value })}
+                                value={newDebt.categoryId || "none"}
+                                onValueChange={(value) => setNewDebt({ ...newDebt, categoryId: value === "none" ? "" : value })}
                             >
                                 <SelectTrigger>
                                     <SelectValue placeholder="Selecione uma categoria" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">Nenhuma</SelectItem>
+                                    <SelectItem value="none">Nenhuma</SelectItem>
                                     {parentCategories.map((cat) => (
                                         <SelectItem key={cat.id} value={cat.id}>
                                             <div className="flex items-center gap-2">

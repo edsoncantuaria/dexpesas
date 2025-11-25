@@ -28,7 +28,8 @@ import {
     Calendar,
     Layers,
     TrendingDown,
-    HelpCircle
+    HelpCircle,
+    Receipt
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useGamificationMode } from '@/hooks/use-gamification-mode';
@@ -145,6 +146,13 @@ const baseServiceItems: ServiceItem[] = [
         description: 'Configure regras inteligentes',
         Icon: Zap,
         iconBgClass: 'bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400'
+    },
+    {
+        href: '/dashboard/rachar',
+        title: 'Rachar Conta',
+        description: 'Divida despesas com amigos e família',
+        Icon: Receipt,
+        iconBgClass: 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400'
     },
     // Ferramentas de IA
     {

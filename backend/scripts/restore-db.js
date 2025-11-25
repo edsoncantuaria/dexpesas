@@ -135,11 +135,22 @@ async function restoreDatabase() {
             process.exit(1);
         }
 
+        // Detecta se é backup data-only
+        const isDataOnly = backupFileName.includes('-data-only');
+
         // Confirmação
         console.log('');
         console.log('⚠️  ATENÇÃO: Esta operação irá SOBRESCREVER todos os dados do banco!');
         console.log(`📦 Database: ${dbConfig.database}`);
         console.log(`📁 Backup: ${backupFileName}`);
+        console.log(`📋 Tipo: ${isDataOnly ? 'Somente Dados' : 'Completo (estrutura + dados)'}`);
+
+        if (isDataOnly) {
+            console.log('');
+            console.log('ℹ️  Este é um backup data-only. Certifique-se de que:');
+            console.log('   1. Você já executou: npx prisma migrate reset');
+            console.log('   2. O schema está atualizado com as migrations');
+        }
         console.log('');
 
         const confirm = await askQuestion('Tem certeza que deseja continuar? (digite "SIM" para confirmar): ');
@@ -159,7 +170,18 @@ async function restoreDatabase() {
         console.log('✅ Banco de dados restaurado com sucesso!');
         console.log(`📁 Backup usado: ${backupFileName}`);
 
-        // Aplicar migrations automaticamente
+        // Para backups data-only, não aplicamos migrations (usuário já fez reset+migrate)
+        if (isDataOnly) {
+            console.log('');
+            console.log('✅ Dados restaurados com sucesso!');
+            console.log('🎉 Restore completo! Seu banco está pronto para uso.');
+            console.log('');
+            console.log('💡 Dica: Se houver problemas, execute:');
+            console.log('   npx prisma db push --accept-data-loss');
+            return;
+        }
+
+        // Aplicar migrations automaticamente (apenas para backups completos)
         console.log('');
         console.log('🔧 Aplicando migrations do Prisma...');
 

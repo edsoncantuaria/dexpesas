@@ -136,7 +136,7 @@ export function useDebts() {
         }
     }, [toast]);
 
-    const createDebt = async (data: CreateDebtData) => {
+    const createDebt = useCallback(async (data: CreateDebtData) => {
         try {
             const response = await api.post('/debts', data);
             setDebts((prev) => [...prev, response.data]);
@@ -156,9 +156,9 @@ export function useDebts() {
             });
             throw error;
         }
-    };
+    }, [fetchDebts, toast]);
 
-    const updateDebt = async (id: string, data: Partial<CreateDebtData>) => {
+    const updateDebt = useCallback(async (id: string, data: Partial<CreateDebtData>) => {
         try {
             const response = await api.put(`/debts/${id}`, data);
             setDebts((prev) => prev.map((d) => (d.id === id ? response.data : d)));
@@ -176,9 +176,9 @@ export function useDebts() {
             });
             throw error;
         }
-    };
+    }, [toast]);
 
-    const deleteDebt = async (id: string) => {
+    const deleteDebt = useCallback(async (id: string) => {
         try {
             await api.delete(`/debts/${id}`);
             setDebts((prev) => prev.filter((d) => d.id !== id));
@@ -195,9 +195,9 @@ export function useDebts() {
             });
             throw error;
         }
-    };
+    }, [toast]);
 
-    const recordPayment = async (id: string, paymentData: DebtPaymentData) => {
+    const recordPayment = useCallback(async (id: string, paymentData: DebtPaymentData) => {
         try {
             const response = await api.post(`/debts/${id}/payments`, paymentData);
             toast({
@@ -216,9 +216,9 @@ export function useDebts() {
             });
             throw error;
         }
-    };
+    }, [fetchDebts, toast]);
 
-    const recordAdjustment = async (id: string, adjustmentData: DebtAdjustmentData) => {
+    const recordAdjustment = useCallback(async (id: string, adjustmentData: DebtAdjustmentData) => {
         try {
             const response = await api.post(`/debts/${id}/adjustments`, adjustmentData);
             toast({
@@ -237,9 +237,9 @@ export function useDebts() {
             });
             throw error;
         }
-    };
+    }, [fetchDebts, toast]);
 
-    const getTrends = async (): Promise<DebtTrends> => {
+    const getTrends = useCallback(async (): Promise<DebtTrends> => {
         try {
             const response = await api.get('/debts/trends');
             return response.data;
@@ -247,9 +247,9 @@ export function useDebts() {
             console.error('Error fetching trends:', error);
             throw error;
         }
-    };
+    }, []);
 
-    const getRecommendations = async (): Promise<DebtRecommendations> => {
+    const getRecommendations = useCallback(async (): Promise<DebtRecommendations> => {
         try {
             const response = await api.get('/debts/recommendations');
             return response.data;
@@ -257,9 +257,9 @@ export function useDebts() {
             console.error('Error fetching recommendations:', error);
             throw error;
         }
-    };
+    }, []);
 
-    const getPaymentHistory = async (id: string) => {
+    const getPaymentHistory = useCallback(async (id: string) => {
         try {
             const response = await api.get(`/debts/${id}/payment-history`);
             return response.data;
@@ -267,9 +267,9 @@ export function useDebts() {
             console.error('Error fetching payment history:', error);
             throw error;
         }
-    };
+    }, []);
 
-    const simulateScenarios = async (scenarios: Array<{ strategy?: string; extraMonthly?: number; name?: string }>): Promise<ScenarioSimulation> => {
+    const simulateScenarios = useCallback(async (scenarios: Array<{ strategy?: string; extraMonthly?: number; name?: string }>): Promise<ScenarioSimulation> => {
         try {
             const response = await api.post('/debts/simulate', { scenarios });
             return response.data;
@@ -277,9 +277,9 @@ export function useDebts() {
             console.error('Error simulating scenarios:', error);
             throw error;
         }
-    };
+    }, []);
 
-    const getAnalytics = async (): Promise<DebtAnalytics> => {
+    const getAnalytics = useCallback(async (): Promise<DebtAnalytics> => {
         try {
             const response = await api.get('/debts/analytics');
             return response.data;
@@ -287,7 +287,7 @@ export function useDebts() {
             console.error('Error fetching analytics:', error);
             throw error;
         }
-    };
+    }, []);
 
     return {
         debts,

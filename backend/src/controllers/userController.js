@@ -489,7 +489,7 @@ class UserController {
 
     async restoreBackup(req, res, next) {
         const userId = req.user.id;
-        const backupData = req.body;
+        const { strategy, tablesToSkip, ...backupData } = req.body;
 
         try {
             const BackupService = (await import('../services/backupService.js')).default;
@@ -499,7 +499,22 @@ class UserController {
                 return res.status(400).json({ message: 'Arquivo de backup inválido' });
             }
 
-            const result = await BackupService.restoreBackup(userId, backupData);
+            // If no strategy provided, check for conflicts first
+            if (!strategy) {
+                const { hasConflicts, counts } = await BackupService.checkConflicts(userId);
+                if (hasConflicts) {
+                    return res.status(409).json({
+                        message: 'Dados existentes encontrados',
+                        conflicts: counts,
+                        requiresConfirmation: true
+                    });
+                }
+            }
+
+            const result = await BackupService.restoreBackup(userId, backupData, {
+                strategy: strategy || 'replace', // Default to replace if no conflicts or explicit strategy
+                tablesToSkip
+            });
             res.json(result);
         } catch (error) {
             if (error.message === 'Versão de backup incompatível') {
