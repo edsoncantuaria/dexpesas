@@ -604,6 +604,118 @@ class SplitBillController {
         }
     }
 
+    async getRecurringExpenses(req, res, next) {
+        try {
+            const { groupId } = req.params;
+            const recurring = await prisma.recurringSplitExpense.findMany({
+                where: { groupId },
+                include: {
+                    paidBy: true
+                },
+                orderBy: { createdAt: 'desc' }
+            });
+            res.json(recurring);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async createRecurringExpense(req, res, next) {
+        try {
+            const { groupId } = req.params;
+            const { description, amount, frequency, startDate, splitType, paidById, splits, payers } = req.body;
+            const userId = req.user.id;
+
+            const recurring = await prisma.recurringSplitExpense.create({
+                data: {
+                    groupId,
+                    description,
+                    amount,
+                    frequency,
+                    startDate: new Date(startDate),
+                    nextRun: new Date(startDate),
+                    splitType: splitType || 'EQUAL',
+                    paidById,
+                    splits: splits || [],
+                    payers: payers || []
+                }
+            });
+
+            await AuditService.log({
+                userId,
+                action: 'CREATE_RECURRING_EXPENSE',
+                entity: 'RECURRING_SPLIT_EXPENSE',
+                entityId: recurring.id,
+                details: { groupId, amount, description, frequency },
+                ipAddress: req.ip
+            });
+
+            res.status(201).json(recurring);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async updateRecurringExpense(req, res, next) {
+        try {
+            const { groupId, recurringId } = req.params;
+            const { description, amount, frequency, startDate, active, splitType, paidById, splits, payers } = req.body;
+            const userId = req.user.id;
+
+            const recurring = await prisma.recurringSplitExpense.update({
+                where: { id: recurringId },
+                data: {
+                    description,
+                    amount,
+                    frequency,
+                    startDate: startDate ? new Date(startDate) : undefined,
+                    active,
+                    splitType,
+                    paidById,
+                    splits,
+                    payers
+                }
+            });
+
+            await AuditService.log({
+                userId,
+                action: 'UPDATE_RECURRING_EXPENSE',
+                entity: 'RECURRING_SPLIT_EXPENSE',
+                entityId: recurringId,
+                details: { groupId, amount, description },
+                ipAddress: req.ip
+            });
+
+            res.json(recurring);
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async deleteRecurringExpense(req, res, next) {
+        try {
+            const { recurringId } = req.params;
+            const userId = req.user.id;
+
+            await prisma.recurringSplitExpense.delete({
+                where: { id: recurringId }
+            });
+
+            await AuditService.log({
+                userId,
+                action: 'DELETE_RECURRING_EXPENSE',
+                entity: 'RECURRING_SPLIT_EXPENSE',
+                entityId: recurringId,
+                details: {},
+                ipAddress: req.ip
+            });
+
+            res.json({ message: 'Despesa recorrente removida.' });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async exportGroupData(req, res, next) {
         try {
             const { groupId } = req.params;

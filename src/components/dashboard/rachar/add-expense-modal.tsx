@@ -13,6 +13,13 @@ import { SplitGroupMember, SplitExpense } from '@/lib/definitions';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileUpload } from '@/components/ui/file-upload';
+import { ReceiptItemizer } from './receipt-itemizer';
+import { Scan, Loader2, CalendarIcon } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface AddExpenseModalProps {
     open: boolean;
@@ -26,6 +33,7 @@ interface AddExpenseModalProps {
 export function AddExpenseModal({ open, onOpenChange, groupId, members, onSuccess, expenseToEdit }: AddExpenseModalProps) {
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
+    const [date, setDate] = useState<Date | undefined>(new Date());
     const [paidById, setPaidById] = useState('');
     const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
     const [splitType, setSplitType] = useState<'EQUAL' | 'PERCENTAGE' | 'EXACT'>('EQUAL');
@@ -35,13 +43,21 @@ export function AddExpenseModal({ open, onOpenChange, groupId, members, onSucces
     const [multiplePayers, setMultiplePayers] = useState<Record<string, number>>({});
     const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [isScanning, setIsScanning] = useState(false);
+    const [scannedItems, setScannedItems] = useState<{ descricao: string; valor: number }[] | null>(null);
+    const [showItemizer, setShowItemizer] = useState(false);
     const { toast } = useToast();
+    const { user } = useUser();
 
     useEffect(() => {
         if (open) {
+            setScannedItems(null);
+            setShowItemizer(false);
+
             if (expenseToEdit) {
                 setDescription(expenseToEdit.description);
                 setAmount(expenseToEdit.amount.toString());
+                setDate(expenseToEdit.date ? new Date(expenseToEdit.date) : new Date());
                 setPaidById(expenseToEdit.paidById);
                 setAttachmentUrl(expenseToEdit.attachmentUrl || null);
                 setSplitType((expenseToEdit.splitType as any) || 'EQUAL');
@@ -75,6 +91,7 @@ export function AddExpenseModal({ open, onOpenChange, groupId, members, onSucces
             } else {
                 setDescription('');
                 setAmount('');
+                setDate(new Date());
                 setAttachmentUrl(null);
                 setSplitType('EQUAL');
                 setPercentages({});
@@ -88,6 +105,97 @@ export function AddExpenseModal({ open, onOpenChange, groupId, members, onSucces
             }
         }
     }, [open, members, expenseToEdit]);
+
+    const handleScanReceipt = async (file: File) => {
+        setIsScanning(true);
+        try {
+            // Convert file to base64
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                const imageDataUri = reader.result as string;
+
+                // Upload to storage first to get URL (optional but good for attachment)
+                // For now, we just use the base64 for OCR
+
+                // Call OCR API
+                const provider = user?.ocrProvider || 'GEMINI';
+                const response = await api.post('/ai/scan-receipt', {
+                    imageDataUri,
+                    provider
+                });
+
+                const result = response.data;
+
+                if (result.itens && result.itens.length > 0) {
+                    setScannedItems(result.itens);
+                    setShowItemizer(true);
+
+                    // Pre-fill other fields
+                    if (result.estabelecimento) setDescription(result.estabelecimento);
+                    if (result.data) {
+                        // Try to parse date (DD/MM/YYYY or YYYY-MM-DD)
+                        const dateStr = result.data;
+                        let parsedDate: Date | null = null;
+                        if (dateStr.includes('/')) {
+                            const [day, month, year] = dateStr.split('/');
+                            parsedDate = new Date(`${year}-${month}-${day}`);
+                        } else {
+                            parsedDate = new Date(dateStr);
+                        }
+                        if (parsedDate && !isNaN(parsedDate.getTime())) {
+                            setDate(parsedDate);
+                        }
+                    }
+                } else {
+                    // Fallback if no items found
+                    if (result.valor) setAmount(result.valor.toString());
+                    if (result.estabelecimento) setDescription(result.estabelecimento);
+                    if (result.data) {
+                        const dateStr = result.data;
+                        let parsedDate: Date | null = null;
+                        if (dateStr.includes('/')) {
+                            const [day, month, year] = dateStr.split('/');
+                            parsedDate = new Date(`${year}-${month}-${day}`);
+                        } else {
+                            parsedDate = new Date(dateStr);
+                        }
+                        if (parsedDate && !isNaN(parsedDate.getTime())) {
+                            setDate(parsedDate);
+                        }
+                    }
+
+                    toast({
+                        title: 'Leitura concluída',
+                        description: 'Itens não identificados, mas o valor total foi preenchido.',
+                    });
+                }
+            };
+        } catch (error) {
+            console.error('Erro ao escanear:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Erro na leitura',
+                description: 'Não foi possível ler o recibo. Tente novamente ou preencha manualmente.',
+            });
+        } finally {
+            setIsScanning(false);
+        }
+    };
+
+    const handleItemizerConfirm = (totals: Record<string, number>) => {
+        setExactAmounts(totals);
+        setSplitType('EXACT');
+
+        const total = Object.values(totals).reduce((a, b) => a + b, 0);
+        setAmount(total.toFixed(2));
+
+        // Auto-select members with > 0 amount
+        const membersWithAmount = Object.keys(totals).filter(id => totals[id] > 0);
+        setSelectedMembers(membersWithAmount);
+
+        setShowItemizer(false);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -173,30 +281,28 @@ export function AddExpenseModal({ open, onOpenChange, groupId, members, onSucces
             }
         }
         try {
+            const payload = {
+                description,
+                amount: totalAmount,
+                date: date ? date.toISOString() : new Date().toISOString(),
+                paidById,
+                splits,
+                splitType,
+                attachmentUrl,
+                payers: payersList
+            };
+
             if (expenseToEdit) {
-                await api.put(`/rachar/groups/${groupId}/expenses/${expenseToEdit.id}`, {
-                    description,
-                    amount: totalAmount,
-                    paidById,
-                    splits,
-                    splitType,
-                    attachmentUrl
-                });
+                await api.put(`/rachar/groups/${groupId}/expenses/${expenseToEdit.id}`, payload);
                 toast({ title: 'Despesa atualizada!' });
             } else {
-                await api.post(`/rachar/groups/${groupId}/expenses`, {
-                    description,
-                    amount: totalAmount,
-                    paidById,
-                    splits,
-                    splitType,
-                    attachmentUrl
-                });
+                await api.post(`/rachar/groups/${groupId}/expenses`, payload);
                 toast({ title: 'Despesa adicionada!' });
             }
 
             setDescription('');
             setAmount('');
+            setDate(new Date());
             setAttachmentUrl(null);
             onSuccess();
         } catch (error) {
@@ -234,289 +340,350 @@ export function AddExpenseModal({ open, onOpenChange, groupId, members, onSucces
             title={expenseToEdit ? "Editar Despesa" : "Adicionar Despesa"}
             description={expenseToEdit ? "Atualize os detalhes da despesa." : "Registre um gasto para dividir com o grupo."}
         >
-            <form onSubmit={handleSubmit}>
-                <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="description">Descrição</Label>
-                        <Input
-                            id="description"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            placeholder="Ex: Jantar, Uber, Mercado..."
-                            required
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="amount">Valor (R$)</Label>
-                        <Input
-                            id="amount"
-                            type="number"
-                            step="0.01"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            placeholder="0,00"
-                            required
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Pago por</Label>
-                        <Tabs value={payerType} onValueChange={(v) => setPayerType(v as any)} className="w-full">
-                            <TabsList className="grid w-full grid-cols-2 mb-2">
-                                <TabsTrigger value="SINGLE">Único Pagador</TabsTrigger>
-                                <TabsTrigger value="MULTIPLE">Múltiplos Pagadores</TabsTrigger>
-                            </TabsList>
-
-                            {payerType === 'SINGLE' ? (
-                                <Select value={paidById} onValueChange={setPaidById}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Quem pagou?" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {members.map(member => (
-                                            <SelectItem key={member.id} value={member.id}>
-                                                {member.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <div className="space-y-2 border rounded-md p-2 max-h-40 overflow-y-auto">
-                                    {members.map(member => (
-                                        <div key={member.id} className="flex items-center justify-between gap-2">
-                                            <Label className="text-sm font-normal min-w-[100px] truncate">{member.name}</Label>
-                                            <div className="relative w-32">
-                                                <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">R$</span>
-                                                <Input
-                                                    type="number"
-                                                    className="h-8 pl-6 text-right"
-                                                    value={multiplePayers[member.id] || ''}
-                                                    onChange={(e) => {
-                                                        const val = parseFloat(e.target.value);
-                                                        setMultiplePayers({ ...multiplePayers, [member.id]: isNaN(val) ? 0 : val });
-                                                    }}
-                                                    placeholder="0.00"
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <div className="flex justify-between items-center pt-2 border-t mt-2">
-                                        <span className="text-xs font-medium">Total Pago:</span>
-                                        <span className={`text-sm font-bold ${Math.abs(Object.values(multiplePayers).reduce((a, b) => a + b, 0) - Number(amount || 0)) < 0.01
-                                            ? 'text-green-600'
-                                            : 'text-red-600'
-                                            }`}>
-                                            R$ {Object.values(multiplePayers).reduce((a, b) => a + b, 0).toFixed(2)}
-                                        </span>
-                                    </div>
+            {showItemizer && scannedItems ? (
+                <ReceiptItemizer
+                    items={scannedItems}
+                    members={members}
+                    onConfirm={handleItemizerConfirm}
+                    onCancel={() => setShowItemizer(false)}
+                />
+            ) : (
+                <form onSubmit={handleSubmit}>
+                    <div className="grid gap-4 py-4">
+                        {!expenseToEdit && (
+                            <div className="flex justify-center mb-4">
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        id="scan-receipt"
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            if (e.target.files?.[0]) {
+                                                handleScanReceipt(e.target.files[0]);
+                                            }
+                                        }}
+                                        disabled={isScanning}
+                                    />
+                                    <Label
+                                        htmlFor="scan-receipt"
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-full border cursor-pointer transition-colors ${isScanning ? 'bg-muted text-muted-foreground' : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 dark:bg-blue-900/20 dark:border-blue-800'}`}
+                                    >
+                                        {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scan className="h-4 w-4" />}
+                                        {isScanning ? 'Lendo Recibo...' : 'Escanear Recibo com IA'}
+                                    </Label>
                                 </div>
-                            )}
-                        </Tabs>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Divisão</Label>
-                        <Tabs value={splitType} onValueChange={(v) => setSplitType(v as any)} className="w-full">
-                            <TabsList className="grid w-full grid-cols-3">
-                                <TabsTrigger value="EQUAL">Igual</TabsTrigger>
-                                <TabsTrigger value="PERCENTAGE">%</TabsTrigger>
-                                <TabsTrigger value="EXACT">R$</TabsTrigger>
-                            </TabsList>
+                            </div>
+                        )}
+                        <div className="grid gap-2">
+                            <Label htmlFor="description">Descrição</Label>
+                            <Input
+                                id="description"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                placeholder="Ex: Jantar, Uber, Mercado..."
+                                required
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="amount">Valor (R$)</Label>
+                                <Input
+                                    id="amount"
+                                    type="number"
+                                    step="0.01"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value)}
+                                    placeholder="0,00"
+                                    required
+                                />
+                            </div>
+                            <div className="grid gap-2">
+                                <Label>Data</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !date && "text-muted-foreground"
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={date}
+                                            onSelect={setDate}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Pago por</Label>
+                            <Tabs value={payerType} onValueChange={(v) => setPayerType(v as any)} className="w-full">
+                                <TabsList className="grid w-full grid-cols-2 mb-2">
+                                    <TabsTrigger value="SINGLE">Único Pagador</TabsTrigger>
+                                    <TabsTrigger value="MULTIPLE">Múltiplos Pagadores</TabsTrigger>
+                                </TabsList>
 
-                            <div className="mt-2 border rounded-md p-2 max-h-60 overflow-y-auto">
-                                {/* EQUAL SPLIT */}
-                                {splitType === 'EQUAL' && (
-                                    <div className="space-y-2">
-                                        <div className="flex items-center justify-between mb-2 pb-2 border-b">
-                                            <Label className="text-xs text-muted-foreground">Selecionar membros</Label>
-                                            <div className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id="select-all"
-                                                    checked={selectedMembers.length === members.length}
-                                                    onCheckedChange={toggleAllMembers}
-                                                />
-                                                <Label htmlFor="select-all" className="text-xs text-muted-foreground cursor-pointer">
-                                                    Todos
-                                                </Label>
-                                            </div>
-                                        </div>
+                                {payerType === 'SINGLE' ? (
+                                    <Select value={paidById} onValueChange={setPaidById}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Quem pagou?" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {members.map(member => (
+                                                <SelectItem key={member.id} value={member.id}>
+                                                    {member.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <div className="space-y-2 border rounded-md p-2 max-h-40 overflow-y-auto">
                                         {members.map(member => (
-                                            <div key={member.id} className="flex items-center justify-between py-1">
+                                            <div key={member.id} className="flex items-center justify-between gap-2">
+                                                <Label className="text-sm font-normal min-w-[100px] truncate">{member.name}</Label>
+                                                <div className="relative w-32">
+                                                    <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">R$</span>
+                                                    <Input
+                                                        type="number"
+                                                        className="h-8 pl-6 text-right"
+                                                        value={multiplePayers[member.id] || ''}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value);
+                                                            setMultiplePayers({ ...multiplePayers, [member.id]: isNaN(val) ? 0 : val });
+                                                        }}
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <div className="flex justify-between items-center pt-2 border-t mt-2">
+                                            <span className="text-xs font-medium">Total Pago:</span>
+                                            <span className={`text-sm font-bold ${Math.abs(Object.values(multiplePayers).reduce((a, b) => a + b, 0) - Number(amount || 0)) < 0.01
+                                                ? 'text-green-600'
+                                                : 'text-red-600'
+                                                }`}>
+                                                R$ {Object.values(multiplePayers).reduce((a, b) => a + b, 0).toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </Tabs>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Divisão</Label>
+                            <Tabs value={splitType} onValueChange={(v) => setSplitType(v as any)} className="w-full">
+                                <TabsList className="grid w-full grid-cols-3">
+                                    <TabsTrigger value="EQUAL">Igual</TabsTrigger>
+                                    <TabsTrigger value="PERCENTAGE">%</TabsTrigger>
+                                    <TabsTrigger value="EXACT">R$</TabsTrigger>
+                                </TabsList>
+
+                                <div className="mt-2 border rounded-md p-2 max-h-60 overflow-y-auto">
+                                    {/* EQUAL SPLIT */}
+                                    {splitType === 'EQUAL' && (
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between mb-2 pb-2 border-b">
+                                                <Label className="text-xs text-muted-foreground">Selecionar membros</Label>
                                                 <div className="flex items-center space-x-2">
                                                     <Checkbox
-                                                        id={`split-${member.id}`}
-                                                        checked={selectedMembers.includes(member.id)}
-                                                        onCheckedChange={() => toggleMember(member.id)}
+                                                        id="select-all"
+                                                        checked={selectedMembers.length === members.length}
+                                                        onCheckedChange={toggleAllMembers}
                                                     />
-                                                    <Label htmlFor={`split-${member.id}`} className="text-sm font-normal cursor-pointer">
-                                                        {member.name}
+                                                    <Label htmlFor="select-all" className="text-xs text-muted-foreground cursor-pointer">
+                                                        Todos
                                                     </Label>
                                                 </div>
-                                                {selectedMembers.includes(member.id) && (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        R$ {(Number(amount || 0) / selectedMembers.length).toFixed(2)}
-                                                    </span>
-                                                )}
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {/* PERCENTAGE SPLIT */}
-                                {splitType === 'PERCENTAGE' && (
-                                    <div className="space-y-2">
-                                        {members.map(member => {
-                                            const isSelected = selectedMembers.includes(member.id);
-                                            const pct = percentages[member.id] || 0;
-                                            const val = (Number(amount || 0) * pct) / 100;
-
-                                            return (
-                                                <div key={member.id} className="flex items-center justify-between py-1 gap-2">
-                                                    <div className="flex items-center space-x-2 min-w-[100px]">
+                                            {members.map(member => (
+                                                <div key={member.id} className="flex items-center justify-between py-1">
+                                                    <div className="flex items-center space-x-2">
                                                         <Checkbox
-                                                            checked={isSelected}
-                                                            onCheckedChange={(checked) => {
-                                                                if (checked) {
-                                                                    setSelectedMembers([...selectedMembers, member.id]);
-                                                                    setPercentages({ ...percentages, [member.id]: 0 });
-                                                                } else {
-                                                                    setSelectedMembers(selectedMembers.filter(id => id !== member.id));
-                                                                    const newPcts = { ...percentages };
-                                                                    delete newPcts[member.id];
-                                                                    setPercentages(newPcts);
-                                                                }
-                                                            }}
+                                                            id={`split-${member.id}`}
+                                                            checked={selectedMembers.includes(member.id)}
+                                                            onCheckedChange={() => toggleMember(member.id)}
                                                         />
-                                                        <span className="text-sm truncate">{member.name}</span>
+                                                        <Label htmlFor={`split-${member.id}`} className="text-sm font-normal cursor-pointer">
+                                                            {member.name}
+                                                        </Label>
                                                     </div>
-                                                    {isSelected && (
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="relative w-20">
-                                                                <Input
-                                                                    type="number"
-                                                                    className="h-8 pr-6 text-right"
-                                                                    value={pct || ''}
-                                                                    onChange={(e) => {
-                                                                        const val = parseFloat(e.target.value);
-                                                                        setPercentages({ ...percentages, [member.id]: isNaN(val) ? 0 : val });
-                                                                    }}
-                                                                />
-                                                                <span className="absolute right-2 top-1.5 text-xs text-muted-foreground">%</span>
-                                                            </div>
-                                                            <span className="text-xs text-muted-foreground w-20 text-right">
-                                                                R$ {val.toFixed(2)}
-                                                            </span>
-                                                        </div>
+                                                    {selectedMembers.includes(member.id) && (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            R$ {(Number(amount || 0) / selectedMembers.length).toFixed(2)}
+                                                        </span>
                                                     )}
                                                 </div>
-                                            );
-                                        })}
-                                        <div className="flex justify-between items-center pt-2 border-t mt-2">
-                                            <span className="text-xs font-medium">Total:</span>
-                                            <span className={`text-sm font-bold ${Math.abs(Object.values(percentages).reduce((a, b) => a + b, 0) - 100) < 0.01
-                                                ? 'text-green-600'
-                                                : 'text-red-600'
-                                                }`}>
-                                                {Object.values(percentages).reduce((a, b) => a + b, 0).toFixed(1)}%
-                                            </span>
+                                            ))}
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* EXACT AMOUNT SPLIT */}
-                                {splitType === 'EXACT' && (
-                                    <div className="space-y-2">
-                                        {members.map(member => {
-                                            const isSelected = selectedMembers.includes(member.id);
-                                            const val = exactAmounts[member.id] || 0;
-                                            const pct = (val / Number(amount || 0)) * 100;
+                                    {/* PERCENTAGE SPLIT */}
+                                    {splitType === 'PERCENTAGE' && (
+                                        <div className="space-y-2">
+                                            {members.map(member => {
+                                                const isSelected = selectedMembers.includes(member.id);
+                                                const pct = percentages[member.id] || 0;
+                                                const val = (Number(amount || 0) * pct) / 100;
 
-                                            return (
-                                                <div key={member.id} className="flex items-center justify-between py-1 gap-2">
-                                                    <div className="flex items-center space-x-2 min-w-[100px]">
-                                                        <Checkbox
-                                                            checked={isSelected}
-                                                            onCheckedChange={(checked) => {
-                                                                if (checked) {
-                                                                    setSelectedMembers([...selectedMembers, member.id]);
-                                                                    setExactAmounts({ ...exactAmounts, [member.id]: 0 });
-                                                                } else {
-                                                                    setSelectedMembers(selectedMembers.filter(id => id !== member.id));
-                                                                    const newAmts = { ...exactAmounts };
-                                                                    delete newAmts[member.id];
-                                                                    setExactAmounts(newAmts);
-                                                                }
-                                                            }}
-                                                        />
-                                                        <span className="text-sm truncate">{member.name}</span>
-                                                    </div>
-                                                    {isSelected && (
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="relative w-24">
-                                                                <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">R$</span>
-                                                                <Input
-                                                                    type="number"
-                                                                    className="h-8 pl-6 text-right"
-                                                                    value={val || ''}
-                                                                    onChange={(e) => {
-                                                                        const val = parseFloat(e.target.value);
-                                                                        setExactAmounts({ ...exactAmounts, [member.id]: isNaN(val) ? 0 : val });
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <span className="text-xs text-muted-foreground w-12 text-right">
-                                                                {isFinite(pct) ? pct.toFixed(0) : 0}%
-                                                            </span>
+                                                return (
+                                                    <div key={member.id} className="flex items-center justify-between py-1 gap-2">
+                                                        <div className="flex items-center space-x-2 min-w-[100px]">
+                                                            <Checkbox
+                                                                checked={isSelected}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (checked) {
+                                                                        setSelectedMembers([...selectedMembers, member.id]);
+                                                                        setPercentages({ ...percentages, [member.id]: 0 });
+                                                                    } else {
+                                                                        setSelectedMembers(selectedMembers.filter(id => id !== member.id));
+                                                                        const newPcts = { ...percentages };
+                                                                        delete newPcts[member.id];
+                                                                        setPercentages(newPcts);
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <span className="text-sm truncate">{member.name}</span>
                                                         </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                        <div className="flex justify-between items-center pt-2 border-t mt-2">
-                                            <span className="text-xs font-medium">Total:</span>
-                                            <span className={`text-sm font-bold ${Math.abs(Object.values(exactAmounts).reduce((a, b) => a + b, 0) - Number(amount || 0)) < 0.01
-                                                ? 'text-green-600'
-                                                : 'text-red-600'
-                                                }`}>
-                                                R$ {Object.values(exactAmounts).reduce((a, b) => a + b, 0).toFixed(2)}
-                                            </span>
+                                                        {isSelected && (
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="relative w-20">
+                                                                    <Input
+                                                                        type="number"
+                                                                        className="h-8 pr-6 text-right"
+                                                                        value={pct || ''}
+                                                                        onChange={(e) => {
+                                                                            const val = parseFloat(e.target.value);
+                                                                            setPercentages({ ...percentages, [member.id]: isNaN(val) ? 0 : val });
+                                                                        }}
+                                                                    />
+                                                                    <span className="absolute right-2 top-1.5 text-xs text-muted-foreground">%</span>
+                                                                </div>
+                                                                <span className="text-xs text-muted-foreground w-20 text-right">
+                                                                    R$ {val.toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                            <div className="flex justify-between items-center pt-2 border-t mt-2">
+                                                <span className="text-xs font-medium">Total:</span>
+                                                <span className={`text-sm font-bold ${Math.abs(Object.values(percentages).reduce((a, b) => a + b, 0) - 100) < 0.01
+                                                    ? 'text-green-600'
+                                                    : 'text-red-600'
+                                                    }`}>
+                                                    {Object.values(percentages).reduce((a, b) => a + b, 0).toFixed(1)}%
+                                                </span>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
-                        </Tabs>
-                    </div>
+                                    )}
 
-                    <div className="grid gap-2">
-                        <Label>Comprovante (Opcional)</Label>
-                        {attachmentUrl ? (
-                            <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
-                                <span className="text-sm truncate max-w-[200px]">Comprovante anexado</span>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-red-500 hover:text-red-700 h-8"
-                                    onClick={() => setAttachmentUrl(null)}
-                                >
-                                    Remover
-                                </Button>
-                            </div>
-                        ) : (
-                            <FileUpload
-                                onValueChange={(url) => setAttachmentUrl(url)}
-                                className="h-32"
-                            />
-                        )}
+                                    {/* EXACT AMOUNT SPLIT */}
+                                    {splitType === 'EXACT' && (
+                                        <div className="space-y-2">
+                                            {members.map(member => {
+                                                const isSelected = selectedMembers.includes(member.id);
+                                                const val = exactAmounts[member.id] || 0;
+                                                const pct = (val / Number(amount || 0)) * 100;
+
+                                                return (
+                                                    <div key={member.id} className="flex items-center justify-between py-1 gap-2">
+                                                        <div className="flex items-center space-x-2 min-w-[100px]">
+                                                            <Checkbox
+                                                                checked={isSelected}
+                                                                onCheckedChange={(checked) => {
+                                                                    if (checked) {
+                                                                        setSelectedMembers([...selectedMembers, member.id]);
+                                                                        setExactAmounts({ ...exactAmounts, [member.id]: 0 });
+                                                                    } else {
+                                                                        setSelectedMembers(selectedMembers.filter(id => id !== member.id));
+                                                                        const newAmts = { ...exactAmounts };
+                                                                        delete newAmts[member.id];
+                                                                        setExactAmounts(newAmts);
+                                                                    }
+                                                                }}
+                                                            />
+                                                            <span className="text-sm truncate">{member.name}</span>
+                                                        </div>
+                                                        {isSelected && (
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="relative w-24">
+                                                                    <span className="absolute left-2 top-1.5 text-xs text-muted-foreground">R$</span>
+                                                                    <Input
+                                                                        type="number"
+                                                                        className="h-8 pl-6 text-right"
+                                                                        value={val || ''}
+                                                                        onChange={(e) => {
+                                                                            const val = parseFloat(e.target.value);
+                                                                            setExactAmounts({ ...exactAmounts, [member.id]: isNaN(val) ? 0 : val });
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <span className="text-xs text-muted-foreground w-12 text-right">
+                                                                    {isFinite(pct) ? pct.toFixed(0) : 0}%
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                            <div className="flex justify-between items-center pt-2 border-t mt-2">
+                                                <span className="text-xs font-medium">Total:</span>
+                                                <span className={`text-sm font-bold ${Math.abs(Object.values(exactAmounts).reduce((a, b) => a + b, 0) - Number(amount || 0)) < 0.01
+                                                    ? 'text-green-600'
+                                                    : 'text-red-600'
+                                                    }`}>
+                                                    R$ {Object.values(exactAmounts).reduce((a, b) => a + b, 0).toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </Tabs>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Comprovante (Opcional)</Label>
+                            {attachmentUrl ? (
+                                <div className="flex items-center justify-between p-2 border rounded-md bg-muted/50">
+                                    <span className="text-sm truncate max-w-[200px]">Comprovante anexado</span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-500 hover:text-red-700 h-8"
+                                        onClick={() => setAttachmentUrl(null)}
+                                    >
+                                        Remover
+                                    </Button>
+                                </div>
+                            ) : (
+                                <FileUpload
+                                    onValueChange={(url) => setAttachmentUrl(url)}
+                                    className="h-32"
+                                />
+                            )}
+                        </div>
                     </div>
-                </div>
-                <DialogFooter>
-                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                        Cancelar
-                    </Button>
-                    <Button type="submit" disabled={isLoading}>
-                        {isLoading ? 'Salvando...' : (expenseToEdit ? 'Atualizar' : 'Salvar Despesa')}
-                    </Button>
-                </DialogFooter>
-            </form>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                            Cancelar
+                        </Button>
+                        <Button type="submit" disabled={isLoading}>
+                            {isLoading ? 'Salvando...' : (expenseToEdit ? 'Atualizar' : 'Salvar Despesa')}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            )}
         </ResponsiveDialog>
     );
 }

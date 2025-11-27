@@ -19,6 +19,11 @@ enum GamificationMode {
   OFF
 }
 
+enum OcrProvider {
+  GEMINI
+  TESSERACT
+}
+
 enum ClanRole {
   LEADER
   ADMIN
@@ -348,6 +353,7 @@ model User {
   enableLimitAlerts                  Boolean          @default(true)
   enableUpcomingPaymentNotifications Boolean          @default(true)
   enableOcr                          Boolean          @default(false)
+  ocrProvider                        OcrProvider      @default(GEMINI)
   enableDailySummary                 Boolean          @default(false)
   enableBudgetSuggestion             Boolean          @default(false)
   enableReconciliationAi             Boolean          @default(false)
@@ -453,6 +459,7 @@ model SplitGroup {
   expenses    SplitExpense[]
   settlements SplitSettlement[]
   activities  SplitGroupActivity[]
+  recurringExpenses RecurringSplitExpense[]
 
   @@index([createdBy])
 }
@@ -475,6 +482,7 @@ model SplitGroupMember {
   sentSettlements     SplitSettlement[] @relation("SettlementFrom")
   receivedSettlements SplitSettlement[] @relation("SettlementTo")
   payments            SplitExpensePayer[]
+  recurringExpenses   RecurringSplitExpense[]
 
   @@unique([groupId, userId])
   @@index([groupId])
@@ -557,6 +565,35 @@ model SplitExpensePayer {
 
   @@index([memberId])
   @@index([expenseId])
+}
+
+model RecurringSplitExpense {
+  id          String   @id @default(cuid())
+  description String
+  amount      Decimal  @db.Decimal(10, 2)
+  frequency   String   // WEEKLY, MONTHLY, YEARLY
+  startDate   DateTime
+  nextRun     DateTime
+  active      Boolean  @default(true)
+  
+  splitType   SplitType @default(EQUAL)
+  
+  groupId     String
+  paidById    String?
+  
+  // Relations
+  group       SplitGroup        @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  paidBy      SplitGroupMember? @relation(fields: [paidById], references: [id], onDelete: SetNull)
+  
+  // Store complex structures as JSON
+  splits      Json     // Array of { memberId, percentage?, amount? }
+  payers      Json?    // Array of { memberId, amount } for multiple payers
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([groupId])
+  @@index([paidById])
 }
 
 model SplitGroupActivity {

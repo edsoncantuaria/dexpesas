@@ -18,6 +18,10 @@ export const OcrOutputSchema = z.object({
   estabelecimento: z.string().optional().describe('O nome do estabelecimento ou loja.'),
   data: z.string().optional().describe('A data da transação no formato YYYY-MM-DD.'),
   valor: z.number().optional().describe('O valor total da compra.'),
+  itens: z.array(z.object({
+    descricao: z.string().describe('Nome ou descrição do item.'),
+    valor: z.number().describe('Preço do item.'),
+  })).optional().describe('Lista de itens comprados.'),
 });
 
 // Definição do prompt multimodal.
@@ -30,6 +34,7 @@ const ocrPrompt = ai.definePrompt({
 - 'estabelecimento': O nome do local da compra.
 - 'data': A data da transação, formatada como YYYY-MM-DD.
 - 'valor': O valor total final pago.
+- 'itens': Uma lista com todos os itens comprados, contendo 'descricao' e 'valor' de cada um.
 
 Imagem do Recibo:
 {{media url=imageDataUri}}`,

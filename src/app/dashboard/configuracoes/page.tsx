@@ -52,6 +52,7 @@ const preferencesSchema = z.object({
   enableLimitAlerts: z.boolean(),
   enableUpcomingPaymentNotifications: z.boolean(),
   enableOcr: z.boolean(),
+  ocrProvider: z.enum(['GEMINI', 'TESSERACT']).optional(),
   enableDailySummary: z.boolean(),
   enableBudgetSuggestion: z.boolean(),
   enableReconciliationAi: z.boolean(),
@@ -177,6 +178,7 @@ function PreferencesForm({ user }: { user: User }) {
       enableLimitAlerts: user.enableLimitAlerts ?? true,
       enableUpcomingPaymentNotifications: user.enableUpcomingPaymentNotifications ?? true,
       enableOcr: user.enableOcr ?? false,
+      ocrProvider: user.ocrProvider ?? 'GEMINI',
       enableDailySummary: user.enableDailySummary ?? false,
       enableBudgetSuggestion: user.enableBudgetSuggestion ?? false,
       enableReconciliationAi: user.enableReconciliationAi ?? false,
@@ -310,7 +312,34 @@ function PreferencesForm({ user }: { user: User }) {
             <CardDescription>Ative ou desative os recursos de inteligência artificial para personalizar sua experiência.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            <FormField control={form.control} name="enableOcr" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><div><FormLabel>Leitura de Recibos com IA</FormLabel><CardDescription className="text-xs pr-4">Permite digitalizar recibos com a câmera para preencher transações.</CardDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
+            <FormField control={form.control} name="enableOcr" render={({ field }) => (
+              <FormItem className="flex flex-col gap-3 rounded-lg border p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>Leitura de Recibos com IA</FormLabel>
+                    <CardDescription className="text-xs pr-4">Permite digitalizar recibos com a câmera para preencher transações.</CardDescription>
+                  </div>
+                  <FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl>
+                </div>
+                {field.value && (
+                  <FormField control={form.control} name="ocrProvider" render={({ field: providerField }) => (
+                    <div className="pl-4 border-l-2 border-muted ml-1">
+                      <FormLabel className="text-xs mb-2 block">Motor de Reconhecimento</FormLabel>
+                      <RadioGroup onValueChange={providerField.onChange} defaultValue={providerField.value} className="flex gap-4">
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="GEMINI" id="r-gemini" />
+                          <Label htmlFor="r-gemini" className="text-sm font-normal">Google Gemini (Recomendado)</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="TESSERACT" id="r-tesseract" />
+                          <Label htmlFor="r-tesseract" className="text-sm font-normal">Tesseract (Local/Offline)</Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  )} />
+                )}
+              </FormItem>
+            )} />
             <FormField control={form.control} name="enableDailySummary" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><div><FormLabel>Resumo Diário com Áudio</FormLabel><CardDescription className="text-xs pr-4">Permite gerar um resumo do seu dia em texto e áudio no dashboard.</CardDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
             <FormField control={form.control} name="enableBudgetSuggestion" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><div><FormLabel>Sugestão de Orçamento com IA</FormLabel><CardDescription className="text-xs pr-4">Permite que a IA sugira valores de orçamento baseados no seu histórico.</CardDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />
             <FormField control={form.control} name="enableReconciliationAi" render={({ field }) => (<FormItem className="flex items-center justify-between rounded-lg border p-3"><div><FormLabel>Sugestão de Categoria na Reconciliação com IA</FormLabel><CardDescription className="text-xs pr-4">Permite que a IA sugira categorias ao criar transações a partir do extrato.</CardDescription></div><FormControl><Switch checked={field.value} onCheckedChange={field.onChange} /></FormControl></FormItem>)} />

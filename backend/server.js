@@ -7,6 +7,7 @@ import { redisClient } from './src/config/redis.js';
 import minioClient from './src/config/minioClient.js';
 import { scheduleDefaultCellJobs } from './src/queues/cellJobsQueue.js';
 import { scheduleDailyNotificationCheck } from './src/jobs/dailyNotificationCheck.js';
+import cronService from './src/services/cronService.js';
 
 const prisma = new PrismaClient();
 
@@ -49,6 +50,9 @@ const startServer = async () => {
 
         // Start daily notification check
         scheduleDailyNotificationCheck();
+
+        // Start cron service for recurring expenses
+        cronService.init();
 
         // 3. Testa MinIO e garante bucket
         console.log('Validando conexão com o MinIO...');

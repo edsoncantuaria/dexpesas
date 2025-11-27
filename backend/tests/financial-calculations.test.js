@@ -60,6 +60,10 @@ test('cardBalanceService recalculates invoice amount and available limit', async
     },
     transaction: {
       aggregate: async ({ where }) => {
+        // Check if it's the future expenses query (has 'gt' in data)
+        if (where.data && where.data.gt) {
+          return { _sum: { valor: 0 } };
+        }
         if (where.tipo === 'despesa') {
           return { _sum: { valor: 750 } };
         }

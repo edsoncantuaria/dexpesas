@@ -19,6 +19,7 @@ import { AttachmentViewer } from '@/components/dashboard/rachar/attachment-viewe
 import { ActivityFeed } from '@/components/dashboard/rachar/activity-feed';
 import { ExportMenu } from '@/components/dashboard/rachar/export-menu';
 import { OptimizedPaymentsPlan } from '@/components/dashboard/rachar/optimized-payments-plan';
+import { RecurringExpensesList } from '@/components/dashboard/rachar/recurring-expenses-list';
 import { calculateNetBalances, optimizePayments } from '@/lib/payment-optimizer';
 import { ResponsiveDialog } from '@/components/ui/responsive-dialog';
 import { SwipeableItem } from '@/components/ui/swipeable-item';
@@ -170,11 +171,12 @@ export default function GroupDetailsPage() {
             )}
 
             <Tabs defaultValue="expenses" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="expenses">Despesas</TabsTrigger>
-                    <TabsTrigger value="membros">Membros</TabsTrigger>
-                    <TabsTrigger value="balances">Saldos</TabsTrigger>
-                    <TabsTrigger value="activity">Atividade</TabsTrigger>
+                <TabsList className="flex w-full overflow-x-auto">
+                    <TabsTrigger value="expenses" className="flex-1">Despesas</TabsTrigger>
+                    <TabsTrigger value="membros" className="flex-1">Membros</TabsTrigger>
+                    <TabsTrigger value="balances" className="flex-1">Saldos</TabsTrigger>
+                    <TabsTrigger value="activity" className="flex-1">Atividade</TabsTrigger>
+                    <TabsTrigger value="recurring" className="flex-1">Recorrentes</TabsTrigger>
                 </TabsList>
                 <TabsContent value="expenses" className="space-y-4 mt-4">
                     {group.expenses?.length === 0 && group.settlements?.length === 0 ? (
@@ -418,6 +420,9 @@ export default function GroupDetailsPage() {
                             <ActivityFeed groupId={groupId} />
                         </CardContent>
                     </Card>
+                </TabsContent>
+                <TabsContent value="recurring">
+                    <RecurringExpensesList groupId={groupId} members={group.members || []} />
                 </TabsContent>
             </Tabs>
 

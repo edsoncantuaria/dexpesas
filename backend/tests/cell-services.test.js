@@ -9,7 +9,8 @@ import EquilibriumService from '../src/services/equilibriumService.js';
 
 test('CellBudgetService.listBudgets agrega o gasto compartilhado do mês solicitado', async () => {
   const originalFindMany = prisma.cellBudget.findMany;
-  const originalSharedGroupBy = prisma.sharedExpense.groupBy;
+  const originalSharedFindMany = prisma.sharedExpense.findMany;
+  const originalCategoryFindMany = prisma.category.findMany;
 
   try {
     prisma.cellBudget.findMany = async () => [
@@ -25,22 +26,28 @@ test('CellBudgetService.listBudgets agrega o gasto compartilhado do mês solicit
       },
     ];
 
-    prisma.sharedExpense.groupBy = async ({ where }) => {
+    prisma.sharedExpense.findMany = async ({ where }) => {
       assert.equal(where.clanId, 'cell-1');
       return [
         {
           categoryId: 'cat-1',
-          _sum: { totalAmount: 150 },
+          totalAmount: 150,
         },
       ];
     };
+
+    // Mock category findMany for map
+    prisma.category.findMany = async () => [
+      { id: 'cat-1', parentCategoryId: null }
+    ];
 
     const [budget] = await CellBudgetService.listBudgets('cell-1', '2024-09');
     assert.equal(budget.limit, 500);
     assert.equal(budget.aggregatedSpent, 150);
   } finally {
     prisma.cellBudget.findMany = originalFindMany;
-    prisma.sharedExpense.groupBy = originalSharedGroupBy;
+    prisma.sharedExpense.findMany = originalSharedFindMany;
+    prisma.category.findMany = originalCategoryFindMany;
   }
 });
 
@@ -83,7 +90,7 @@ test('SplitEngineService.applyRuleToExpense reaplica pesos e marca a despesa com
     prisma.$transaction = async (callback) =>
       callback({
         sharedExpenseParticipant: {
-          deleteMany: async () => {},
+          deleteMany: async () => { },
           create: async ({ data }) => {
             createdParticipants.push(data);
           },

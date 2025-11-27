@@ -18,4 +18,9 @@ router.delete('/groups/:groupId/settlements/:settlementId', splitBillController.
 router.get('/groups/:groupId/activity', splitBillController.getGroupActivity);
 router.get('/groups/:groupId/export', splitBillController.exportGroupData);
 
+router.get('/groups/:groupId/recurring', splitBillController.getRecurringExpenses);
+router.post('/groups/:groupId/recurring', splitBillController.createRecurringExpense);
+router.put('/groups/:groupId/recurring/:recurringId', splitBillController.updateRecurringExpense);
+router.delete('/groups/:groupId/recurring/:recurringId', splitBillController.deleteRecurringExpense);
+
 export default router;

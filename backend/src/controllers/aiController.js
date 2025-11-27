@@ -14,6 +14,18 @@ import { goalProjectionFlow } from '../ai/flows/goal-projection-flow.js';
 import { startOfDay, endOfDay, subMonths } from 'date-fns';
 import AuditService from '../services/auditService.js';
 import GamificationService from '../services/gamificationService.js';
+import { createWorker } from 'tesseract.js';
+import sharp from 'sharp';
+
+let tesseractWorker = null;
+
+const getTesseractWorker = async () => {
+    if (!tesseractWorker) {
+        console.log('Initializing Tesseract Worker...');
+        tesseractWorker = await createWorker('por');
+    }
+    return tesseractWorker;
+};
 
 const prisma = new PrismaClient();
 
@@ -50,14 +62,14 @@ class AiController {
             next(error);
         }
     }
-    
+
     async analyzeHabits(req, res, next) {
         const userId = req.user.id;
         try {
             const [transactions, profile, goals] = await Promise.all([
                 prisma.transaction.findMany({ where: { userId, tipo: 'despesa' }, take: 100, orderBy: { data: 'desc' } }),
                 prisma.user.findUnique({ where: { id: userId } }),
-                prisma.goal.findMany({ where: { userId, status: 'IN_PROGRESS' }})
+                prisma.goal.findMany({ where: { userId, status: 'IN_PROGRESS' } })
             ]);
 
             const input = {
@@ -65,9 +77,9 @@ class AiController {
                 profile: JSON.stringify(profile),
                 goals: JSON.stringify(goals),
             };
-            
+
             const result = await habitAnalysisFlow(input);
-            
+
             // Salva a análise no histórico
             const analysisRecord = await prisma.aiAnalysis.create({
                 data: {
@@ -88,7 +100,7 @@ class AiController {
             });
 
             res.json(result);
-        } catch(error) {
+        } catch (error) {
             next(error);
         }
     }
@@ -99,9 +111,9 @@ class AiController {
             const [transactions, profile, goals] = await Promise.all([
                 prisma.transaction.findMany({ where: { userId }, take: 100, orderBy: { data: 'desc' } }),
                 prisma.user.findUnique({ where: { id: userId } }),
-                prisma.goal.findMany({ where: { userId, status: 'IN_PROGRESS' }})
+                prisma.goal.findMany({ where: { userId, status: 'IN_PROGRESS' } })
             ]);
-            
+
             const input = {
                 transactions: JSON.stringify(transactions),
                 profile: JSON.stringify(profile),
@@ -109,9 +121,9 @@ class AiController {
             };
 
             const result = await opportunityAnalysisFlow(input);
-            
-             // Salva a análise no histórico
-             const analysisRecord = await prisma.aiAnalysis.create({
+
+            // Salva a análise no histórico
+            const analysisRecord = await prisma.aiAnalysis.create({
                 data: {
                     userId,
                     type: 'OPPORTUNITY_ANALYSIS',
@@ -130,7 +142,7 @@ class AiController {
             });
 
             res.json(result);
-        } catch(error) {
+        } catch (error) {
             next(error);
         }
     }
@@ -147,20 +159,141 @@ class AiController {
     /**
      * Recebe uma imagem de recibo e usa um fluxo de IA para extrair dados.
      */
+
+    /**
+     * Recebe uma imagem de recibo e usa um fluxo de IA ou Tesseract para extrair dados.
+     */
     async scanReceipt(req, res, next) {
-        const { imageDataUri } = req.body;
+        const { imageDataUri, provider = 'GEMINI' } = req.body; // provider: 'GEMINI' | 'TESSERACT'
         if (!imageDataUri) {
             return res.status(400).json({ message: 'A imagem do recibo é obrigatória.' });
         }
         try {
-            const result = await receiptOcrFlow({ imageDataUri });
+            let result;
+
+            if (provider === 'TESSERACT') {
+                const worker = await getTesseractWorker();
+
+                // Preprocess image with sharp
+                const base64Data = imageDataUri.replace(/^data:image\/\w+;base64,/, "");
+                const imgBuffer = Buffer.from(base64Data, 'base64');
+
+                const processedBuffer = await sharp(imgBuffer)
+                    .resize(1000, null, { withoutEnlargement: true }) // Resize to reasonable width
+                    .grayscale() // Convert to grayscale
+                    .normalize() // Enhance contrast
+                    .sharpen() // Sharpen text
+                    .toBuffer();
+
+                // Tesseract accepts buffer directly
+                const { data: { text } } = await worker.recognize(processedBuffer);
+
+                // Do NOT terminate worker here to reuse it
+                // await worker.terminate(); 
+
+                // Improved Parsing Logic for Tesseract
+                const lines = text.split('\n').filter(line => line.trim().length > 0);
+                const items = [];
+                let total = 0;
+                let date = null;
+
+                // Helper to clean number strings (OCR common errors)
+                const parsePrice = (str) => {
+                    // Replace common OCR typos
+                    let cleaned = str.replace(/[oO]/g, '0')
+                        .replace(/[lI]/g, '1')
+                        .replace(/[S]/g, '5');
+                    // Remove currency symbols and spaces
+                    cleaned = cleaned.replace(/[R$€£]/g, '').trim();
+                    // Fix decimal separator: 1.000,00 -> 1000.00 or 10,00 -> 10.00
+                    // If contains comma, replace dots with nothing and comma with dot
+                    if (cleaned.includes(',')) {
+                        cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+                    }
+                    return parseFloat(cleaned);
+                };
+
+                // Regex for date (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, YYYY-MM-DD)
+                const dateRegex = /(\d{2}[\/\.-]\d{2}[\/\.-]\d{4})|(\d{4}[\/\.-]\d{2}[\/\.-]\d{2})/;
+
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+
+                    // Try to find date
+                    if (!date) {
+                        const dateMatch = trimmedLine.match(dateRegex);
+                        if (dateMatch) {
+                            let d = dateMatch[0];
+                            // Normalize separators
+                            d = d.replace(/[\.-]/g, '/');
+                            const parts = d.split('/');
+                            if (parts[0].length === 4) {
+                                // YYYY/MM/DD
+                                date = `${parts[0]}-${parts[1]}-${parts[2]}`;
+                            } else {
+                                // DD/MM/YYYY
+                                date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                            }
+                        }
+                    }
+
+                    // Try to find price at the end of the line
+                    // Look for the last "word" that looks like a number
+                    const words = trimmedLine.split(/\s+/);
+                    if (words.length > 1) {
+                        const lastWord = words[words.length - 1];
+                        // Check if it looks like a price (digits, comma/dot, 2 decimal places usually)
+                        if (/[\d.,]+/.test(lastWord)) {
+                            const price = parsePrice(lastWord);
+                            if (!isNaN(price)) {
+                                const description = words.slice(0, words.length - 1).join(' ');
+                                const upperDesc = description.toUpperCase();
+
+                                // Check if it's a Total line
+                                if (upperDesc.includes('TOTAL') && !upperDesc.includes('SUB') && !upperDesc.includes('ITENS')) {
+                                    total = price;
+                                }
+                                // Check if it's an Item line (filter out common non-item lines)
+                                else if (
+                                    description.length > 2 &&
+                                    !upperDesc.includes('SUBTOTAL') &&
+                                    !upperDesc.includes('TROCO') &&
+                                    !upperDesc.includes('DINHEIRO') &&
+                                    !upperDesc.includes('CARTAO') &&
+                                    !upperDesc.includes('PAGAMENTO') &&
+                                    !upperDesc.includes('CNPJ') &&
+                                    !upperDesc.includes('CPF')
+                                ) {
+                                    items.push({ descricao: description, valor: price });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // If no explicit total found, sum items
+                if (total === 0 && items.length > 0) {
+                    total = items.reduce((sum, item) => sum + item.valor, 0);
+                }
+
+                result = {
+                    estabelecimento: lines[0] || 'Desconhecido', // Assume first line is establishment
+                    data: date,
+                    valor: total,
+                    itens: items
+                };
+
+            } else {
+                // Default to Gemini (Genkit Flow)
+                result = await receiptOcrFlow({ imageDataUri });
+            }
 
             await AuditService.log({
                 userId: req.user.id,
                 action: 'RUN_AI_OCR',
                 entity: 'TRANSACTION',
                 entityId: 'N/A',
-                details: { result },
+                details: { result, provider },
                 ipAddress: req.ip,
             });
 
@@ -176,9 +309,9 @@ class AiController {
     async getDailySummary(req, res, next) {
         const userId = req.user.id;
         try {
-            const user = await prisma.user.findUnique({ where: { id: userId }});
+            const user = await prisma.user.findUnique({ where: { id: userId } });
             if (!user || !user.enableDailySummary) {
-                return res.status(403).json({ message: "Funcionalidade não ativada pelo usuário."});
+                return res.status(403).json({ message: "Funcionalidade não ativada pelo usuário." });
             }
 
             const todayStart = startOfDay(new Date());
@@ -214,9 +347,9 @@ class AiController {
         }
     }
 
-     /**
-     * Sugere um valor de orçamento para uma categoria com base no histórico de gastos.
-     */
+    /**
+    * Sugere um valor de orçamento para uma categoria com base no histórico de gastos.
+    */
     async suggestBudget(req, res, next) {
         const userId = req.user.id;
         const { categoryId, categoryName } = req.body;
@@ -226,9 +359,9 @@ class AiController {
         }
 
         try {
-            const user = await prisma.user.findUnique({ where: { id: userId }});
-             if (!user || !user.enableBudgetSuggestion) {
-                return res.status(403).json({ message: "Funcionalidade não ativada pelo usuário."});
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            if (!user || !user.enableBudgetSuggestion) {
+                return res.status(403).json({ message: "Funcionalidade não ativada pelo usuário." });
             }
 
             const threeMonthsAgo = subMonths(new Date(), 3);
@@ -266,13 +399,13 @@ class AiController {
         if (!goalId || !simulationQuery) {
             return res.status(400).json({ message: 'ID da meta e consulta de simulação são obrigatórios.' });
         }
-        
+
         try {
-            const user = await prisma.user.findUnique({ where: { id: userId }});
+            const user = await prisma.user.findUnique({ where: { id: userId } });
             if (!user || !user.enableGoalProjection) {
                 return res.status(403).json({ message: "Funcionalidade não ativada pelo usuário." });
             }
-            
+
             const goal = await prisma.goal.findFirst({
                 where: { id: goalId, userId },
                 include: { contributions: { orderBy: { date: 'asc' } } }
@@ -285,10 +418,10 @@ class AiController {
                 goal: JSON.stringify(goal),
                 simulationQuery
             };
-            
+
             const result = await goalProjectionFlow(input);
             res.json(result);
-            
+
         } catch (error) {
             next(error);
         }

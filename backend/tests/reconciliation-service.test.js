@@ -30,7 +30,7 @@ test('mapCsvTransaction parses amounts and dates with different formats', () => 
   assert.equal(result.amount, 1234.56);
   assert.equal(result.description, 'Pagamento');
   assert.equal(result.fitId, 'csv-rec-1-0');
-  assert.equal(result.date.getDate(), 15);
+  assert.equal(result.date.getUTCDate(), 15);
 });
 
 test('mapCsvTransaction handles negative values and fallback formats', () => {
@@ -92,9 +92,9 @@ test('mapOfxTransaction converts OFX row to internal format', () => {
   assert.equal(result.type, 'DEBIT');
   assert.equal(result.description, 'Compra Mercado');
   assert.equal(result.fitId, '12345');
-  assert.equal(result.date.getFullYear(), 2024);
-  assert.equal(result.date.getMonth(), 5);
-  assert.equal(result.date.getDate(), 30);
+  assert.equal(result.date.getUTCFullYear(), 2024);
+  assert.equal(result.date.getUTCMonth(), 5);
+  assert.equal(result.date.getUTCDate(), 30);
 });
 
 test('findBestMatch scores candidates by amount/date/description', () => {
